@@ -35,6 +35,8 @@ html, body {
   color: #ccc;
   margin-bottom: 10px;
   flex-shrink: 0;
+  display: flex;
+  gap: 20px;
 }
 #moves-row span { color: #fff; font-weight: bold; }
 #board-wrap {
@@ -68,10 +70,24 @@ html, body {
   user-select: none;
 }
 .tile:active { transform: scale(0.93); box-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+.tile.selected {
+  outline: 4px solid #fff;
+  transform: scale(1.07);
+  z-index: 10;
+  box-shadow: 0 0 18px rgba(255,255,255,.7);
+}
 .tile.empty {
   background: rgba(255,255,255,0.06) !important;
   box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
   cursor: default;
+}
+#btn-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 #shuffle-btn {
   font-family: inherit;
@@ -83,12 +99,31 @@ html, body {
   padding: 12px 36px;
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(255,215,0,.4);
-  margin-top: 14px;
   min-height: 56px;
-  min-width: 180px;
+  min-width: 160px;
   flex-shrink: 0;
 }
 #shuffle-btn:active { transform: scale(0.96); }
+#swap-btn {
+  font-family: inherit;
+  font-size: 26px;
+  background: #7C4DFF;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 28px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(124,77,255,.4);
+  min-height: 56px;
+  min-width: 140px;
+  flex-shrink: 0;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+#swap-btn.active {
+  background: #E040FB;
+  box-shadow: 0 4px 22px rgba(224,64,251,.65);
+}
+#swap-btn:active { transform: scale(0.96); }
 #overlay {
   display: none;
   position: fixed;
@@ -105,6 +140,7 @@ html, body {
 #overlay.show { display: flex; }
 #overlay h1 { font-size: 48px; color: #FFE566; text-shadow: 0 0 20px rgba(255,229,102,.8); }
 #overlay .moves-done { font-size: 36px; color: #3FFFA0; font-weight: 900; }
+#overlay .swaps-done { font-size: 28px; color: #FFD700; font-weight: 900; margin-top: -8px; }
 #overlay p { font-size: 26px; color: #ccc; }
 #overlay button {
   font-family: inherit;
@@ -124,15 +160,22 @@ html, body {
 <body>
 <div id="title">🧩 Slide Puzzle!</div>
 <!-- v3 -->
-<div id="moves-row">Moves: <span id="moves-el">0</span></div>
+<div id="moves-row">
+  <span>Moves: <span id="moves-el">0</span></span>
+  <span>Swaps: <span id="swaps-el">0</span></span>
+</div>
 <div id="board-wrap">
   <div id="board"></div>
 </div>
-<button id="shuffle-btn">🔀 New Puzzle</button>
+<div id="btn-row">
+  <button id="shuffle-btn">🔀 New Puzzle</button>
+  <button id="swap-btn">🔁 Swap</button>
+</div>
 
 <div id="overlay">
   <h1>🎉 You did it!</h1>
   <div class="moves-done" id="final-moves-el">0 moves</div>
+  <div class="swaps-done" id="final-swaps-el">0 swaps</div>
   <p>Amazing solving! 🌟</p>
   <button id="play-again-btn">🔀 New Puzzle</button>
 </div>
@@ -153,14 +196,20 @@ html, body {
   var GAP = 6, PAD = 8;
   var tiles = [];    /* positions 0..15, value=tile number 1..15, 0=empty */
   var moves = 0;
+  var swaps = 0;
   var won = false;
+  var swapMode = false;
+  var swapSel = null;  /* val of first selected tile in swap mode */
   var tileEls = {};  /* val 1..15 -> DOM element */
 
   var boardEl      = document.getElementById('board');
   var movesEl      = document.getElementById('moves-el');
+  var swapsEl      = document.getElementById('swaps-el');
   var overlay      = document.getElementById('overlay');
   var finalMovEl   = document.getElementById('final-moves-el');
+  var finalSwpEl   = document.getElementById('final-swaps-el');
   var shuffleBtn   = document.getElementById('shuffle-btn');
+  var swapBtn      = document.getElementById('swap-btn');
   var playAgainBtn = document.getElementById('play-again-btn');
 
   function tileSize() {
@@ -190,6 +239,7 @@ html, body {
       emptyIdx = pick;
     }
     moves = 0;
+    swaps = 0;
     won = false;
   }
 
@@ -228,6 +278,7 @@ html, body {
       }, 30);
     }
     movesEl.textContent = moves;
+    swapsEl.textContent = swaps;
   }
 
   /* ── Create persistent tile elements (once per game) ── */
@@ -312,15 +363,54 @@ html, body {
     return true;
   }
 
+  function checkWin() {
+    if (!isSolved()) return;
+    won = true;
+    finalMovEl.textContent = moves + (moves === 1 ? ' move' : ' moves');
+    finalSwpEl.textContent = swaps + (swaps === 1 ? ' swap' : ' swaps');
+    setTimeout(function() { overlay.classList.add('show'); }, 350);
+  }
+
   function tryMove(val) {
     if (won) return;
+    if (swapMode) { trySwapSelect(val); return; }
     if (!doSlide(val)) return;
     moves++;
     positionTiles(true);
-    if (isSolved()) {
-      won = true;
-      finalMovEl.textContent = moves + (moves === 1 ? ' move' : ' moves');
-      setTimeout(function() { overlay.classList.add('show'); }, 350);
+    checkWin();
+  }
+
+  function trySwapSelect(val) {
+    if (swapSel === null) {
+      swapSel = val;
+      tileEls[val].classList.add('selected');
+    } else if (swapSel === val) {
+      tileEls[val].classList.remove('selected');
+      swapSel = null;
+    } else {
+      var idx1 = tiles.indexOf(swapSel);
+      var idx2 = tiles.indexOf(val);
+      var r1 = Math.floor(idx1 / SIZE), c1 = idx1 % SIZE;
+      var r2 = Math.floor(idx2 / SIZE), c2 = idx2 % SIZE;
+      var adjacent = (r1 === r2 && Math.abs(c1 - c2) === 1) ||
+                     (c1 === c2 && Math.abs(r1 - r2) === 1);
+      if (adjacent) {
+        tileEls[swapSel].classList.remove('selected');
+        tiles[idx1] = val;
+        tiles[idx2] = swapSel;
+        swaps++;
+        swapMode = false;
+        swapSel = null;
+        swapBtn.classList.remove('active');
+        swapBtn.textContent = '🔁 Swap';
+        positionTiles(true);
+        checkWin();
+      } else {
+        /* not adjacent — move selection to newly tapped tile */
+        tileEls[swapSel].classList.remove('selected');
+        swapSel = val;
+        tileEls[val].classList.add('selected');
+      }
     }
   }
 
@@ -341,11 +431,31 @@ html, body {
     tryMove(val);
   }
 
+  function exitSwapMode() {
+    swapMode = false;
+    swapSel = null;
+    for (var v in tileEls) tileEls[v].classList.remove('selected');
+    swapBtn.classList.remove('active');
+    swapBtn.textContent = '🔁 Swap';
+  }
+
   function startGame() {
     overlay.classList.remove('show');
+    exitSwapMode();
     shuffle();
     createBoard();
   }
+
+  swapBtn.addEventListener('click', function() {
+    if (won) return;
+    if (swapMode) {
+      exitSwapMode();
+    } else {
+      swapMode = true;
+      swapBtn.classList.add('active');
+      swapBtn.textContent = '❌ Cancel';
+    }
+  });
 
   shuffleBtn.addEventListener('click', startGame);
   playAgainBtn.addEventListener('click', startGame);
