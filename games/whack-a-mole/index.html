@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Whack a Mole!</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%;
+  background: #5DBB63;
+  font-family: 'Chalkboard SE', 'Comic Sans MS', 'Marker Felt', cursive;
+  -webkit-user-select: none;
+  user-select: none;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+/* ── HUD ── */
+#hud {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  padding: 10px 14px;
+  padding-top: max(10px, env(safe-area-inset-top, 10px));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+  gap: 6px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.35) 0%, transparent 100%);
+}
+.hud-pill {
+  font-size: 20px;
+  color: #fff;
+  background: rgba(0,0,0,0.3);
+  border-radius: 999px;
+  padding: 5px 14px;
+  text-shadow: 0 1px 3px rgba(0,0,0,.6);
+  white-space: nowrap;
+}
+.hud-pill.blue  { background: rgba(30,100,220,0.45); }
+.hud-pill.red   { background: rgba(200,30,30,0.4); }
+
+/* ── Level-up banner ── */
+#level-up-msg {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  z-index: 30;
+  font-size: 52px;
+  font-weight: 900;
+  color: #FFE566;
+  text-shadow: 0 0 24px rgba(255,229,102,.9), 0 3px 8px rgba(0,0,0,.8);
+  pointer-events: none;
+  transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  white-space: nowrap;
+}
+#level-up-msg.show { transform: translate(-50%, -50%) scale(1); }
+
+/* ── Grid ── */
+#grid {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 70px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
+}
+#grid-inner {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  width: min(360px, 92vw);
+}
+
+/* ── Hole ── */
+.hole {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 40% 35%, #6b4226, #2e1a0e);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.5), inset 0 -4px 10px rgba(0,0,0,0.4);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.08s;
+}
+.hole:active { transform: scale(0.93); }
+
+/* ── Character inside hole ── */
+.character {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(32px, 10vw, 52px);
+  transform: translateY(110%);
+  transition: transform 0.14s cubic-bezier(0.34,1.4,0.64,1);
+  pointer-events: none;
+  user-select: none;
+  line-height: 1;
+}
+.hole.active .character {
+  transform: translateY(0%);
+}
+
+/* ── Hole states ── */
+.hole.golden {
+  background: radial-gradient(ellipse at 40% 35%, #f5c842, #b8860b);
+  box-shadow: 0 6px 18px rgba(255,215,0,0.6), 0 0 20px rgba(255,215,0,0.4);
+}
+.hole.bomb-active {
+  background: radial-gradient(ellipse at 40% 35%, #555, #111);
+}
+
+/* ── Whack pop labels ── */
+.pop-msg {
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+  font-weight: 900;
+  color: #FFE566;
+  text-shadow: 0 0 8px rgba(0,0,0,.8);
+  pointer-events: none;
+  z-index: 5;
+  animation: popUp 0.8s ease-out forwards;
+  white-space: nowrap;
+}
+.pop-msg.gold-pop { color: #FFD700; font-size: 28px; }
+.pop-msg.bomb-pop { color: #FF4444; }
+@keyframes popUp {
+  0%   { opacity:1; transform:translateX(-50%) translateY(0) scale(0.7); }
+  30%  { opacity:1; transform:translateX(-50%) translateY(-20px) scale(1.2); }
+  100% { opacity:0; transform:translateX(-50%) translateY(-50px) scale(0.9); }
+}
+
+/* ── Whacked flash ── */
+.hole.whacked { animation: whackFlash 0.3s ease-out; }
+@keyframes whackFlash {
+  0%   { filter: brightness(3); }
+  100% { filter: brightness(1); }
+}
+
+/* ── Screen shake ── */
+@keyframes shake {
+  0%,100% { transform: translate(0,0); }
+  20%     { transform: translate(-8px, 4px); }
+  40%     { transform: translate(8px, -4px); }
+  60%     { transform: translate(-6px, 6px); }
+  80%     { transform: translate(6px, -2px); }
+}
+body.shake { animation: shake 0.4s ease-out; }
+
+/* ── Overlay ── */
+#overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,60,0,0.85);
+  z-index: 40;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+  padding: 32px;
+}
+#overlay.show { display: flex; }
+#overlay h1 { font-size: 46px; color: #FFE566; text-shadow: 0 0 20px rgba(255,229,102,.8); line-height: 1.2; }
+#overlay p  { font-size: 26px; color: #fff; line-height: 1.5; }
+#overlay button {
+  font-family: inherit;
+  font-size: 30px;
+  background: #FFD700;
+  color: #2e1a0e;
+  border: none;
+  border-radius: 999px;
+  padding: 16px 48px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(255,215,0,.5);
+  min-width: 200px;
+  min-height: 66px;
+  margin-top: 8px;
+}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <span class="hud-pill blue">🚀 Level <b id="lvl">1</b></span>
+  <span class="hud-pill">🔨 <b id="score">0</b></span>
+  <span class="hud-pill red" id="lives-pill">❤️❤️❤️</span>
+</div>
+
+<div id="grid">
+  <div id="grid-inner">
+    <div class="hole" id="hole-0"><span class="character"></span></div>
+    <div class="hole" id="hole-1"><span class="character"></span></div>
+    <div class="hole" id="hole-2"><span class="character"></span></div>
+    <div class="hole" id="hole-3"><span class="character"></span></div>
+    <div class="hole" id="hole-4"><span class="character"></span></div>
+    <div class="hole" id="hole-5"><span class="character"></span></div>
+    <div class="hole" id="hole-6"><span class="character"></span></div>
+    <div class="hole" id="hole-7"><span class="character"></span></div>
+    <div class="hole" id="hole-8"><span class="character"></span></div>
+  </div>
+</div>
+
+<div id="level-up-msg"></div>
+
+<div id="overlay">
+  <h1 id="overlay-title">Amazing! 🌟</h1>
+  <p id="overlay-body">You whacked <b id="final-whacks">0</b> moles<br>and reached <b>Level <span id="final-level">1</span></b>!<br>Score: <b id="final-score">0</b></p>
+  <button id="play-again-btn">Play Again! 🔨</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var NUM_HOLES = 9;
+  var LEVEL_UP_WHACKS = 10;
+  var HEART_MAP = { 3: '❤️❤️❤️', 2: '❤️❤️', 1: '❤️', 0: '💔' };
+
+  /* ── DOM refs ── */
+  var scoreEl   = document.getElementById('score');
+  var lvlEl     = document.getElementById('lvl');
+  var livesPill = document.getElementById('lives-pill');
+  var overlay   = document.getElementById('overlay');
+  var oTitle    = document.getElementById('overlay-title');
+  var oBody     = document.getElementById('overlay-body');
+  var oWhacks   = document.getElementById('final-whacks');
+  var oLevel    = document.getElementById('final-level');
+  var oScore    = document.getElementById('final-score');
+  var playBtn   = document.getElementById('play-again-btn');
+  var lvlMsg    = document.getElementById('level-up-msg');
+
+  var holeEls = [];
+  for (var i = 0; i < NUM_HOLES; i++) {
+    holeEls.push(document.getElementById('hole-' + i));
+  }
+
+  /* ── Game state ── */
+  var score, lives, level, whacks, gameOver;
+  var holeStates  = [];  /* 'empty' | 'mole' | 'golden' | 'bomb' */
+  var holeTimers  = [];  /* auto-retract timers */
+  var spawnTimer  = null;
+  var upTime, spawnInterval;
+
+  var TITLES = [
+    'Amazing! 🌟', 'You Rock! ⭐', 'Super Star! 🌠', 'Incredible! 🚀',
+    'Whack Master! 🔨'
+  ];
+
+  /* ── Attach hole click/touch handlers ── */
+  holeEls.forEach(function (hole, idx) {
+    hole.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      hitHole(idx);
+    });
+  });
+
+  /* ── Play again ── */
+  playBtn.addEventListener('click', function () {
+    overlay.classList.remove('show');
+    startGame();
+  });
+
+  /* ── Start / reset ── */
+  function startGame() {
+    score = 0; lives = 3; level = 1; whacks = 0; gameOver = false;
+    upTime = 1500; spawnInterval = 950;
+
+    for (var i = 0; i < NUM_HOLES; i++) {
+      holeStates[i] = 'empty';
+      clearTimeout(holeTimers[i]);
+      holeTimers[i] = null;
+      holeEls[i].classList.remove('active', 'golden', 'bomb-active', 'whacked');
+      holeEls[i].querySelector('.character').textContent = '';
+    }
+    clearTimeout(spawnTimer);
+    updateHUD();
+    scheduleSpawn();
+  }
+
+  /* ── Spawn logic ── */
+  function scheduleSpawn() {
+    if (gameOver) return;
+    var jitter = (Math.random() - 0.5) * 200;
+    spawnTimer = setTimeout(spawnMole, spawnInterval + jitter);
+  }
+
+  function spawnMole() {
+    if (gameOver) return;
+
+    /* find empty holes */
+    var empty = [];
+    for (var i = 0; i < NUM_HOLES; i++) {
+      if (holeStates[i] === 'empty') empty.push(i);
+    }
+    if (empty.length === 0) { scheduleSpawn(); return; }
+
+    var idx  = empty[Math.floor(Math.random() * empty.length)];
+    var roll = Math.random();
+    var bombRate   = Math.min(0.12 + (level - 1) * 0.025, 0.32);
+    var goldenRate = 0.14;
+    var type;
+    if (roll < bombRate)               type = 'bomb';
+    else if (roll < bombRate + goldenRate) type = 'golden';
+    else                                   type = 'mole';
+
+    activateHole(idx, type);
+
+    /* possibly spawn a second mole at higher levels */
+    if (level >= 3 && empty.length >= 3 && Math.random() < 0.4) {
+      var empty2 = empty.filter(function (h) { return h !== idx; });
+      var idx2   = empty2[Math.floor(Math.random() * empty2.length)];
+      var roll2  = Math.random();
+      var type2  = roll2 < 0.18 ? 'bomb' : 'mole';
+      setTimeout(function () { if (!gameOver) activateHole(idx2, type2); }, 150);
+    }
+
+    scheduleSpawn();
+  }
+
+  function activateHole(idx, type) {
+    if (holeStates[idx] !== 'empty') return;
+    holeStates[idx] = type;
+
+    var hole = holeEls[idx];
+    var char = hole.querySelector('.character');
+
+    if (type === 'mole')   { char.textContent = '🐹'; hole.classList.remove('golden','bomb-active'); }
+    if (type === 'golden') { char.textContent = '🌟'; hole.classList.add('golden'); hole.classList.remove('bomb-active'); }
+    if (type === 'bomb')   { char.textContent = '💣'; hole.classList.add('bomb-active'); hole.classList.remove('golden'); }
+
+    hole.classList.add('active');
+
+    var thisUp = (type === 'golden') ? upTime * 0.55 : (type === 'bomb') ? 1500 : upTime;
+    holeTimers[idx] = setTimeout(function () {
+      if (holeStates[idx] === type) retractHole(idx);
+    }, thisUp);
+  }
+
+  function retractHole(idx) {
+    holeStates[idx] = 'empty';
+    clearTimeout(holeTimers[idx]);
+    holeTimers[idx] = null;
+    var hole = holeEls[idx];
+    hole.classList.remove('active', 'golden', 'bomb-active', 'whacked');
+  }
+
+  /* ── Hit handler ── */
+  function hitHole(idx) {
+    if (gameOver) return;
+    var type = holeStates[idx];
+    if (type === 'empty') return;
+
+    clearTimeout(holeTimers[idx]);
+    holeEls[idx].classList.add('whacked');
+
+    if (type === 'mole') {
+      var pts = 10 * level;
+      score += pts;
+      whacks++;
+      showPop(idx, '+' + pts, '');
+      checkLevelUp();
+    } else if (type === 'golden') {
+      var gpts = 50 * level;
+      score += gpts;
+      whacks++;
+      showPop(idx, '⭐ +' + gpts, 'gold-pop');
+      checkLevelUp();
+    } else if (type === 'bomb') {
+      showPop(idx, '💥', 'bomb-pop');
+      lives = Math.max(0, lives - 1);
+      document.body.classList.remove('shake');
+      /* force reflow to restart animation */
+      void document.body.offsetWidth;
+      document.body.classList.add('shake');
+      if (lives === 0) {
+        setTimeout(endGame, 700);
+      }
+    }
+
+    retractHole(idx);
+    updateHUD();
+  }
+
+  /* ── Level up ── */
+  function checkLevelUp() {
+    var newLevel = Math.floor(whacks / LEVEL_UP_WHACKS) + 1;
+    if (newLevel > level) {
+      level = newLevel;
+      upTime       = Math.max(450, 1500 - (level - 1) * 130);
+      spawnInterval = Math.max(350, 950 - (level - 1) * 80);
+      lvlMsg.textContent = '🚀 Level ' + level + '!';
+      lvlMsg.classList.remove('show');
+      void lvlMsg.offsetWidth;
+      lvlMsg.classList.add('show');
+      setTimeout(function () { lvlMsg.classList.remove('show'); }, 1400);
+    }
+  }
+
+  /* ── HUD ── */
+  function updateHUD() {
+    scoreEl.textContent   = score;
+    lvlEl.textContent     = level;
+    livesPill.textContent = HEART_MAP[lives] || '💔';
+  }
+
+  /* ── Pop message ── */
+  function showPop(idx, text, cls) {
+    var el = document.createElement('span');
+    el.className   = 'pop-msg' + (cls ? ' ' + cls : '');
+    el.textContent = text;
+    holeEls[idx].appendChild(el);
+    el.addEventListener('animationend', function () { el.remove(); }, { once: true });
+  }
+
+  /* ── End game ── */
+  function endGame() {
+    gameOver = true;
+    clearTimeout(spawnTimer);
+    for (var i = 0; i < NUM_HOLES; i++) retractHole(i);
+    oTitle.textContent = TITLES[Math.min(level - 1, TITLES.length - 1)];
+    oWhacks.textContent = whacks;
+    oLevel.textContent  = level;
+    oScore.textContent  = score;
+    overlay.classList.add('show');
+  }
+
+  /* ── Go! ── */
+  startGame();
+}());
+</script>
+</body>
+</html>
