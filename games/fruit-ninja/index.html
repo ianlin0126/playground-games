@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Fruit Ninja 🍉</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: linear-gradient(180deg, #87CEEB 0%, #98FB98 100%);
+  overflow: hidden;
+  height: 100dvh;
+  width: 100vw;
+  font-family: system-ui, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+#canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#score-display {
+  font-size: 32px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+#lives-display {
+  font-size: 28px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+#level-display {
+  font-size: 28px;
+  font-weight: 900;
+  color: #FFD700;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+#combo-display {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 36px;
+  font-weight: 900;
+  color: #FFD700;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#start-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  z-index: 20;
+  background: rgba(0,0,0,0.3);
+}
+
+#start-screen h1 {
+  font-size: 56px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+#start-screen p {
+  font-size: 26px;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  text-align: center;
+  padding: 0 24px;
+}
+
+#start-btn {
+  background: #FF6B35;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 20px 56px;
+  font-size: 28px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  touch-action: manipulation;
+  min-height: 72px;
+}
+
+#start-btn:active { transform: scale(0.96); }
+
+#end-screen {
+  display: none;
+  position: absolute;
+  inset: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 20;
+  background: rgba(0,0,0,0.4);
+}
+
+#end-screen.show { display: flex; }
+
+#end-title {
+  font-size: 52px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+#end-score {
+  font-size: 32px;
+  color: #FFD700;
+  font-weight: 900;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+#play-again-btn {
+  background: #4CAF50;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 20px 48px;
+  font-size: 26px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  touch-action: manipulation;
+  min-height: 72px;
+}
+
+#play-again-btn:active { transform: scale(0.96); }
+
+.slice-line {
+  position: absolute;
+  pointer-events: none;
+  z-index: 15;
+}
+
+#save-btn {
+  position: absolute;
+  bottom: 24px;
+  right: 20px;
+  background: #7B68EE;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  font-size: 28px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  touch-action: manipulation;
+  z-index: 10;
+  display: none;
+}
+
+#save-btn:active { transform: scale(0.92); }
+
+#save-flash {
+  position: absolute;
+  bottom: 100px;
+  right: 16px;
+  background: rgba(123,104,238,0.9);
+  color: #fff;
+  border-radius: 16px;
+  padding: 10px 18px;
+  font-size: 22px;
+  font-weight: 900;
+  pointer-events: none;
+  z-index: 11;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#continue-btn {
+  background: #7B68EE;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 20px 56px;
+  font-size: 26px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  touch-action: manipulation;
+  min-height: 72px;
+  display: none;
+}
+
+#continue-btn:active { transform: scale(0.96); }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="hud">
+  <div id="score-display">🍉 0</div>
+  <div id="level-display">⭐ 1</div>
+  <div id="lives-display">❤️ 10</div>
+</div>
+<div id="combo-display"></div>
+
+<div id="start-screen">
+  <h1>🍉 Fruit Ninja!</h1>
+  <p>Swipe to slice the fruits!<br>Don't miss them! 🎯</p>
+  <button id="continue-btn">Continue ▶️</button>
+  <button id="start-btn">New Game 🎮</button>
+</div>
+
+<button id="save-btn">💾</button>
+<div id="save-flash">💾 Saved!</div>
+
+<div id="end-screen">
+  <div id="end-title">Amazing! 🎉</div>
+  <div id="end-score">Score: 0</div>
+  <button id="play-again-btn">Play Again! 🍉</button>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+var canvas = document.getElementById('canvas');
+var ctx = canvas.getContext('2d');
+var W, H;
+
+var FRUITS = ['🍉','🍊','🍋','🍇','🍓','🍑','🥝','🍍','🫐','🍒'];
+var fruits = [];
+var slices = [];
+var particles = [];
+var score = 0;
+var lives = 10;
+var gameLevel = 1;
+var fruitsCutTotal = 0;
+var running = false;
+var frameId = null;
+var lastTime = 0;
+var spawnTimer = 0;
+var spawnInterval = 1400;
+
+// Swipe tracking
+var swipeStart = null;
+var swipeTrail = [];
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+
+function Fruit(x, y, vx, vy, emoji, mode) {
+  this.x = x;
+  this.y = y;
+  this.vx = vx;
+  this.vy = vy;
+  this.emoji = emoji;
+  this.mode = mode || 'up';
+  this.size = Math.min(W, H) * 0.12;
+  this.size = Math.max(60, Math.min(this.size, 110));
+  this.rotation = (Math.random() - 0.5) * 0.1;
+  this.angle = 0;
+  this.sliced = false;
+  this.alpha = 1;
+  this.gone = false;
+}
+
+function spawnOneFruit(x) {
+  var emoji = FRUITS[Math.floor(Math.random() * FRUITS.length)];
+  var speedScale = 1 + (gameLevel - 1) * 0.08;
+  var vy = -(H * 0.033 + Math.random() * H * 0.012) * speedScale;
+  // Derive vx from a random landing x so the arc stays within screen bounds.
+  // Approximate flight ticks: t = -2*vy / G  (G = H*0.0012 per tick)
+  var G = H * 0.0012;
+  var tFlight = (-2 * vy) / G;
+  var margin = 40;
+  var landX = margin + Math.random() * (W - margin * 2);
+  var vx = (landX - x) / tFlight;
+  fruits.push(new Fruit(x, H + 40, vx, vy, emoji, 'up'));
+}
+
+function spawnWave() {
+  var count = Math.min(gameLevel, 6);
+  var margin = 80;
+  var usable = W - margin * 2;
+  if (count === 1) {
+    // Single fruit: fully random x
+    spawnOneFruit(margin + Math.random() * usable);
+  } else {
+    // Divide the width into count equal slots, pick one x per slot
+    var slotW = usable / count;
+    for (var s = 0; s < count; s++) {
+      var slotX = margin + s * slotW + Math.random() * slotW;
+      spawnOneFruit(slotX);
+    }
+  }
+}
+
+function Particle(x, y, emoji) {
+  this.x = x;
+  this.y = y;
+  this.emoji = emoji;
+  this.vx = (Math.random() - 0.5) * 8;
+  this.vy = -Math.random() * 6 - 2;
+  this.alpha = 1;
+  this.size = 28;
+  this.rotation = Math.random() * Math.PI * 2;
+  this.spin = (Math.random() - 0.5) * 0.3;
+}
+
+function SliceEffect(x, y) {
+  this.x = x;
+  this.y = y;
+  this.alpha = 1;
+  this.r = 30;
+}
+
+function update(dt) {
+  var G = H * 0.0012;
+
+  spawnTimer += dt;
+  if (spawnTimer >= spawnInterval) {
+    spawnTimer = 0;
+    spawnWave();
+  }
+
+  for (var i = fruits.length - 1; i >= 0; i--) {
+    var f = fruits[i];
+    if (f.sliced) {
+      f.alpha -= 0.05;
+      if (f.alpha <= 0) { f.gone = true; }
+    } else {
+      f.vy += G;
+      f.x += f.vx;
+      f.y += f.vy;
+      f.angle += f.rotation;
+      // Check if fruit escaped without being sliced
+      if (f.y > H + 60) {
+        f.gone = true;
+        loseLife();
+      } else if (f.y < -(H * 0.6)) {
+        f.gone = true; // silently remove if somehow launched too high
+      }
+    }
+  }
+  fruits = fruits.filter(function(f) { return !f.gone; });
+
+  for (var j = particles.length - 1; j >= 0; j--) {
+    var p = particles[j];
+    p.vy += G * 0.5;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.alpha -= 0.03;
+    p.rotation += p.spin;
+    if (p.alpha <= 0) particles.splice(j, 1);
+  }
+
+  for (var k = slices.length - 1; k >= 0; k--) {
+    slices[k].alpha -= 0.06;
+    slices[k].r += 2;
+    if (slices[k].alpha <= 0) slices.splice(k, 1);
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw swipe trail
+  if (swipeTrail.length > 1) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(swipeTrail[0].x, swipeTrail[0].y);
+    for (var t = 1; t < swipeTrail.length; t++) {
+      ctx.lineTo(swipeTrail[t].x, swipeTrail[t].y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Draw slice effects
+  for (var k = 0; k < slices.length; k++) {
+    var s = slices[k];
+    ctx.save();
+    ctx.globalAlpha = s.alpha;
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Draw fruits
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (var i = 0; i < fruits.length; i++) {
+    var f = fruits[i];
+    ctx.save();
+    ctx.globalAlpha = f.alpha;
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.angle);
+    ctx.font = f.size + 'px serif';
+    ctx.fillText(f.emoji, 0, 0);
+    ctx.restore();
+  }
+
+  // Draw particles
+  for (var j = 0; j < particles.length; j++) {
+    var p = particles[j];
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rotation);
+    ctx.font = p.size + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(p.emoji, 0, 0);
+    ctx.restore();
+  }
+}
+
+function loop(ts) {
+  if (!running) return;
+  var dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+  update(dt);
+  draw();
+  frameId = requestAnimationFrame(loop);
+}
+
+function loseLife() {
+  if (!running) return;
+  lives--;
+  updateLivesDisplay();
+  if (lives <= 0) {
+    endGame();
+  }
+}
+
+function updateScoreDisplay() {
+  document.getElementById('score-display').textContent = '🍉 ' + score;
+}
+
+function updateLivesDisplay() {
+  document.getElementById('lives-display').textContent = '❤️ ' + lives;
+}
+
+function updateLevelDisplay() {
+  document.getElementById('level-display').textContent = '⭐ ' + gameLevel;
+}
+
+function levelUp() {
+  gameLevel++;
+  spawnInterval = Math.max(600, 1400 - (gameLevel - 1) * 80);
+  updateLevelDisplay();
+  showCombo('⭐ Level ' + gameLevel + '!');
+}
+
+function showCombo(text) {
+  var el = document.getElementById('combo-display');
+  el.textContent = text;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(function() { el.style.opacity = '0'; }, 1000);
+}
+
+var sliceCombo = 0;
+var comboTimer = null;
+
+var SAVE_KEY = 'fruitninja_save';
+
+function saveGame() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      level: gameLevel,
+      score: score,
+      lives: lives,
+      fruitsCutTotal: fruitsCutTotal
+    }));
+  } catch(e) {}
+  var flash = document.getElementById('save-flash');
+  flash.style.opacity = '1';
+  clearTimeout(flash._t);
+  flash._t = setTimeout(function() { flash.style.opacity = '0'; }, 1500);
+}
+
+function getSave() {
+  try {
+    var s = localStorage.getItem(SAVE_KEY);
+    return s ? JSON.parse(s) : null;
+  } catch(e) { return null; }
+}
+
+function applySave(save) {
+  gameLevel = save.level || 1;
+  score = save.score || 0;
+  lives = save.lives || 10;
+  fruitsCutTotal = save.fruitsCutTotal || 0;
+  spawnInterval = Math.max(600, 1400 - (gameLevel - 1) * 80);
+}
+
+function updateContinueBtn() {
+  var save = getSave();
+  var btn = document.getElementById('continue-btn');
+  if (save) {
+    btn.style.display = 'block';
+    btn.textContent = 'Continue ⭐ ' + save.level + ' 💾';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function sliceFruit(f, x, y) {
+  if (f.sliced) return;
+  f.sliced = true;
+  score += 1;
+  fruitsCutTotal++;
+  updateScoreDisplay();
+
+  if (fruitsCutTotal % 10 === 0) levelUp();
+
+  sliceCombo++;
+  clearTimeout(comboTimer);
+  comboTimer = setTimeout(function() { sliceCombo = 0; }, 600);
+  if (sliceCombo >= 3) showCombo('🔥 x' + sliceCombo + ' Combo!');
+
+  // Particles
+  for (var p = 0; p < 4; p++) {
+    particles.push(new Particle(x, y, f.emoji));
+  }
+  slices.push(new SliceEffect(x, y));
+}
+
+function checkSlice(x1, y1, x2, y2) {
+  var sliced = 0;
+  for (var i = 0; i < fruits.length; i++) {
+    var f = fruits[i];
+    if (f.sliced) continue;
+    var hit = lineCircleIntersect(x1, y1, x2, y2, f.x, f.y, f.size * 0.45);
+    if (hit) {
+      sliceFruit(f, f.x, f.y);
+      sliced++;
+    }
+  }
+  return sliced;
+}
+
+function lineCircleIntersect(x1, y1, x2, y2, cx, cy, r) {
+  var dx = x2 - x1, dy = y2 - y1;
+  var len2 = dx*dx + dy*dy;
+  if (len2 === 0) {
+    var ddx = cx - x1, ddy = cy - y1;
+    return ddx*ddx + ddy*ddy <= r*r;
+  }
+  var t = ((cx - x1)*dx + (cy - y1)*dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  var nx = x1 + t*dx - cx;
+  var ny = y1 + t*dy - cy;
+  return nx*nx + ny*ny <= r*r;
+}
+
+function beginPlay() {
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('end-screen').classList.remove('show');
+  document.getElementById('save-btn').style.display = 'block';
+  fruits = [];
+  slices = [];
+  particles = [];
+  spawnTimer = 0;
+  sliceCombo = 0;
+  swipeTrail = [];
+  updateScoreDisplay();
+  updateLivesDisplay();
+  updateLevelDisplay();
+  running = true;
+  lastTime = performance.now();
+  frameId = requestAnimationFrame(loop);
+  spawnWave();
+}
+
+function startGame() {
+  score = 0;
+  lives = 10;
+  gameLevel = 1;
+  fruitsCutTotal = 0;
+  spawnInterval = 1400;
+  beginPlay();
+}
+
+function continueGame() {
+  var save = getSave();
+  if (!save) { startGame(); return; }
+  applySave(save);
+  beginPlay();
+}
+
+function endGame() {
+  running = false;
+  if (frameId) cancelAnimationFrame(frameId);
+  document.getElementById('save-btn').style.display = 'none';
+  var endEl = document.getElementById('end-screen');
+  var msg = score >= 20 ? 'Amazing! 🏆' : score >= 10 ? 'Great job! 🎉' : 'Nice try! 😄';
+  document.getElementById('end-title').textContent = msg;
+  document.getElementById('end-score').textContent = 'Score: ' + score + ' 🍉';
+  endEl.classList.add('show');
+  updateContinueBtn();
+}
+
+// Touch/mouse swipe controls
+canvas.addEventListener('touchstart', function(e) {
+  e.preventDefault();
+  var t = e.changedTouches[0];
+  swipeStart = { x: t.clientX, y: t.clientY };
+  swipeTrail = [{ x: t.clientX, y: t.clientY }];
+}, { passive: false });
+
+canvas.addEventListener('touchmove', function(e) {
+  e.preventDefault();
+  if (!swipeStart) return;
+  var t = e.changedTouches[0];
+  var x = t.clientX, y = t.clientY;
+  var prev = swipeTrail[swipeTrail.length - 1];
+  swipeTrail.push({ x: x, y: y });
+  if (swipeTrail.length > 12) swipeTrail.shift();
+  if (running) checkSlice(prev.x, prev.y, x, y);
+}, { passive: false });
+
+canvas.addEventListener('touchend', function(e) {
+  e.preventDefault();
+  swipeStart = null;
+  swipeTrail = [];
+}, { passive: false });
+
+// Mouse support for desktop testing
+canvas.addEventListener('mousedown', function(e) {
+  swipeStart = { x: e.clientX, y: e.clientY };
+  swipeTrail = [{ x: e.clientX, y: e.clientY }];
+});
+
+canvas.addEventListener('mousemove', function(e) {
+  if (!swipeStart) return;
+  var x = e.clientX, y = e.clientY;
+  var prev = swipeTrail[swipeTrail.length - 1];
+  swipeTrail.push({ x: x, y: y });
+  if (swipeTrail.length > 12) swipeTrail.shift();
+  if (running) checkSlice(prev.x, prev.y, x, y);
+});
+
+canvas.addEventListener('mouseup', function() {
+  swipeStart = null;
+  swipeTrail = [];
+});
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('continue-btn').addEventListener('click', continueGame);
+document.getElementById('play-again-btn').addEventListener('click', startGame);
+document.getElementById('save-btn').addEventListener('click', saveGame);
+
+window.addEventListener('resize', resize);
+resize();
+updateContinueBtn();
+
+}());
+</script>
+</body>
+</html>
