@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Space Shooter 2 🚀</title>
+<title>Space Shooter</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -52,28 +52,115 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,20,0.88);
+    background: radial-gradient(ellipse at center, rgba(20,40,80,0.55) 0%, #000 70%), #000;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 20px;
+    gap: 22px;
     z-index: 20;
   }
   #overlay.show { display: flex; }
-  #overlay h2 { color: #ffd700; font-size: 38px; text-align: center; padding: 0 20px; }
-  #overlay p  { color: #adf; font-size: 24px; }
-  #play-btn {
-    padding: 18px 52px;
-    font-size: 26px;
-    border: none;
-    border-radius: 20px;
-    background: #ffd700;
-    color: #1a1a2e;
-    cursor: pointer;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-    -webkit-tap-highlight-color: transparent;
+  #overlay h2 {
+    color: #fff;
+    font-family: 'Helvetica Neue', 'Arial Black', sans-serif;
+    font-weight: 900;
+    font-size: clamp(46px, 12vw, 78px);
+    letter-spacing: 6px;
+    text-align: center;
+    padding: 0 20px;
+    text-transform: uppercase;
+    line-height: 0.95;
+    text-shadow:
+      0 0 18px #42d7f5,
+      0 0 36px rgba(66,215,245,0.7),
+      2px 2px 0 #ff4081;
   }
-  #play-btn:active { transform: scale(0.94); }
+  #title-rule {
+    width: min(60%, 280px);
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #42d7f5, transparent);
+    box-shadow: 0 0 10px #42d7f5;
+  }
+  #overlay p {
+    color: #42d7f5;
+    font-family: 'Courier New', 'Menlo', monospace;
+    font-size: 16px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 0 28px;
+    text-shadow: 0 0 8px rgba(66,215,245,0.6);
+  }
+  #play-btn {
+    padding: 16px 56px;
+    font-size: 22px;
+    font-family: 'Helvetica Neue', 'Arial Black', sans-serif;
+    font-weight: bold;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    border: 2px solid #42d7f5;
+    border-radius: 4px;
+    background: rgba(66,215,245,0.08);
+    color: #42d7f5;
+    cursor: pointer;
+    text-shadow: 0 0 10px #42d7f5;
+    box-shadow:
+      0 0 16px rgba(66,215,245,0.45),
+      inset 0 0 16px rgba(66,215,245,0.12);
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s, color 0.12s, box-shadow 0.12s, transform 0.06s;
+  }
+  #play-btn:active {
+    background: #42d7f5;
+    color: #000;
+    text-shadow: none;
+    box-shadow: 0 0 28px #42d7f5;
+    transform: scale(0.97);
+  }
+  #difficulty-label {
+    margin-top: -6px;
+    color: rgba(66,215,245,0.65);
+    font-family: 'Courier New', 'Menlo', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-shadow: 0 0 6px rgba(66,215,245,0.4);
+  }
+  #difficulty-selector {
+    display: flex;
+    gap: 0;
+    margin-top: -10px;
+  }
+  .diff-btn {
+    padding: 8px 28px;
+    font-size: 14px;
+    font-family: 'Helvetica Neue', 'Arial Black', sans-serif;
+    font-weight: bold;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    border: 2px solid rgba(66,215,245,0.4);
+    background: transparent;
+    color: rgba(66,215,245,0.65);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s, transform 0.06s;
+  }
+  .diff-btn:first-child {
+    border-radius: 4px 0 0 4px;
+    border-right-width: 1px;
+  }
+  .diff-btn:last-child {
+    border-radius: 0 4px 4px 0;
+    border-left-width: 1px;
+  }
+  .diff-btn.active {
+    background: rgba(66,215,245,0.18);
+    color: #42d7f5;
+    border-color: #42d7f5;
+    box-shadow: inset 0 0 12px rgba(66,215,245,0.25), 0 0 14px rgba(66,215,245,0.3);
+    text-shadow: 0 0 8px #42d7f5;
+  }
+  .diff-btn:active { transform: scale(0.97); }
   #shop-overlay {
     display: none;
     position: fixed;
@@ -148,10 +235,15 @@
 <canvas id="c"></canvas>
 
 <div id="overlay" class="show">
-  <div style="font-size:80px">🚀</div>
-  <h2>Space Shooter 2!</h2>
-  <p id="overlay-sub">Slide to move · Blast the asteroids!</p>
-  <button id="play-btn">Play! 🚀</button>
+  <h2>Space Shooter</h2>
+  <div id="title-rule"></div>
+  <p id="overlay-sub">Slide to move · Blast everything</p>
+  <button id="play-btn">Start</button>
+  <div id="difficulty-label">Difficulty</div>
+  <div id="difficulty-selector" role="radiogroup" aria-label="Difficulty">
+    <button class="diff-btn" data-mode="easy" role="radio" aria-checked="false">Easy</button>
+    <button class="diff-btn active" data-mode="normal" role="radio" aria-checked="true">Normal</button>
+  </div>
 </div>
 
 <div id="shop-overlay">
@@ -189,53 +281,79 @@
 </div>
 
 <script>
-// ── Kenney asset images ────────────────────────────────────────────────────
-var B = './assets/kenney_space-shooter-remastered/PNG';
-var IMGS = {};
-(function() {
-  var srcs = {
-    player:      B + '/playerShip1_blue.png',
-    laserBlue:   B + '/Lasers/laserBlue07.png',
-    laserRed:    B + '/Lasers/laserRed07.png',
-    ufoGreen:    B + '/ufoGreen.png',
-    meteorBb1:   B + '/Meteors/meteorBrown_big1.png',
-    meteorBb2:   B + '/Meteors/meteorBrown_big2.png',
-    meteorBb3:   B + '/Meteors/meteorBrown_big3.png',
-    meteorBb4:   B + '/Meteors/meteorBrown_big4.png',
-    meteorGb1:   B + '/Meteors/meteorGrey_big1.png',
-    meteorGb2:   B + '/Meteors/meteorGrey_big2.png',
-    meteorBm1:   B + '/Meteors/meteorBrown_med1.png',
-    meteorBm3:   B + '/Meteors/meteorBrown_med3.png',
-    meteorGm1:   B + '/Meteors/meteorGrey_med1.png',
-    meteorGm2:   B + '/Meteors/meteorGrey_med2.png',
-    meteorBs1:   B + '/Meteors/meteorBrown_small1.png',
-    meteorBs2:   B + '/Meteors/meteorBrown_small2.png',
-    meteorGs1:   B + '/Meteors/meteorGrey_small1.png',
-    meteorGs2:   B + '/Meteors/meteorGrey_small2.png',
-  };
-  for (var k in srcs) {
-    var img = new Image();
-    img.src = srcs[k];
-    IMGS[k] = img;
-  }
-})();
+// ── Sprite atlas ──────────────────────────────────────────────────────────
+var ATLAS = new Image();
+ATLAS.src = './assets/space-shooter-atlas.png';
 
-var METEOR_KEYS = [
-  // tier 1-2: small
-  ['meteorBs1','meteorBs2','meteorGs1','meteorGs2'],
-  // tier 3-4: small (still smallish)
-  ['meteorBs1','meteorGs1','meteorBs2','meteorGs2'],
-  // tier 5-6: medium
-  ['meteorBm1','meteorBm3','meteorGm1','meteorGm2'],
-  // tier 7-8: big brown
-  ['meteorBb1','meteorBb2','meteorGb1','meteorGb2'],
-  // tier 9-10: big grey
-  ['meteorBb3','meteorBb4','meteorGb1','meteorGb2'],
-];
-function meteorImg(tier) {
-  var bucket = tier <= 2 ? 0 : tier <= 4 ? 1 : tier <= 6 ? 2 : tier <= 8 ? 3 : 4;
-  var keys = METEOR_KEYS[bucket];
-  return IMGS[keys[(tier - 1) % keys.length]];
+// Generated by tools/atlas-extract.py + manual labeling. Paste in the
+// labeled sprite-map.json contents. Each entry: name → { x, y, w, h }.
+var SPRITES = {
+  player_level: { x: 49, y: 30, w: 148, h: 130 },
+  player_tilt: { x: 238, y: 36, w: 132, h: 129 },
+  player_shield_level: { x: 435, y: 27, w: 164, h: 156 },
+  player_shield_left: { x: 626, y: 28, w: 168, h: 156 },
+  player_shield_right: { x: 812, y: 29, w: 167, h: 155 },
+  explosion_1: { x: 47, y: 211, w: 147, h: 120 },
+  explosion_2: { x: 241, y: 208, w: 155, h: 121 },
+  explosion_3: { x: 424, y: 199, w: 176, h: 133 },
+  explosion_4: { x: 626, y: 211, w: 158, h: 118 },
+  explosion_5: { x: 832, y: 224, w: 144, h: 107 },
+  asteroid_1: { x: 90, y: 415, w: 85, h: 77 },
+  asteroid_2: { x: 253, y: 389, w: 133, h: 117 },
+  asteroid_3: { x: 439, y: 380, w: 145, h: 128 },
+  asteroid_4: { x: 629, y: 367, w: 155, h: 144 },
+  asteroid_5: { x: 821, y: 371, w: 165, h: 141 },
+  alien_normal: { x: 47, y: 548, w: 157, h: 150 },
+  boss_base: { x: 434, y: 547, w: 158, h: 158 },
+  coin_star: { x: 836, y: 913, w: 116, h: 101 },
+};
+
+
+function drawSprite(name, dx, dy, dw, dh) {
+  var s = SPRITES[name];
+  if (!ATLAS.complete || ATLAS.naturalWidth === 0 || !s) return false;
+  ctx.drawImage(ATLAS, s.x, s.y, s.w, s.h, dx, dy, dw, dh);
+  return true;
+}
+
+function drawSpriteCentered(name, cx, cy, dw, dh) {
+  return drawSprite(name, cx - dw / 2, cy - dh / 2, dw, dh);
+}
+
+// Per-sprite (wMul, hMul) overrides applied INSTEAD of bbox-ratio scaling
+// in drawSpriteRel. Use this when the entity inside a sprite isn't at the
+// same pixel scale as the reference sprite's entity, or when the bbox of
+// a hit-state sprite is clipped (not extended) relative to its base.
+var SPRITE_RENDER_OVERRIDES = {
+  // Shield variants: bbox-ratio alone (1.11 wide, 1.20 tall) left the ship
+  // inside the bubble looking slightly smaller than the standalone ship
+  // because the ship occupies less than the full bbox width. An additional
+  // ~8% bump on top of bbox-ratio matches the standalone ship's visible
+  // size while still letting the bubble extend naturally beyond it.
+  player_shield_level: { wMul: 1.20, hMul: 1.30 },
+  player_shield_left:  { wMul: 1.23, hMul: 1.30 },
+  player_shield_right: { wMul: 1.22, hMul: 1.29 },
+};
+
+// Draws a sprite at a destination size proportional to its source bbox,
+// using refName's bbox as the canonical reference. Keeps the source-px →
+// dest-px ratio constant across related sprites (e.g. player_level ↔
+// player_shield_level: the shield bubble extends the bbox beyond the ship,
+// so the shielded sprite needs a proportionally larger destination to keep
+// the ship-inside at the same visible size). For sprites where bbox-ratio
+// is wrong, see SPRITE_RENDER_OVERRIDES above.
+function drawSpriteRel(refName, name, cx, cy, baseDW, baseDH) {
+  var ov = SPRITE_RENDER_OVERRIDES[name];
+  if (ov) {
+    var ox = ov.xOffset || 0, oy = ov.yOffset || 0;
+    return drawSpriteCentered(name, cx + ox, cy + oy, baseDW * ov.wMul, baseDH * ov.hMul);
+  }
+  var ref = SPRITES[refName];
+  var s = SPRITES[name];
+  if (!ref || !s) return drawSpriteCentered(name, cx, cy, baseDW, baseDH);
+  var dw = baseDW * (s.w / ref.w);
+  var dh = baseDH * (s.h / ref.h);
+  return drawSpriteCentered(name, cx, cy, dw, dh);
 }
 
 // ── Original game ──────────────────────────────────────────────────────────
@@ -273,10 +391,13 @@ var missileLevel = 0;
 var fireRateBoosts = 0;
 var FAST_FIRE_COSTS = [10, 20, 30, 40, 50];
 var WIDE_SHOT_COSTS = [20, 40, 60, 80, 100];
+var easyMode = false;
+function bulletDamage() { return easyMode ? 2 : 1; }
+function priceFor(base) { return easyMode ? Math.ceil(base / 2) : base; }
 var shipShake = 0;
 var screenFlash = 0;
 
-var ship = { x: 0, y: 0, targetX: 0 };
+var ship = { x: 0, y: 0, targetX: 0, prevX: 0, shieldFrames: 0 };
 var bullets = [];
 var asteroids = [];
 var particles = [];
@@ -284,7 +405,8 @@ var stars = [];
 var coinItems = [];
 var aliens = [];
 var alienBullets = [];
-var boss = null, bossLasers = [], bossNextScore = 100, bossNum = 0, bossAnnounceTimer = 0;
+var boss = null, bossLasers = [], bossNum = 0, bossNextScore = 100, bossAnnounceTimer = 0;
+var playerDeath = null; // { x, y, frame } or null
 var powerupThresholdIdx = 0;
 
 function initStars() {
@@ -299,8 +421,9 @@ function startGame() {
   missileLevel = 0; fireRateBoosts = 0; powerupThresholdIdx = 0;
   shipShake = 0; screenFlash = 0; shopOpen = false;
   bullets = []; asteroids = []; particles = []; coinItems = []; aliens = []; alienBullets = [];
-  boss = null; bossLasers = []; bossNextScore = 100; bossNum = 0; bossAnnounceTimer = 0;
-  ship.x = W / 2; ship.targetX = W / 2;
+  boss = null; bossLasers = []; bossNum = 0; bossNextScore = nextBossThreshold(0); bossAnnounceTimer = 0;
+  playerDeath = null;
+  ship.x = W / 2; ship.targetX = W / 2; ship.prevX = W / 2; ship.shieldFrames = 0;
   ship.y = H - 80;
   gameActive = true;
   document.getElementById('score-el').textContent = 0;
@@ -309,8 +432,10 @@ function startGame() {
   document.getElementById('missile-el').textContent = '×1';
   document.getElementById('fast-fire-desc').textContent = 'Shoot 20% faster! (0/5)';
   document.getElementById('wide-shot-desc').textContent = 'More missiles! (×1)';
-  document.getElementById('buy-fast-btn').textContent = FAST_FIRE_COSTS[0] + ' 🟡';
-  document.getElementById('buy-wide-btn').textContent = WIDE_SHOT_COSTS[0] + ' 🟡';
+  document.getElementById('buy-life-btn').textContent = priceFor(5) + ' 🟡';
+  document.getElementById('buy-shield-btn').textContent = priceFor(25) + ' 🟡';
+  document.getElementById('buy-fast-btn').textContent = priceFor(FAST_FIRE_COSTS[0]) + ' 🟡';
+  document.getElementById('buy-wide-btn').textContent = priceFor(WIDE_SHOT_COSTS[0]) + ' 🟡';
   document.getElementById('overlay').classList.remove('show');
   document.getElementById('shop-overlay').classList.remove('show');
   initStars();
@@ -343,7 +468,7 @@ function spawnAsteroid() {
   var x = margin + Math.random() * (W - margin * 2);
   var tier = asteroidTier();
   var radius = ASTEROID_RADII[tier];
-  var speed = 1.0 + level * 0.25 + Math.random() * 1.0;
+  var speed = 1.5 + Math.random() * 1.0;
   asteroids.push({ x: x, y: -radius - 10, tier: tier, radius: radius, speed: speed,
     angle: (Math.random() - 0.5) * 0.3, rot: Math.random() * Math.PI * 2,
     rotSpeed: (Math.random() - 0.5) * 0.05, hp: ASTEROID_HP[tier], maxHp: ASTEROID_HP[tier] });
@@ -371,9 +496,14 @@ function spawnCoinItems(x, y, count) {
 
 function spawnAlien() {
   var fromLeft = Math.random() < 0.5;
-  var alienSpeed = 1.2 + Math.random() * 0.6 + Math.floor((score - 30) / 30) * 0.2;
-  aliens.push({ x: fromLeft ? -50 : W + 50, y: HUD_H + 50 + Math.random() * (H * 0.3),
-    vx: fromLeft ? alienSpeed : -alienSpeed, hp: 3, shootTimer: 80 + Math.floor(Math.random() * 60) });
+  var alienSpeed = 1.2 + Math.random() * 0.6;
+  aliens.push({
+    x: fromLeft ? -50 : W + 50,
+    y: HUD_H + 50 + Math.random() * (H * 0.3),
+    vx: fromLeft ? alienSpeed : -alienSpeed,
+    hp: 3,
+    shootTimer: 80 + Math.floor(Math.random() * 60)
+  });
 }
 
 function spawnParticles(x, y, color, count) {
@@ -410,12 +540,31 @@ function drawShip(x, y) {
   var flameH = 18 + Math.sin(frameCount * 0.4) * 6;
   ctx.beginPath();
   ctx.moveTo(-10, 22); ctx.lineTo(10, 22); ctx.lineTo(0, 22 + flameH);
-  ctx.fillStyle = frameCount % 6 < 3 ? '#ff9800' : '#fff176'; ctx.fill();
+  ctx.fillStyle = frameCount % 6 < 3 ? '#ff9800' : '#fff176';
+  ctx.fill();
 
-  var img = IMGS.player;
-  if (img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, -36, -28, 72, 54);
+  // Pick sprite based on velocity + shield state
+  var vx = ship.x - ship.prevX;
+  var shielded = ship.shieldFrames > 0;
+  var DW = 72, DH = 72;
+  var spriteName, mirror = false;
+  if (Math.abs(vx) < 0.5) {
+    spriteName = shielded ? 'player_shield_level' : 'player_level';
+  } else if (vx < 0) {
+    spriteName = shielded ? 'player_shield_left' : 'player_tilt';
   } else {
+    spriteName = shielded ? 'player_shield_right' : 'player_tilt';
+    mirror = !shielded;
+  }
+
+  if (mirror) ctx.scale(-1, 1);
+  // Scale destination by the sprite's bbox ratio against player_level so
+  // shield variants render larger (their bbox includes the bubble) and the
+  // ship-inside-bubble appears the same visible size as the unshielded ship.
+  var ok = drawSpriteRel('player_level', spriteName, 0, 0, DW, DH);
+  if (mirror) ctx.scale(-1, 1);
+
+  if (!ok) {
     // Canvas fallback
     ctx.beginPath();
     ctx.moveTo(0, -26); ctx.lineTo(18, 22); ctx.lineTo(-18, 22); ctx.closePath();
@@ -426,16 +575,19 @@ function drawShip(x, y) {
   ctx.restore();
 }
 
+function asteroidSpriteName(tier) {
+  var bucket = Math.min(5, Math.ceil(tier / 2));
+  return 'asteroid_' + bucket;
+}
+
 function drawAsteroid(a) {
-  var img = meteorImg(a.tier);
   ctx.save();
   ctx.translate(a.x, a.y);
   ctx.rotate(a.rot);
   var d = a.radius * 2.2;
-  if (img && img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, -d / 2, -d / 2, d, d);
-  } else {
-    // Canvas fallback
+  var spriteName = asteroidSpriteName(a.tier);
+  var ok = drawSpriteCentered(spriteName, 0, 0, d, d);
+  if (!ok) {
     var s = a.radius;
     ctx.beginPath();
     var pts = 9;
@@ -448,22 +600,19 @@ function drawAsteroid(a) {
     ctx.closePath();
     var ag = ctx.createRadialGradient(-s * 0.3, -s * 0.3, s * 0.1, 0, 0, s);
     ag.addColorStop(0, '#9e9e9e'); ag.addColorStop(1, '#37474f');
-    ctx.fillStyle = ag; ctx.fill(); ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = ag; ctx.fill();
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.stroke();
   }
-  // Damage tint
-  if (a.hp < a.maxHp) {
-    ctx.globalAlpha = 0.5 * (1 - a.hp / a.maxHp);
-    ctx.fillStyle = '#ff3d00';
-    ctx.beginPath(); ctx.arc(0, 0, a.radius * 0.6, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-  // Tier label for larger rocks
-  if (a.tier >= 3) {
-    ctx.rotate(-a.rot);
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = 'bold ' + Math.round(a.radius * 0.45) + 'px Arial';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(a.tier, 0, 0);
+  // Damage tint — re-draw the same sprite with a red filter on top of
+  // itself, alpha-blended in proportion to damage taken. The silhouette
+  // is preserved exactly because we're drawing the same shape; only the
+  // colors shift toward red as HP drops.
+  if (a.hp < a.maxHp && ok) {
+    ctx.save();
+    ctx.filter = 'sepia(1) saturate(5) hue-rotate(-50deg) brightness(1.1)';
+    ctx.globalAlpha = 1 - a.hp / a.maxHp;
+    drawSpriteCentered(spriteName, 0, 0, d, d);
+    ctx.restore();
   }
   ctx.restore();
 }
@@ -471,51 +620,61 @@ function drawAsteroid(a) {
 function drawBullet(b) {
   ctx.save();
   ctx.translate(b.x, b.y);
-  var img = IMGS.laserBlue;
-  if (img && img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, -6, -19, 12, 37);
-  } else {
-    ctx.shadowColor = '#42d7f5'; ctx.shadowBlur = 12;
-    ctx.fillStyle = '#e1f5fe';
-    ctx.beginPath(); ctx.ellipse(0, 0, 4, 11, 0, 0, Math.PI * 2); ctx.fill();
-  }
+  ctx.shadowColor = '#42d7f5';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#e1f5fe';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 4, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#42d7f5';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 2, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
 function drawCoinItem(c) {
   ctx.save();
   ctx.translate(c.x, c.y);
-  ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffd700';
-  ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 8;
-  ctx.fill();
-  ctx.fillStyle = '#b8860b';
-  ctx.font = 'bold 12px Arial';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  var bob = Math.sin(frameCount * 0.1 + c.x * 0.01) * 2;
+  ctx.translate(0, bob);
+  ctx.rotate(c.rot);
+  var size = 26;
+  ctx.shadowColor = '#ffd700';
+  ctx.shadowBlur = 10;
+  var ok = drawSpriteCentered('coin_star', 0, 0, size, size);
   ctx.shadowBlur = 0;
-  ctx.fillText('$', 0, 1);
+  if (!ok) {
+    ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd700';
+    ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 8;
+    ctx.fill();
+    ctx.fillStyle = '#b8860b';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 0;
+    ctx.fillText('$', 0, 1);
+  }
   ctx.restore();
 }
 
 function drawAlien(a) {
   ctx.save();
   ctx.translate(a.x, a.y);
-  var img = IMGS.ufoGreen;
-  if (img && img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, -34, -24, 68, 48);
-  } else {
-    // Canvas fallback
-    var pulse = 0.9 + 0.1 * Math.sin(frameCount * 0.1 + a.x);
+  var ok = drawSpriteCentered('alien_normal', 0, 0, 68, 68);
+  if (!ok) {
     ctx.beginPath(); ctx.ellipse(0, 4, 34, 12, 0, 0, Math.PI * 2);
     var bg = ctx.createLinearGradient(-34, -4, 34, 12);
     bg.addColorStop(0, '#424242'); bg.addColorStop(0.5, '#757575'); bg.addColorStop(1, '#424242');
-    ctx.fillStyle = bg; ctx.fill(); ctx.strokeStyle = '#212121'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = bg; ctx.fill();
+    ctx.strokeStyle = '#212121'; ctx.lineWidth = 2; ctx.stroke();
     ctx.beginPath(); ctx.ellipse(0, 0, 18, 14, 0, Math.PI, 0);
     var dg = ctx.createRadialGradient(-4, -4, 0, 0, 0, 18);
     dg.addColorStop(0, 'rgba(180,255,180,0.9)'); dg.addColorStop(1, 'rgba(0,160,0,0.6)');
-    ctx.fillStyle = dg; ctx.fill(); ctx.strokeStyle = '#00c853'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = dg; ctx.fill();
+    ctx.strokeStyle = '#00c853'; ctx.lineWidth = 1.5; ctx.stroke();
   }
-  // HP bar
   ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-18, 26, 36, 5);
   ctx.fillStyle = '#00e676'; ctx.fillRect(-18, 26, 36 * (a.hp / 3), 5);
   ctx.restore();
@@ -525,20 +684,44 @@ function drawAlienBullet(b) {
   ctx.save();
   ctx.translate(b.x, b.y);
   ctx.rotate(Math.atan2(b.vy, b.vx) + Math.PI / 2);
-  var img = IMGS.laserRed;
-  if (img && img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, -6, -19, 12, 37);
-  } else {
-    ctx.shadowColor = '#ff1744'; ctx.shadowBlur = 10; ctx.fillStyle = '#ff6d00';
-    ctx.beginPath(); ctx.ellipse(0, 0, 5, 10, 0, 0, Math.PI * 2); ctx.fill();
-  }
+  ctx.shadowColor = '#ff6d00';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#ff9800';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 5, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#ffeb3b';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 2, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
+// Boss appearance schedule: 100, 400, 1000, then +2000 each.
+// killedCount is the number of bosses already killed (== bossNum after kill).
+var BOSS_SCHEDULE = [100, 400, 1000];
+function nextBossThreshold(killedCount) {
+  var raw = killedCount < BOSS_SCHEDULE.length
+    ? BOSS_SCHEDULE[killedCount]
+    : 1000 + (killedCount - 2) * 2000;
+  return easyMode ? Math.round(raw / 2) : raw;
+}
+
+// Per-tier HP multipliers — tier 2 = 2x tier 1, tier 3 = 4x tier 1
+var BOSS_BASE_HP = 22;
+var BOSS_TIER_HP_MULT = { 1: 1, 2: 2, 3: 4 };
+
 function spawnBoss() {
   bossNum++;
-  var hp = 10 + bossNum * 12;
-  boss = { x: W / 2, y: HUD_H - 80, hp: hp, maxHp: hp, shootTimer: 90, phase: 0 };
+  var tier = Math.min(3, bossNum);
+  var hp = BOSS_BASE_HP * BOSS_TIER_HP_MULT[tier];
+  boss = {
+    x: W / 2, y: HUD_H - 80,
+    hp: hp, maxHp: hp,
+    shootTimer: 90, phase: 0,
+    tier: tier,
+  };
   bossLasers = [];
   bossAnnounceTimer = 130;
 }
@@ -547,49 +730,72 @@ function drawBoss(b) {
   ctx.save();
   ctx.translate(b.x, b.y);
   var pulse = 0.96 + 0.04 * Math.sin(frameCount * 0.1);
-  var glow = ctx.createRadialGradient(0, 0, 10, 0, 0, 75);
-  glow.addColorStop(0, 'rgba(180,0,255,0.3)'); glow.addColorStop(1, 'rgba(180,0,255,0)');
-  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 75, 0, Math.PI * 2); ctx.fill();
-  ctx.scale(pulse, pulse);
-  ctx.beginPath();
-  ctx.moveTo(0, 58); ctx.lineTo(58, -18); ctx.lineTo(42, -42); ctx.lineTo(-42, -42); ctx.lineTo(-58, -18);
-  ctx.closePath();
-  var hg = ctx.createLinearGradient(-58, -42, 58, 58);
-  hg.addColorStop(0, '#4a148c'); hg.addColorStop(0.5, '#8e24aa'); hg.addColorStop(1, '#4a148c');
-  ctx.fillStyle = hg; ctx.fill(); ctx.strokeStyle = '#ce93d8'; ctx.lineWidth = 2.5; ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-58, -18); ctx.lineTo(-95, 12); ctx.lineTo(-58, 22); ctx.fillStyle = '#6a1b9a'; ctx.fill();
-  ctx.beginPath(); ctx.moveTo(58, -18); ctx.lineTo(95, 12); ctx.lineTo(58, 22); ctx.fillStyle = '#6a1b9a'; ctx.fill();
-  ctx.beginPath(); ctx.ellipse(0, -5, 20, 15, 0, 0, Math.PI * 2);
-  var eg = ctx.createRadialGradient(-3, -8, 0, 0, -5, 20);
-  eg.addColorStop(0, '#ff4081'); eg.addColorStop(0.6, '#d50000'); eg.addColorStop(1, '#b71c1c');
-  ctx.fillStyle = eg; ctx.fill(); ctx.strokeStyle = '#ff8a80'; ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.fillStyle = '#263238';
-  ctx.fillRect(-7, 30, 14, 30); ctx.fillRect(-40, 4, 13, 22); ctx.fillRect(27, 4, 13, 22);
-  ctx.fillStyle = '#ff4081';
-  ctx.beginPath(); ctx.arc(0, 60, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(-34, 22, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(34, 22, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.scale(1 / pulse, 1 / pulse);
-  var bw = 140, bh = 11;
+
+  var scale = b.tier === 1 ? 1.0 : (b.tier === 2 ? 1.15 : 1.30);
+  var glowR = b.tier === 1 ? 75 : (b.tier === 2 ? 95 : 120);
+  var glowColor = b.tier === 1 ? 'rgba(180,255,180,0.30)' : (b.tier === 2 ? 'rgba(255,140,80,0.35)' : 'rgba(255,60,60,0.42)');
+  var pulseT3 = b.tier === 3 ? (0.94 + 0.06 * Math.sin(frameCount * 0.18)) : 1;
+
+  var glow = ctx.createRadialGradient(0, 0, 10, 0, 0, glowR * pulseT3);
+  glow.addColorStop(0, glowColor);
+  glow.addColorStop(1, glowColor.replace(/[\d.]+\)/, '0)'));
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(0, 0, glowR * pulseT3, 0, Math.PI * 2); ctx.fill();
+
+  ctx.save();
+  ctx.scale(pulse * scale * pulseT3, pulse * scale * pulseT3);
+  var ok = drawSpriteRel('boss_base', 'boss_base', 0, 0, 140, 140);
+  if (!ok) {
+    ctx.beginPath();
+    ctx.moveTo(0, 58); ctx.lineTo(58, -18); ctx.lineTo(42, -42); ctx.lineTo(-42, -42); ctx.lineTo(-58, -18);
+    ctx.closePath();
+    var hg = ctx.createLinearGradient(-58, -42, 58, 58);
+    hg.addColorStop(0, '#4a148c'); hg.addColorStop(0.5, '#8e24aa'); hg.addColorStop(1, '#4a148c');
+    ctx.fillStyle = hg; ctx.fill();
+    ctx.strokeStyle = '#ce93d8'; ctx.lineWidth = 2.5; ctx.stroke();
+  }
+  ctx.restore();
+
+  if (b.tier >= 2) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = b.tier === 2 ? 0.30 : 0.55;
+    ctx.fillStyle = b.tier === 2 ? '#ff8060' : '#ff3030';
+    ctx.beginPath(); ctx.arc(0, 0, 80 * scale, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  var bw = 140 + b.tier * 20, bh = 11;
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-bw / 2, 75, bw, bh);
   var hpFrac = b.hp / b.maxHp;
-  ctx.fillStyle = hpFrac > 0.5 ? '#69f0ae' : hpFrac > 0.25 ? '#ffd700' : '#ff1744';
+  var hpHi = b.tier === 1 ? '#69f0ae' : (b.tier === 2 ? '#ffa726' : '#ef5350');
+  var hpMid = b.tier === 1 ? '#ffd700' : (b.tier === 2 ? '#ff7043' : '#e53935');
+  var hpLow = '#ff1744';
+  ctx.fillStyle = hpFrac > 0.5 ? hpHi : (hpFrac > 0.25 ? hpMid : hpLow);
   ctx.fillRect(-bw / 2, 75, bw * hpFrac, bh);
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(-bw / 2, 75, bw, bh);
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 9px Arial';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('BOSS', 0, 80.5);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('BOSS · TIER ' + b.tier, 0, 80.5);
   ctx.restore();
 }
 
 function drawBossLaser(l) {
   ctx.save();
-  ctx.shadowColor = '#ff4081'; ctx.shadowBlur = 18;
   ctx.translate(l.x, l.y);
   ctx.rotate(Math.atan2(l.vy, l.vx) + Math.PI / 2);
+  var pulse = 0.85 + 0.15 * Math.sin(frameCount * 0.4);
+  ctx.shadowColor = '#ff4081';
+  ctx.shadowBlur = 18 * pulse;
   ctx.fillStyle = '#ff80ab';
-  ctx.beginPath(); ctx.ellipse(0, 0, 5, 14, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.shadowBlur = 0; ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.ellipse(0, 0, 2, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 6, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 2.5, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -606,9 +812,16 @@ function drawParticles() {
 
 // ---- Intervals ----
 
-function asteroidSpawnInterval() { return Math.max(28, 80 - level * 8); }
+function asteroidSpawnInterval() {
+  var base = Math.max(28, 80 - level * 8);
+  return easyMode ? base * 2 : base;
+}
 function bulletInterval()        { return Math.max(6, Math.floor(Math.max(14, 28 - level * 2) * Math.pow(0.8, fireRateBoosts))); }
-function maxAliensOnScreen()     { return score < 30 ? 0 : Math.min(6, 1 + Math.floor((score - 30) / 20)); }
+function maxAliensOnScreen() {
+  if (score < 30) return 0;
+  var base = Math.min(6, 1 + Math.floor((score - 30) / 20));
+  return easyMode ? Math.max(1, Math.floor(base / 2)) : base;
+}
 
 function addScore(pts) {
   score += pts;
@@ -637,7 +850,9 @@ function updateLivesHUD(animateLast) {
 
 function update() {
   frameCount++;
+  ship.prevX = ship.x;
   ship.x += (ship.targetX - ship.x) * 0.15;
+  if (ship.shieldFrames > 0) ship.shieldFrames--;
   if (shipShake > 0) shipShake = Math.max(0, shipShake - 1.2);
   if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - 1);
 
@@ -665,11 +880,11 @@ function update() {
       var b = bullets[bi];
       var dx = b.x - a.x, dy = b.y - a.y;
       if (Math.sqrt(dx*dx + dy*dy) < a.radius * 0.9) {
-        bullets.splice(bi, 1); a.hp--;
-        spawnParticles(b.x, b.y, '#ffcc02', 4);
+        bullets.splice(bi, 1); a.hp -= bulletDamage();
+        spawnParticles(b.x, b.y, '#42d7f5', 4); // cyan — matches player laser
         if (a.hp <= 0) {
-          spawnParticles(a.x, a.y, '#ff7043', 8 + a.tier * 2);
-          spawnParticles(a.x, a.y, '#ffcc02', 4 + a.tier);
+          spawnParticles(a.x, a.y, '#ff7043', 8 + a.tier * 2); // orange burst (kept)
+          spawnParticles(a.x, a.y, '#5d4037', 4 + a.tier);     // brown debris
           addScore(ASTEROID_PTS[a.tier]);
           spawnCoinItems(a.x, a.y, Math.ceil(a.tier / 2));
           asteroids.splice(ai, 1);
@@ -715,11 +930,11 @@ function update() {
       var bul = bullets[bi2];
       var bdx = bul.x - al.x, bdy = bul.y - al.y;
       if (Math.sqrt(bdx*bdx + bdy*bdy) < 34) {
-        bullets.splice(bi2, 1); al.hp--;
-        spawnParticles(bul.x, bul.y, '#69f0ae', 5);
+        bullets.splice(bi2, 1); al.hp -= bulletDamage();
+        spawnParticles(bul.x, bul.y, '#ce93d8', 5); // light purple sparks
         if (al.hp <= 0) {
-          spawnParticles(al.x, al.y, '#69f0ae', 12);
-          spawnParticles(al.x, al.y, '#ffd700', 8);
+          spawnParticles(al.x, al.y, '#9c27b0', 12); // purple
+          spawnParticles(al.x, al.y, '#69f0ae', 8);  // green-yellow accent
           addScore(5);
           spawnCoinItems(al.x, al.y, 3);
           aliens.splice(li, 1); alienHit = true; break;
@@ -765,16 +980,17 @@ function update() {
       var bhBul = bullets[bhi];
       var bhDx = bhBul.x - boss.x, bhDy = bhBul.y - boss.y;
       if (Math.sqrt(bhDx * bhDx + bhDy * bhDy) < 63) {
-        bullets.splice(bhi, 1);
-        boss.hp--;
-        spawnParticles(bhBul.x, bhBul.y, '#ce93d8', 5);
+        bullets.splice(bhi, 1); boss.hp -= bulletDamage();
+        spawnParticles(bhBul.x, bhBul.y, '#ff80ab', 5); // matches boss laser color
         if (boss.hp <= 0) {
-          spawnParticles(boss.x, boss.y, '#ff80ab', 25);
-          spawnParticles(boss.x, boss.y, '#ffd700', 20);
-          spawnParticles(boss.x, boss.y, '#fff', 15);
+          spawnParticles(boss.x, boss.y, '#ff4081', 25); // magenta core
+          spawnParticles(boss.x, boss.y, '#ffd700', 20); // gold (kept)
+          spawnParticles(boss.x, boss.y, '#fff', 15);    // white sparks (kept)
           addScore(15 * bossNum);
           spawnCoinItems(boss.x, boss.y, 6 * bossNum);
-          bossNextScore = score + 20;
+          bossNextScore = nextBossThreshold(bossNum);
+          shipShake = 30;        // strong shake on boss death
+          screenFlash = 18;      // bright flash
           boss = null; bossLasers = [];
           break;
         }
@@ -798,14 +1014,19 @@ function update() {
 }
 
 function loseLife() {
+  if (ship.shieldFrames > 0) return;
   lives--;
+  ship.shieldFrames = 60;
   shipShake = 22; screenFlash = 14;
-  spawnParticles(ship.x, ship.y, '#ff1744', 20);
-  spawnParticles(ship.x, ship.y, '#ff9800', 12);
+  spawnParticles(ship.x, ship.y, '#42d7f5', 16);
+  spawnParticles(ship.x, ship.y, '#ff9800', 8);
   updateLivesHUD(false);
   if (lives <= 0) {
     gameActive = false;
-    setTimeout(showEndScreen, 600);
+    playerDeath = { x: ship.x, y: ship.y, frame: 0 };
+    spawnParticles(ship.x, ship.y, '#ff5722', 30);
+    spawnParticles(ship.x, ship.y, '#ffeb3b', 18);
+    setTimeout(showEndScreen, 750); // wait for the 30-frame animation + 0.25s pause
   }
 }
 
@@ -837,21 +1058,51 @@ function gameLoop() {
     for (var l = 0; l < aliens.length; l++) drawAlien(aliens[l]);
     for (var m = 0; m < alienBullets.length; m++) drawAlienBullet(alienBullets[m]);
     for (var n = 0; n < bullets.length; n++) drawBullet(bullets[n]);
-    drawShip(ship.x, ship.y);
+    if (!playerDeath) {
+      drawShip(ship.x, ship.y);
+    } else {
+      var frameIdx = Math.min(5, Math.floor(playerDeath.frame / 6) + 1);
+      var DW = 90;
+      ctx.save();
+      drawSpriteCentered('explosion_' + frameIdx, playerDeath.x, playerDeath.y, DW, DW);
+      ctx.restore();
+      playerDeath.frame++;
+    }
     if (boss) drawBoss(boss);
     for (var bliD = 0; bliD < bossLasers.length; bliD++) drawBossLaser(bossLasers[bliD]);
     if (bossAnnounceTimer > 0) {
       ctx.save();
-      ctx.globalAlpha = bossAnnounceTimer > 30 ? 1 : bossAnnounceTimer / 30;
-      ctx.font = 'bold 42px Arial';
+      // Screen darken — fades in/out with the timer
+      var fade = bossAnnounceTimer > 100 ? (130 - bossAnnounceTimer) / 30
+               : bossAnnounceTimer < 30 ? bossAnnounceTimer / 30
+               : 1;
+      ctx.fillStyle = 'rgba(0,0,0,' + (0.4 * fade) + ')';
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = fade;
+      // Pulsing main text
+      var pulse = 1 + 0.06 * Math.sin(frameCount * 0.25);
+      ctx.font = 'bold ' + Math.round(42 * pulse) + 'px Arial';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.shadowColor = '#ff4081'; ctx.shadowBlur = 28;
       ctx.fillStyle = '#fff';
       ctx.fillText('⚠️ BOSS INCOMING! ⚠️', W / 2, H / 2);
+      // Tier subtitle for tier 2/3
+      if (boss && boss.tier >= 2) {
+        ctx.font = 'bold 26px Arial';
+        ctx.shadowColor = boss.tier === 2 ? '#ff7043' : '#ef5350';
+        ctx.shadowBlur = 22;
+        ctx.fillStyle = boss.tier === 2 ? '#ffab91' : '#ef9a9a';
+        ctx.fillText('TIER ' + boss.tier, W / 2, H / 2 + 56);
+      }
       ctx.restore();
     }
   } else if (!gameActive) {
     for (var o = 0; o < asteroids.length; o++) drawAsteroid(asteroids[o]);
+    if (playerDeath && playerDeath.frame < 30) {
+      var frameIdx = Math.min(5, Math.floor(playerDeath.frame / 6) + 1);
+      drawSpriteCentered('explosion_' + frameIdx, playerDeath.x, playerDeath.y, 90, 90);
+      playerDeath.frame++;
+    }
   } else {
     for (var q = 0; q < asteroids.length; q++) drawAsteroid(asteroids[q]);
     drawShip(ship.x, ship.y);
@@ -877,6 +1128,18 @@ canvas.addEventListener('mousemove', function(e) {
 
 document.getElementById('play-btn').addEventListener('click', startGame);
 
+document.querySelectorAll('.diff-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.diff-btn').forEach(function (b) {
+      b.classList.remove('active');
+      b.setAttribute('aria-checked', 'false');
+    });
+    this.classList.add('active');
+    this.setAttribute('aria-checked', 'true');
+    easyMode = this.getAttribute('data-mode') === 'easy';
+  });
+});
+
 document.getElementById('shop-hud-btn').addEventListener('click', function() {
   if (!gameActive) return;
   openShop();
@@ -885,8 +1148,9 @@ document.getElementById('shop-hud-btn').addEventListener('click', function() {
 document.getElementById('close-shop-btn').addEventListener('click', closeShop);
 
 document.getElementById('buy-life-btn').addEventListener('click', function() {
-  if (coins < 5 || lives >= 10) return;
-  coins -= 5; lives++;
+  var cost = priceFor(5);
+  if (coins < cost || lives >= 10) return;
+  coins -= cost; lives++;
   document.getElementById('coins-el').textContent = coins;
   document.getElementById('shop-coins-el').textContent = coins;
   updateLivesHUD(true);
@@ -894,8 +1158,9 @@ document.getElementById('buy-life-btn').addEventListener('click', function() {
 });
 
 document.getElementById('buy-shield-btn').addEventListener('click', function() {
-  if (coins < 25) return;
-  coins -= 25;
+  var cost = priceFor(25);
+  if (coins < cost) return;
+  coins -= cost;
   lives = 10;
   document.getElementById('coins-el').textContent = coins;
   document.getElementById('shop-coins-el').textContent = coins;
@@ -904,25 +1169,25 @@ document.getElementById('buy-shield-btn').addEventListener('click', function() {
 });
 
 document.getElementById('buy-fast-btn').addEventListener('click', function() {
-  var cost = FAST_FIRE_COSTS[fireRateBoosts];
+  var cost = priceFor(FAST_FIRE_COSTS[fireRateBoosts]);
   if (coins < cost || fireRateBoosts >= 5) return;
   coins -= cost; fireRateBoosts++;
   document.getElementById('coins-el').textContent = coins;
   document.getElementById('shop-coins-el').textContent = coins;
   document.getElementById('fast-fire-desc').textContent = 'Shoot 20% faster! (' + fireRateBoosts + '/5)';
-  document.getElementById('buy-fast-btn').textContent = fireRateBoosts >= 5 ? 'MAX!' : FAST_FIRE_COSTS[fireRateBoosts] + ' 🟡';
+  document.getElementById('buy-fast-btn').textContent = fireRateBoosts >= 5 ? 'MAX!' : priceFor(FAST_FIRE_COSTS[fireRateBoosts]) + ' 🟡';
   spawnParticles(W / 2, H / 2, '#42d7f5', 18);
 });
 
 document.getElementById('buy-wide-btn').addEventListener('click', function() {
-  var cost = WIDE_SHOT_COSTS[missileLevel];
+  var cost = priceFor(WIDE_SHOT_COSTS[missileLevel]);
   if (coins < cost || missileLevel >= 3) return;
   coins -= cost; missileLevel++;
   document.getElementById('coins-el').textContent = coins;
   document.getElementById('shop-coins-el').textContent = coins;
   document.getElementById('missile-el').textContent = '×' + MISSILE_COUNTS[missileLevel];
   document.getElementById('wide-shot-desc').textContent = 'More missiles! (×' + MISSILE_COUNTS[missileLevel] + ')';
-  document.getElementById('buy-wide-btn').textContent = missileLevel >= 3 ? 'MAX!' : WIDE_SHOT_COSTS[missileLevel] + ' 🟡';
+  document.getElementById('buy-wide-btn').textContent = missileLevel >= 3 ? 'MAX!' : priceFor(WIDE_SHOT_COSTS[missileLevel]) + ' 🟡';
   spawnParticles(W / 2, H / 2, '#ffd700', 18);
 });
 
