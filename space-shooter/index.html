@@ -807,7 +807,7 @@ function drawBoss(b) {
   if (b.tier >= 2) {
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = b.tier === 2 ? 0.30 : 0.55;
+    ctx.globalAlpha = 0.30;
     ctx.fillStyle = b.tier === 2 ? '#ff8060' : '#ff3030';
     ctx.beginPath(); ctx.arc(0, 0, 80 * scale, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
