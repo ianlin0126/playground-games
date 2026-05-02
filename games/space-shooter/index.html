@@ -42,6 +42,12 @@
   }
   #shop-hud-btn:active { background: rgba(255,215,0,0.4); }
   #lives-el { font-size: 20px; letter-spacing: 1px; }
+  /* Smaller HUD on phone-sized screens so it doesn't dominate the viewport */
+  @media (max-width: 600px) {
+    #hud { font-size: 16px; padding: 6px 8px; }
+    #shop-hud-btn { font-size: 16px; padding: 3px 8px; }
+    #lives-el { font-size: 13px; letter-spacing: 0; }
+  }
   @keyframes shipPop {
     0%   { transform: scale(0) translateY(-8px); opacity: 0; }
     60%  { transform: scale(1.4) translateY(0); opacity: 1; }
@@ -386,9 +392,24 @@ var canvas = document.getElementById('c');
 var ctx = canvas.getContext('2d');
 var W, H, HUD_H = 56;
 
+// On phones, render into a logical canvas that's ~1.5× wider than the
+// physical screen and CSS-scale it to fit. Effect: the game's world is
+// bigger relative to each on-screen pixel, so sprites/bullets/asteroids
+// appear smaller and combat feels more spacious. Touch coordinates need
+// transforming from CSS pixels into canvas pixels (see touchToCanvasX).
 function resize() {
-  W = canvas.width = window.innerWidth;
-  H = canvas.height = window.innerHeight;
+  var displayW = window.innerWidth;
+  var displayH = window.innerHeight;
+  var logicalScale = displayW < 600 ? 1.5 : 1.0;
+  W = canvas.width = Math.round(displayW * logicalScale);
+  H = canvas.height = Math.round(displayH * logicalScale);
+  canvas.style.width = displayW + 'px';
+  canvas.style.height = displayH + 'px';
+}
+
+function touchToCanvasX(clientX) {
+  var displayWidth = canvas.clientWidth || window.innerWidth;
+  return clientX * (canvas.width / displayWidth);
 }
 resize();
 window.addEventListener('resize', resize);
@@ -1139,17 +1160,17 @@ function gameLoop() {
 
 canvas.addEventListener('touchmove', function(e) {
   e.preventDefault();
-  ship.targetX = Math.max(36, Math.min(W - 36, e.touches[0].clientX));
+  ship.targetX = Math.max(36, Math.min(W - 36, touchToCanvasX(e.touches[0].clientX)));
 }, { passive: false });
 
 canvas.addEventListener('touchstart', function(e) {
   e.preventDefault();
-  ship.targetX = Math.max(36, Math.min(W - 36, e.touches[0].clientX));
+  ship.targetX = Math.max(36, Math.min(W - 36, touchToCanvasX(e.touches[0].clientX)));
 }, { passive: false });
 
 canvas.addEventListener('mousemove', function(e) {
   if (!gameActive || shopOpen) return;
-  ship.targetX = Math.max(36, Math.min(W - 36, e.clientX));
+  ship.targetX = Math.max(36, Math.min(W - 36, touchToCanvasX(e.clientX)));
 });
 
 document.getElementById('play-btn').addEventListener('click', startGame);
