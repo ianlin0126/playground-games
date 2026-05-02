@@ -320,6 +320,31 @@ function drawSpriteCentered(name, cx, cy, dw, dh) {
   return drawSprite(name, cx - dw / 2, cy - dh / 2, dw, dh);
 }
 
+// Offscreen canvas for sprite tinting. Used by drawAsteroid for the damage
+// red. We can't use ctx.filter (the natural choice) because iOS Safari
+// before v17 silently ignores it — the kid's tablet would see no tint.
+// Instead: draw the sprite to an offscreen canvas (transparent background),
+// fill the sprite-shaped region with a tint color via source-atop (which
+// only paints where existing pixels are opaque), and composite the tinted
+// result back to the main canvas. Works on every browser.
+var TINT_CANVAS = document.createElement('canvas');
+TINT_CANVAS.width = 512;
+TINT_CANVAS.height = 512;
+var TINT_CTX = TINT_CANVAS.getContext('2d');
+
+function drawSpriteTinted(name, cx, cy, dw, dh, tintFill) {
+  var s = SPRITES[name];
+  if (!ATLAS.complete || ATLAS.naturalWidth === 0 || !s) return false;
+  TINT_CTX.clearRect(0, 0, TINT_CANVAS.width, TINT_CANVAS.height);
+  TINT_CTX.drawImage(ATLAS, s.x, s.y, s.w, s.h, 0, 0, dw, dh);
+  TINT_CTX.globalCompositeOperation = 'source-atop';
+  TINT_CTX.fillStyle = tintFill;
+  TINT_CTX.fillRect(0, 0, dw, dh);
+  TINT_CTX.globalCompositeOperation = 'source-over';
+  ctx.drawImage(TINT_CANVAS, 0, 0, dw, dh, cx - dw / 2, cy - dh / 2, dw, dh);
+  return true;
+}
+
 // Per-sprite (wMul, hMul) overrides applied INSTEAD of bbox-ratio scaling
 // in drawSpriteRel. Use this when the entity inside a sprite isn't at the
 // same pixel scale as the reference sprite's entity, or when the bbox of
@@ -603,15 +628,16 @@ function drawAsteroid(a) {
     ctx.fillStyle = ag; ctx.fill();
     ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.stroke();
   }
-  // Damage tint — re-draw the same sprite with a red filter on top of
-  // itself, alpha-blended in proportion to damage taken. The silhouette
-  // is preserved exactly because we're drawing the same shape; only the
-  // colors shift toward red as HP drops.
+  // Damage tint — overlay a red-tinted version of the sprite on top of the
+  // original at alpha proportional to damage. Uses an offscreen canvas
+  // (drawSpriteTinted) instead of ctx.filter because iOS Safari before
+  // v17 silently ignores filter, leaving the asteroid grey on the kid's
+  // tablet. The silhouette is preserved because we're masking the tint
+  // through the same sprite's alpha.
   if (a.hp < a.maxHp && ok) {
     ctx.save();
-    ctx.filter = 'sepia(1) saturate(5) hue-rotate(-50deg) brightness(1.1)';
     ctx.globalAlpha = 1 - a.hp / a.maxHp;
-    drawSpriteCentered(spriteName, 0, 0, d, d);
+    drawSpriteTinted(spriteName, 0, 0, d, d, 'rgba(255, 60, 30, 0.92)');
     ctx.restore();
   }
   ctx.restore();
