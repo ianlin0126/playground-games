@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>📚 Baldi Basics</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; }
+  body {
+    background: #1a1a1a;
+    overflow: hidden;
+    touch-action: none;
+    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    color: #fff;
+  }
+  canvas { display: block; cursor: pointer; image-rendering: pixelated; }
+
+  /* HUD */
+  #hud {
+    position: fixed; top: 10px; left: 12px; right: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    z-index: 4; pointer-events: none;
+    font-size: 22px; font-weight: bold;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.85);
+  }
+  #nb-hud { color: #FFEB3B; }
+  #lives-hud { color: #FF1744; }
+  #diff-hud { color: #FFFFFF; font-size: 18px; opacity: 0.9; }
+
+  /* Mini-map (top-right corner during play) */
+  #minimap {
+    position: fixed; top: 50px; right: 12px;
+    z-index: 3; pointer-events: none;
+    border: 2px solid rgba(255,255,255,0.6);
+    background: rgba(0,0,0,0.55);
+    border-radius: 4px;
+  }
+
+  /* Touch D-pad */
+  #dpad {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    z-index: 4;
+    display: grid;
+    grid-template-columns: 64px 64px 64px;
+    grid-template-rows: 64px 64px 64px;
+    gap: 8px;
+  }
+  .dbtn {
+    background: rgba(20,20,40,0.55);
+    border: 3px solid #FFEB3B;
+    color: #FFEB3B;
+    font-size: 26px; font-weight: bold;
+    border-radius: 16px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dbtn.pressed, .dbtn:active {
+    background: rgba(255,235,59,0.5);
+    transform: scale(0.95);
+  }
+  .dbtn small { font-size: 11px; display: block; }
+  #dup    { grid-column: 2; grid-row: 1; }
+  #dleft  { grid-column: 1; grid-row: 2; }
+  #ddown  { grid-column: 2; grid-row: 3; }
+  #dright { grid-column: 3; grid-row: 2; }
+  #dpad-center {
+    grid-column: 2; grid-row: 2; pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,235,59,0.6); font-size: 22px;
+  }
+
+  /* Overlays */
+  .overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,20,30,0.92);
+    z-index: 20;
+    align-items: center; justify-content: center; flex-direction: column;
+    text-align: center; padding: 24px;
+  }
+  .overlay.show { display: flex; }
+  .overlay h1 {
+    font-size: 38px; margin-bottom: 8px;
+    color: #FFEB3B;
+    text-shadow: 0 0 18px #FFEB3B, 0 4px 8px rgba(0,0,0,0.5);
+  }
+  .overlay h2 { font-size: 30px; margin-bottom: 14px; color: #fff; }
+  .overlay p { font-size: 22px; margin-bottom: 20px; opacity: 0.95; max-width: 460px; }
+  .big-btn {
+    width: 280px; max-width: 80vw;
+    padding: 18px 22px;
+    margin: 8px 0;
+    font-size: 24px; font-weight: bold;
+    background: linear-gradient(90deg, #FFEB3B, #FFA726);
+    color: #1a1a1a;
+    border: none; border-radius: 28px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(255,235,59,0.45);
+    -webkit-tap-highlight-color: transparent;
+    font-family: inherit;
+    min-height: 60px;
+  }
+  .big-btn.cool { background: linear-gradient(90deg, #00BCD4, #2196F3); color: #fff; box-shadow: 0 6px 20px rgba(33,150,243,0.45); }
+  .big-btn.hot  { background: linear-gradient(90deg, #FF6090, #E91E63); color: #fff; box-shadow: 0 6px 20px rgba(233,30,99,0.5); }
+  .big-btn:active { transform: scale(0.97); }
+
+  /* Math modal */
+  #math-modal { background: rgba(0, 30, 50, 0.96); }
+  #math-q {
+    font-size: 44px; color: #fff; margin-bottom: 10px;
+    text-shadow: 0 0 14px #00FFFF;
+    text-align: center;
+  }
+  #math-sub { font-size: 18px; color: #FFEB3B; margin-bottom: 22px; }
+  #math-choices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 320px; max-width: 88vw;
+  }
+  .choice-btn {
+    padding: 22px 10px;
+    font-size: 28px; font-weight: bold;
+    background: #00BCD4;
+    color: #fff;
+    border: 3px solid #00FFFF;
+    border-radius: 18px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    font-family: inherit;
+    min-height: 70px;
+  }
+  .choice-btn:active { transform: scale(0.96); }
+  .choice-btn.correct { background: #4CAF50; border-color: #80E27E; }
+  .choice-btn.wrong   { background: #9E9E9E; border-color: #BDBDBD; }
+  #math-feedback {
+    margin-top: 16px; font-size: 22px; min-height: 28px;
+    color: #FFEB3B;
+    text-shadow: 0 0 10px #FFEB3B;
+  }
+  #menu .credits { margin-top: 18px; font-size: 14px; opacity: 0.7; color: #B2DFDB; }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<canvas id="minimap" width="120" height="92"></canvas>
+
+<div id="hud">
+  <div id="nb-hud">📓 0/7</div>
+  <div id="diff-hud">Easy</div>
+  <div id="lives-hud">❤️❤️❤️</div>
+</div>
+
+<div id="dpad">
+  <div class="dbtn" id="dup"    role="button" aria-label="Forward">▲<small>FWD</small></div>
+  <div class="dbtn" id="dleft"  role="button" aria-label="Turn left">◄<small>TURN</small></div>
+  <div id="dpad-center">🚶</div>
+  <div class="dbtn" id="ddown"  role="button" aria-label="Backward">▼<small>BACK</small></div>
+  <div class="dbtn" id="dright" role="button" aria-label="Turn right">►<small>TURN</small></div>
+</div>
+
+<div id="menu" class="overlay show">
+  <h1>📚 Baldi Basics 3D</h1>
+  <p>Walk through the school in first person.<br>Find notebooks, answer math!<br>One notebook is IMPOSSIBLE 😱</p>
+  <button class="big-btn cool" data-diff="easy" type="button">😀 Easy — 7 📓</button>
+  <button class="big-btn"      data-diff="medium" type="button">😐 Medium — 11 📓</button>
+  <button class="big-btn hot"  data-diff="hard" type="button">😡 Hard — 15 📓</button>
+  <div class="credits">▲ Forward · ▼ Back · ◄ ► Turn</div>
+</div>
+
+<div id="math-modal" class="overlay">
+  <div id="math-q">2 + 2 = ?</div>
+  <div id="math-sub">Pick the right answer!</div>
+  <div id="math-choices"></div>
+  <div id="math-feedback"></div>
+</div>
+
+<div id="win" class="overlay">
+  <h1>🎉 YOU DID IT!</h1>
+  <p id="win-msg">You got all the notebooks!</p>
+  <button class="big-btn cool" id="win-again" type="button">▶ Play Again</button>
+  <button class="big-btn" id="win-menu" type="button">🏠 Menu</button>
+</div>
+
+<div id="lose" class="overlay">
+  <h1>😅 Almost!</h1>
+  <p>The teacher caught you — but you can try again!</p>
+  <button class="big-btn cool" id="lose-retry" type="button">▶ Try Again</button>
+  <button class="big-btn" id="lose-menu" type="button">🏠 Menu</button>
+</div>
+
+<script>
+// ── Setup ──────────────────────────────────────────────────────────────────
+var canvas = document.getElementById('c');
+var ctx = canvas.getContext('2d');
+var miniCanvas = document.getElementById('minimap');
+var mctx = miniCanvas.getContext('2d');
+var W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── Map (school hallways) ──────────────────────────────────────────────────
+// 23×16 grid. '#' = locker wall, '.' = open hallway/classroom.
+var ARENA = [
+  '#######################',
+  '#.....................#',
+  '#.###.....###.....###.#',
+  '#.###.....###.....###.#',
+  '#.....................#',
+  '#####.#####.#####.#####',
+  '#.....................#',
+  '#.###..###.###..###...#',
+  '#.###..###.###..###...#',
+  '#.....................#',
+  '#####.#####.#####.#####',
+  '#.....................#',
+  '#.###.....###.....###.#',
+  '#.###.....###.....###.#',
+  '#.....................#',
+  '#######################',
+];
+var COLS = ARENA[0].length;
+var ROWS = ARENA.length;
+function isWallTile(c, r) {
+  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return true;
+  return ARENA[r].charAt(c) === '#';
+}
+
+// ── Game state ─────────────────────────────────────────────────────────────
+var DIFFS = {
+  easy:   { target:  7, baldiBaseSpeed: 1.4, baldiSpeedup: 0.30, lives: 3, qLevel: 1 },
+  medium: { target: 11, baldiBaseSpeed: 1.8, baldiSpeedup: 0.36, lives: 3, qLevel: 2 },
+  hard:   { target: 15, baldiBaseSpeed: 2.3, baldiSpeedup: 0.45, lives: 3, qLevel: 3 },
+};
+var DIFF_LABELS = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+
+var difficulty = 'easy';
+var diff = DIFFS.easy;
+var notebooks = [];           // { x, y, collected, impossible }
+var collected = 0;
+var lives = 3;
+// Player & Baldi positions are in TILE units (e.g. x=1.5 = center of column 1)
+var player = { x: 1.5, y: 1.5, angle: 0, speed: 2.4, turnSpeed: 2.6, hitCooldown: 0 };
+var baldi  = { x: 0, y: 0, speed: 1.4, alive: false };
+var input = { up: false, down: false, left: false, right: false };
+var scene = 'menu';
+var lastTime = 0;
+var pulseT = 0;
+var currentMathQ = null;
+var currentMathNotebook = null;
+
+// Raycaster
+var FOV = Math.PI / 3;
+var HALF_FOV = FOV / 2;
+var MAX_DEPTH = 20;
+var COL_W = 4;                // pixels per ray strip — fewer rays for mobile perf
+var zBuffer = [];
+
+// ── Reset / start ──────────────────────────────────────────────────────────
+function startGame(d) {
+  difficulty = d;
+  diff = DIFFS[d];
+  collected = 0;
+  lives = diff.lives;
+  baldi.speed = diff.baldiBaseSpeed;
+  baldi.alive = false;
+  scene = 'playing';
+  spawnPlayerAt(1.5, 1.5, 0);
+  spawnNotebooks();
+  hideAllOverlays();
+  refreshHUD();
+}
+
+function findOpenCellNear(c, r) {
+  if (!isWallTile(c, r)) return { c: c, r: r };
+  for (var d = 1; d < Math.max(COLS, ROWS); d++) {
+    for (var dx = -d; dx <= d; dx++) {
+      for (var dy = -d; dy <= d; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
+        var nc = c + dx, nr = r + dy;
+        if (!isWallTile(nc, nr)) return { c: nc, r: nr };
+      }
+    }
+  }
+  return { c: 1, r: 1 };
+}
+
+function spawnPlayerAt(x, y, angle) {
+  var cell = findOpenCellNear(Math.floor(x), Math.floor(y));
+  player.x = cell.c + 0.5;
+  player.y = cell.r + 0.5;
+  player.angle = angle || 0;
+  player.hitCooldown = 1.2;
+}
+
+function spawnBaldiFar() {
+  var corners = [
+    { c: COLS - 2, r: 1 },
+    { c: 1,        r: ROWS - 2 },
+    { c: COLS - 2, r: ROWS - 2 },
+  ];
+  var best = corners[0], bestD = -Infinity;
+  for (var i = 0; i < corners.length; i++) {
+    var bx = corners[i].c + 0.5;
+    var by = corners[i].r + 0.5;
+    var d2 = (bx - player.x) * (bx - player.x) + (by - player.y) * (by - player.y);
+    if (d2 > bestD) { bestD = d2; best = corners[i]; }
+  }
+  var cell = findOpenCellNear(best.c, best.r);
+  baldi.x = cell.c + 0.5;
+  baldi.y = cell.r + 0.5;
+  baldi.alive = true;
+}
+
+function spawnNotebooks() {
+  notebooks = [];
+  var openCells = [];
+  for (var r = 0; r < ROWS; r++) {
+    for (var c = 0; c < COLS; c++) {
+      if (isWallTile(c, r)) continue;
+      // Avoid spawning right next to the player
+      var dx = c - 1, dy = r - 1;
+      if (dx * dx + dy * dy < 9) continue;
+      openCells.push({ c: c, r: r });
+    }
+  }
+  for (var i = openCells.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = openCells[i]; openCells[i] = openCells[j]; openCells[j] = tmp;
+  }
+  for (var k = 0; k < diff.target && k < openCells.length; k++) {
+    notebooks.push({
+      x: openCells[k].c + 0.5,
+      y: openCells[k].r + 0.5,
+      collected: false,
+      impossible: false,
+    });
+  }
+  // Pick ONE random notebook to be the impossible one
+  if (notebooks.length > 0) {
+    var imp = Math.floor(Math.random() * notebooks.length);
+    notebooks[imp].impossible = true;
+  }
+}
+
+// ── Math question generator ───────────────────────────────────────────────
+function makeMathQuestion(level) {
+  var a, b, op, ans, qText;
+  if (level === 1) {
+    a = 1 + Math.floor(Math.random() * 9);
+    b = 1 + Math.floor(Math.random() * 9);
+    if (Math.random() < 0.5) { op = '+'; ans = a + b; }
+    else { if (a < b) { var t = a; a = b; b = t; } op = '−'; ans = a - b; }
+    qText = a + ' ' + op + ' ' + b + ' = ?';
+  } else if (level === 2) {
+    if (Math.random() < 0.5) {
+      a = 5 + Math.floor(Math.random() * 25);
+      b = 1 + Math.floor(Math.random() * 19);
+      op = '+'; ans = a + b;
+    } else {
+      a = 10 + Math.floor(Math.random() * 30);
+      b = 1 + Math.floor(Math.random() * (a - 1));
+      op = '−'; ans = a - b;
+    }
+    qText = a + ' ' + op + ' ' + b + ' = ?';
+  } else {
+    var which = Math.random();
+    if (which < 0.4) {
+      a = 2 + Math.floor(Math.random() * 9);
+      b = 2 + Math.floor(Math.random() * 9);
+      op = '×'; ans = a * b;
+    } else if (which < 0.7) {
+      a = 20 + Math.floor(Math.random() * 60);
+      b = 5 + Math.floor(Math.random() * 30);
+      op = '+'; ans = a + b;
+    } else {
+      a = 30 + Math.floor(Math.random() * 60);
+      b = 5 + Math.floor(Math.random() * (a - 5));
+      op = '−'; ans = a - b;
+    }
+    qText = a + ' ' + op + ' ' + b + ' = ?';
+  }
+  var choices = [ans];
+  while (choices.length < 4) {
+    var delta = (1 + Math.floor(Math.random() * 5)) * (Math.random() < 0.5 ? 1 : -1);
+    var bad = ans + delta;
+    if (bad < 0) bad = ans + Math.abs(delta);
+    if (choices.indexOf(bad) === -1) choices.push(bad);
+  }
+  for (var i = choices.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = choices[i]; choices[i] = choices[j]; choices[j] = tmp;
+  }
+  return { text: qText, answer: ans, choices: choices, impossible: false };
+}
+
+function makeImpossibleQuestion() {
+  // A silly question with no real answer — every choice is "wrong"
+  var qs = [
+    { text: '♾️ + 🤔 = ?',     choices: ['🌈', '🦄', '☁️', '🔥'] },
+    { text: '🐸 × 7 = ?',      choices: ['🍕', '🚀', '💎', '⭐'] },
+    { text: '999999 ÷ 0 = ?',  choices: ['POTATO', 'BANANA', 'CARROT', 'TURNIP'] },
+    { text: '🌙 − ☀️ = ?',     choices: ['❤️', '🎵', '🍦', '🎈'] },
+    { text: '🐱 + 🐶 + 🐭 = ?', choices: ['HOUSE', 'TREE', 'CLOUD', 'MOON'] },
+  ];
+  var pick = qs[Math.floor(Math.random() * qs.length)];
+  return { text: pick.text, answer: '__nope__', choices: pick.choices, impossible: true };
+}
+
+function showMathQuestion(notebook) {
+  scene = 'math';
+  currentMathNotebook = notebook;
+  currentMathQ = notebook.impossible ? makeImpossibleQuestion() : makeMathQuestion(diff.qLevel);
+  document.getElementById('math-q').textContent = currentMathQ.text;
+  document.getElementById('math-sub').textContent =
+    notebook.impossible ? '🤯 IMPOSSIBLE question — just pick one!' : 'Pick the right answer!';
+  document.getElementById('math-feedback').textContent = '';
+  var box = document.getElementById('math-choices');
+  box.innerHTML = '';
+  for (var i = 0; i < currentMathQ.choices.length; i++) {
+    var b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.type = 'button';
+    b.textContent = currentMathQ.choices[i];
+    (function(val) {
+      b.addEventListener('click', function() { onMathAnswer(val, b); });
+    })(currentMathQ.choices[i]);
+    box.appendChild(b);
+  }
+  releaseAllInput();   // drop any held D-pad keys while the modal is open
+  document.getElementById('math-modal').classList.add('show');
+}
+
+function onMathAnswer(val, btn) {
+  if (scene !== 'math') return;
+  var correct = (!currentMathQ.impossible && val === currentMathQ.answer);
+  if (correct) {
+    btn.classList.add('correct');
+    document.getElementById('math-feedback').textContent = '🎉 Correct! Notebook collected!';
+    collected++;
+    refreshHUD();
+    setTimeout(function() {
+      document.getElementById('math-modal').classList.remove('show');
+      if (collected >= diff.target) winGame();
+      else { scene = 'playing'; }
+    }, 700);
+  } else {
+    btn.classList.add('wrong');
+    document.getElementById('math-feedback').textContent = currentMathQ.impossible
+      ? '😱 That was an IMPOSSIBLE question! The teacher heard you!'
+      : '😊 Almost! The answer was ' + currentMathQ.answer + '.';
+    if (!baldi.alive) spawnBaldiFar();
+    else baldi.speed += diff.baldiSpeedup;
+    collected++;
+    refreshHUD();
+    setTimeout(function() {
+      document.getElementById('math-modal').classList.remove('show');
+      if (collected >= diff.target) winGame();
+      else { scene = 'playing'; }
+    }, 1200);
+  }
+}
+
+// ── Game outcomes ──────────────────────────────────────────────────────────
+function winGame() {
+  scene = 'win';
+  document.getElementById('win-msg').textContent =
+    'You collected all ' + diff.target + ' notebooks on ' + DIFF_LABELS[difficulty] + '! 🎉';
+  document.getElementById('win').classList.add('show');
+}
+
+function loseLife() {
+  lives--;
+  refreshHUD();
+  if (lives <= 0) {
+    scene = 'lose';
+    document.getElementById('lose').classList.add('show');
+  } else {
+    spawnPlayerAt(1.5, 1.5, 0);
+    spawnBaldiFar();
+  }
+}
+
+function hideAllOverlays() {
+  ['menu','math-modal','win','lose'].forEach(function(id) {
+    document.getElementById(id).classList.remove('show');
+  });
+}
+
+function refreshHUD() {
+  document.getElementById('nb-hud').textContent = '📓 ' + collected + '/' + diff.target;
+  var hearts = '';
+  for (var i = 0; i < lives; i++) hearts += '❤️';
+  document.getElementById('lives-hud').textContent = hearts;
+  document.getElementById('diff-hud').textContent = DIFF_LABELS[difficulty];
+}
+
+// ── Input ──────────────────────────────────────────────────────────────────
+function bindDpad(btnId, key) {
+  var b = document.getElementById(btnId);
+  var heldBy = null;
+  function press(id) {
+    heldBy = id;
+    input[key] = true;
+    b.classList.add('pressed');
+  }
+  function release(id) {
+    if (id !== null && heldBy !== null && id !== heldBy) return;
+    heldBy = null;
+    input[key] = false;
+    b.classList.remove('pressed');
+  }
+  b.addEventListener('pointerdown', function(e) {
+    e.preventDefault();
+    press(e.pointerId);
+    if (b.setPointerCapture) { try { b.setPointerCapture(e.pointerId); } catch(_) {} }
+  }, { passive: false });
+  b.addEventListener('pointerup',     function(e) { e.preventDefault(); release(e.pointerId); }, { passive: false });
+  b.addEventListener('pointercancel', function(e) { release(e.pointerId); });
+  b.addEventListener('lostpointercapture', function(e) { release(e.pointerId); });
+  b.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    if (e.changedTouches && e.changedTouches[0]) press('t' + e.changedTouches[0].identifier);
+  }, { passive: false });
+  function te(e) {
+    e.preventDefault();
+    if (e.changedTouches) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        release('t' + e.changedTouches[i].identifier);
+      }
+    }
+  }
+  b.addEventListener('touchend',    te, { passive: false });
+  b.addEventListener('touchcancel', te, { passive: false });
+}
+bindDpad('dup',    'up');
+bindDpad('ddown',  'down');
+bindDpad('dleft',  'left');
+bindDpad('dright', 'right');
+
+function releaseAllInput() {
+  ['up','down','left','right'].forEach(function(k) { input[k] = false; });
+  document.querySelectorAll('.dbtn').forEach(function(b) { b.classList.remove('pressed'); });
+}
+document.addEventListener('visibilitychange', function() { if (document.hidden) releaseAllInput(); });
+window.addEventListener('blur', releaseAllInput);
+
+window.addEventListener('keydown', function(e) {
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') input.up = true;
+  if (e.code === 'ArrowDown' || e.code === 'KeyS') input.down = true;
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = true;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = true;
+});
+window.addEventListener('keyup', function(e) {
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') input.up = false;
+  if (e.code === 'ArrowDown' || e.code === 'KeyS') input.down = false;
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = false;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = false;
+});
+
+// Menu wiring
+document.querySelectorAll('#menu .big-btn').forEach(function(b) {
+  b.addEventListener('click', function() {
+    startGame(b.getAttribute('data-diff'));
+  });
+});
+document.getElementById('win-again').addEventListener('click', function() { startGame(difficulty); });
+document.getElementById('win-menu').addEventListener('click', function() {
+  scene = 'menu'; hideAllOverlays(); document.getElementById('menu').classList.add('show');
+});
+document.getElementById('lose-retry').addEventListener('click', function() { startGame(difficulty); });
+document.getElementById('lose-menu').addEventListener('click', function() {
+  scene = 'menu'; hideAllOverlays(); document.getElementById('menu').classList.add('show');
+});
+
+// ── Movement (with axis-separate wall collision) ──────────────────────────
+function tryMoveBy(actor, dx, dy, radius) {
+  var nx = actor.x + dx;
+  if (!collidesAtPoint(nx, actor.y, radius)) actor.x = nx;
+  var ny = actor.y + dy;
+  if (!collidesAtPoint(actor.x, ny, radius)) actor.y = ny;
+}
+function collidesAtPoint(x, y, radius) {
+  // Sample a ring around the point — keep both player and Baldi off the locker corners
+  var samples = [
+    [x - radius, y         ],
+    [x + radius, y         ],
+    [x,          y - radius],
+    [x,          y + radius],
+  ];
+  for (var i = 0; i < samples.length; i++) {
+    if (isWallTile(Math.floor(samples[i][0]), Math.floor(samples[i][1]))) return true;
+  }
+  return false;
+}
+
+function updatePlayerMovement(dt) {
+  if (input.left)  player.angle -= player.turnSpeed * dt;
+  if (input.right) player.angle += player.turnSpeed * dt;
+  var fwd = (input.up ? 1 : 0) - (input.down ? 1 : 0);
+  if (fwd !== 0) {
+    var dx = Math.cos(player.angle) * player.speed * dt * fwd;
+    var dy = Math.sin(player.angle) * player.speed * dt * fwd;
+    tryMoveBy(player, dx, dy, 0.20);
+  }
+}
+
+function updateBaldi(dt) {
+  if (!baldi.alive) return;
+  var dx = player.x - baldi.x;
+  var dy = player.y - baldi.y;
+  var dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 0.02) return;
+  var step = baldi.speed * dt;
+  // Greedy axis-aligned chase: prefer larger axis first, fall back to other
+  var primaryDx = 0, primaryDy = 0, secondaryDx = 0, secondaryDy = 0;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    primaryDx = Math.sign(dx) * step; secondaryDy = Math.sign(dy) * step;
+  } else {
+    primaryDy = Math.sign(dy) * step; secondaryDx = Math.sign(dx) * step;
+  }
+  var radius = 0.25;
+  var bx = baldi.x + primaryDx, by = baldi.y + primaryDy;
+  if (!collidesAtPoint(bx, by, radius)) { baldi.x = bx; baldi.y = by; }
+  else {
+    var sx = baldi.x + secondaryDx, sy = baldi.y + secondaryDy;
+    if (!collidesAtPoint(sx, sy, radius)) { baldi.x = sx; baldi.y = sy; }
+    else {
+      var trySlide = [[step,0],[-step,0],[0,step],[0,-step]];
+      for (var i = 0; i < trySlide.length; i++) {
+        var tx = baldi.x + trySlide[i][0], ty = baldi.y + trySlide[i][1];
+        if (!collidesAtPoint(tx, ty, radius)) { baldi.x = tx; baldi.y = ty; break; }
+      }
+    }
+  }
+}
+
+// ── Update ─────────────────────────────────────────────────────────────────
+function update(dt) {
+  pulseT += dt;
+  if (scene !== 'playing') return;
+
+  updatePlayerMovement(dt);
+  if (player.hitCooldown > 0) player.hitCooldown = Math.max(0, player.hitCooldown - dt);
+
+  // Notebook pickup (any notebook within reach)
+  for (var i = 0; i < notebooks.length; i++) {
+    var n = notebooks[i];
+    if (n.collected) continue;
+    var dx = n.x - player.x, dy = n.y - player.y;
+    if (dx * dx + dy * dy < 0.45 * 0.45) {
+      n.collected = true;
+      showMathQuestion(n);
+      return;
+    }
+  }
+
+  updateBaldi(dt);
+
+  if (baldi.alive && player.hitCooldown <= 0) {
+    var bdx = baldi.x - player.x, bdy = baldi.y - player.y;
+    if (bdx * bdx + bdy * bdy < 0.55 * 0.55) loseLife();
+  }
+}
+
+// ── Raycaster render ──────────────────────────────────────────────────────
+function castRay(rayAngle) {
+  // DDA algorithm
+  var sin = Math.sin(rayAngle);
+  var cos = Math.cos(rayAngle);
+  var mapX = Math.floor(player.x);
+  var mapY = Math.floor(player.y);
+  var deltaDistX = Math.abs(1 / cos);
+  var deltaDistY = Math.abs(1 / sin);
+  var stepX, stepY, sideDistX, sideDistY;
+  if (cos < 0) { stepX = -1; sideDistX = (player.x - mapX) * deltaDistX; }
+  else         { stepX =  1; sideDistX = (mapX + 1 - player.x) * deltaDistX; }
+  if (sin < 0) { stepY = -1; sideDistY = (player.y - mapY) * deltaDistY; }
+  else         { stepY =  1; sideDistY = (mapY + 1 - player.y) * deltaDistY; }
+  var hit = false, side = 0;
+  var iter = 0;
+  while (!hit && iter < 64) {
+    if (sideDistX < sideDistY) {
+      sideDistX += deltaDistX;
+      mapX += stepX;
+      side = 0;
+    } else {
+      sideDistY += deltaDistY;
+      mapY += stepY;
+      side = 1;
+    }
+    iter++;
+    if (mapX < 0 || mapY < 0 || mapX >= COLS || mapY >= ROWS) break;
+    if (ARENA[mapY].charAt(mapX) === '#') hit = true;
+  }
+  var perpDist;
+  if (side === 0) perpDist = (sideDistX - deltaDistX);
+  else            perpDist = (sideDistY - deltaDistY);
+  if (perpDist < 0.01) perpDist = 0.01;
+  // Wall hit X (for column index — texture column would use this)
+  var wallHitX;
+  if (side === 0) wallHitX = player.y + perpDist * sin;
+  else            wallHitX = player.x + perpDist * cos;
+  wallHitX -= Math.floor(wallHitX);
+  return { dist: perpDist, side: side, mapX: mapX, mapY: mapY, hitX: wallHitX };
+}
+
+function drawScene() {
+  // Sky / ceiling (white-ish school ceiling)
+  var ceilGrad = ctx.createLinearGradient(0, 0, 0, H / 2);
+  ceilGrad.addColorStop(0, '#3A3A3A');
+  ceilGrad.addColorStop(1, '#7A7A7A');
+  ctx.fillStyle = ceilGrad;
+  ctx.fillRect(0, 0, W, H / 2);
+  // Floor (brown checker hint)
+  var floorGrad = ctx.createLinearGradient(0, H / 2, 0, H);
+  floorGrad.addColorStop(0, '#5D3A1A');
+  floorGrad.addColorStop(1, '#A36B3F');
+  ctx.fillStyle = floorGrad;
+  ctx.fillRect(0, H / 2, W, H / 2);
+
+  // Walls — fire one ray per COL_W column, store distance in zBuffer
+  var numRays = Math.ceil(W / COL_W);
+  zBuffer.length = numRays;
+  for (var i = 0; i < numRays; i++) {
+    var rayAngle = player.angle - HALF_FOV + (i / numRays) * FOV;
+    var r = castRay(rayAngle);
+    // Fish-eye correction
+    var corrected = r.dist * Math.cos(rayAngle - player.angle);
+    zBuffer[i] = corrected;
+    // Wall column height (projection)
+    var lineH = Math.min(H * 1.4, (H / corrected) * 0.95);
+    var startY = (H - lineH) / 2;
+    // Locker color: red lockers, with vertical seams every ~0.16 of tile width
+    var hitX = r.hitX;
+    var seam = (hitX % 0.16) < 0.02 || ((hitX + 0.08) % 0.16) < 0.02;
+    var baseR = 200, baseG = 35, baseB = 40;
+    if (r.side === 1) { baseR -= 35; baseG -= 10; baseB -= 8; }   // shade NS faces
+    // Distance fade
+    var fade = Math.max(0.25, 1 - corrected / MAX_DEPTH);
+    var rr = Math.round(baseR * fade);
+    var gg = Math.round(baseG * fade);
+    var bb = Math.round(baseB * fade);
+    if (seam) { rr = Math.round(rr * 0.55); gg = Math.round(gg * 0.55); bb = Math.round(bb * 0.55); }
+    ctx.fillStyle = 'rgb(' + rr + ',' + gg + ',' + bb + ')';
+    ctx.fillRect(i * COL_W, startY, COL_W + 1, lineH);
+    // Top trim (black band so lockers look flat-topped)
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.55 * fade) + ')';
+    ctx.fillRect(i * COL_W, startY, COL_W + 1, Math.max(2, lineH * 0.06));
+    // Bottom skirting
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.4 * fade) + ')';
+    ctx.fillRect(i * COL_W, startY + lineH - Math.max(2, lineH * 0.04), COL_W + 1, Math.max(2, lineH * 0.04));
+    // Locker handle (small bright pip near middle on the locker face — only every 0.16)
+    if (Math.abs((hitX % 0.16) - 0.08) < 0.02 && lineH > 60) {
+      ctx.fillStyle = 'rgba(255,235,59,' + (0.7 * fade) + ')';
+      ctx.fillRect(i * COL_W, startY + lineH * 0.5, COL_W + 1, 3);
+    }
+  }
+}
+
+function drawSprites() {
+  // Collect visible sprites with distance
+  var sprites = [];
+  for (var i = 0; i < notebooks.length; i++) {
+    var n = notebooks[i];
+    if (n.collected) continue;
+    sprites.push({ x: n.x, y: n.y, kind: 'notebook', impossible: n.impossible, dist: 0 });
+  }
+  if (baldi.alive) sprites.push({ x: baldi.x, y: baldi.y, kind: 'baldi', dist: 0 });
+  // Compute distance² to player
+  for (var s = 0; s < sprites.length; s++) {
+    var dxs = sprites[s].x - player.x, dys = sprites[s].y - player.y;
+    sprites[s].dist = dxs * dxs + dys * dys;
+  }
+  // Sort far → near so near sprites overdraw
+  sprites.sort(function(a, b) { return b.dist - a.dist; });
+
+  var cosA = Math.cos(player.angle), sinA = Math.sin(player.angle);
+  var numRays = Math.ceil(W / COL_W);
+  for (var k = 0; k < sprites.length; k++) {
+    var sp = sprites[k];
+    var rx = sp.x - player.x, ry = sp.y - player.y;
+    // Transform into camera space: forward = +z, right = +x
+    var camX =  cosA * rx + sinA * ry;     // forward (depth)
+    var camY = -sinA * rx + cosA * ry;     // sideways
+    if (camX < 0.05) continue;             // behind player (or extremely close)
+    var screenX = (W / 2) * (1 + camY / camX);
+    var spriteH = (H / camX) * (sp.kind === 'baldi' ? 0.95 : 0.55);
+    var spriteW = spriteH * (sp.kind === 'baldi' ? 0.65 : 0.55);
+    var sy = (H - spriteH) / 2 + (sp.kind === 'notebook' ? spriteH * 0.25 : 0);
+    var sx = screenX - spriteW / 2;
+    // z-test against wall buffer per column
+    var startCol = Math.max(0, Math.floor(sx / COL_W));
+    var endCol   = Math.min(numRays - 1, Math.ceil((sx + spriteW) / COL_W));
+    for (var col = startCol; col <= endCol; col++) {
+      if (zBuffer[col] && camX > zBuffer[col] + 0.05) continue;   // wall in front
+      var slice = COL_W;
+      var x0 = col * COL_W;
+      // Draw the slice of the sprite
+      if (sp.kind === 'notebook') drawNotebookSlice(x0, slice, sx, spriteW, sy, spriteH, sp.impossible);
+      else                          drawBaldiSlice(x0, slice, sx, spriteW, sy, spriteH);
+    }
+  }
+}
+
+function drawNotebookSlice(x0, slice, spriteX, spriteW, spriteY, spriteH, impossible) {
+  var local = (x0 + slice / 2 - spriteX) / spriteW;
+  if (local < 0 || local > 1) return;
+  var bob = Math.sin(pulseT * 4 + spriteX * 0.01) * (spriteH * 0.05);
+  // Yellow background
+  ctx.fillStyle = impossible ? '#E91E63' : '#FFD54F';
+  ctx.fillRect(x0, spriteY + bob, slice, spriteH);
+  // Spiral binding on left ~10%
+  if (local < 0.16) {
+    ctx.fillStyle = '#1A1A1A';
+    var rings = 5;
+    for (var ri = 0; ri < rings; ri++) {
+      var ry = spriteY + bob + spriteH * (0.12 + ri * 0.18);
+      ctx.fillRect(x0, ry, slice, spriteH * 0.06);
+    }
+  }
+  // Top orange title bar
+  ctx.fillStyle = impossible ? '#FFEB3B' : '#FF7043';
+  ctx.fillRect(x0, spriteY + bob, slice, spriteH * 0.12);
+  // White paper lines
+  if (local > 0.18 && local < 0.92) {
+    ctx.fillStyle = '#FFFFFF';
+    for (var li = 0; li < 4; li++) {
+      ctx.fillRect(x0, spriteY + bob + spriteH * (0.32 + li * 0.14), slice, 1);
+    }
+  }
+  // Outline (faint)
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(x0, spriteY + bob, slice, 1);
+  ctx.fillRect(x0, spriteY + bob + spriteH - 1, slice, 1);
+  // Impossible marker
+  if (impossible) {
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold ' + Math.max(10, spriteH * 0.18) + 'px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (local > 0.4 && local < 0.6) {
+      ctx.fillText('?', x0 + slice / 2, spriteY + bob + spriteH * 0.55);
+    }
+  }
+}
+
+function drawBaldiSlice(x0, slice, spriteX, spriteW, spriteY, spriteH) {
+  var local = (x0 + slice / 2 - spriteX) / spriteW;
+  if (local < 0 || local > 1) return;
+  // Vertical zones: head (top 35%), bow tie (35-45%), body (45-100%)
+  var headTop = spriteY;
+  var headBot = spriteY + spriteH * 0.45;
+  var bodyTop = headBot;
+  var bodyBot = spriteY + spriteH;
+  // Body — green suit with arms hint at sides
+  var inBodyHoriz = local > 0.10 && local < 0.90;
+  if (inBodyHoriz) {
+    ctx.fillStyle = '#2E7D32';
+    ctx.fillRect(x0, bodyTop, slice, bodyBot - bodyTop);
+  }
+  // Head — peach circle approx (rectangle hint)
+  var headHorizMin = 0.20, headHorizMax = 0.80;
+  if (local > headHorizMin && local < headHorizMax) {
+    // Approximate ellipse top via a curved offset
+    var t = (local - headHorizMin) / (headHorizMax - headHorizMin);
+    var curve = Math.sin(t * Math.PI);   // 0..1..0
+    var top = headTop + (1 - curve) * (headBot - headTop) * 0.25;
+    var bot = headBot - (1 - curve) * (headBot - headTop) * 0.05;
+    ctx.fillStyle = '#FFCC80';
+    ctx.fillRect(x0, top, slice, bot - top);
+    // Eyes (small dark pips at fixed local positions)
+    if (Math.abs(local - 0.36) < 0.04) {
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(x0, top + (bot - top) * 0.45, slice, Math.max(2, spriteH * 0.04));
+    }
+    if (Math.abs(local - 0.64) < 0.04) {
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(x0, top + (bot - top) * 0.45, slice, Math.max(2, spriteH * 0.04));
+    }
+    // Smile (curve from 0.40..0.60)
+    if (local > 0.40 && local < 0.60) {
+      var u = (local - 0.40) / 0.20;
+      var smileY = top + (bot - top) * (0.70 + Math.sin(u * Math.PI) * 0.06);
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(x0, smileY, slice, Math.max(2, spriteH * 0.025));
+    }
+  }
+  // Bow tie (yellow band at neck)
+  if (local > 0.30 && local < 0.70) {
+    ctx.fillStyle = '#FFEB3B';
+    ctx.fillRect(x0, bodyTop, slice, spriteH * 0.06);
+  }
+  // Arms (darker green sleeves on outer sides of body)
+  if ((local > 0.05 && local < 0.18) || (local > 0.82 && local < 0.95)) {
+    ctx.fillStyle = '#1B5E20';
+    ctx.fillRect(x0, bodyTop + spriteH * 0.08, slice, spriteH * 0.40);
+  }
+}
+
+// ── Mini-map (so the kid doesn't get lost) ─────────────────────────────────
+function drawMinimap() {
+  if (scene !== 'playing') return;
+  var s = 5;       // pixels per tile
+  miniCanvas.width = COLS * s;
+  miniCanvas.height = ROWS * s;
+  // Walls + floor
+  for (var r = 0; r < ROWS; r++) {
+    for (var c = 0; c < COLS; c++) {
+      mctx.fillStyle = isWallTile(c, r) ? '#1E3A5F' : 'rgba(255,255,255,0.10)';
+      mctx.fillRect(c * s, r * s, s, s);
+    }
+  }
+  // Notebooks
+  for (var i = 0; i < notebooks.length; i++) {
+    var n = notebooks[i];
+    if (n.collected) continue;
+    mctx.fillStyle = n.impossible ? '#E91E63' : '#FFEB3B';
+    mctx.fillRect(n.x * s - 2, n.y * s - 2, 4, 4);
+  }
+  // Baldi
+  if (baldi.alive) {
+    mctx.fillStyle = '#FFCC80';
+    mctx.fillRect(baldi.x * s - 2, baldi.y * s - 2, 4, 4);
+  }
+  // Player + facing
+  mctx.fillStyle = '#42A5F5';
+  mctx.fillRect(player.x * s - 2, player.y * s - 2, 4, 4);
+  mctx.strokeStyle = '#42A5F5';
+  mctx.lineWidth = 1;
+  mctx.beginPath();
+  mctx.moveTo(player.x * s, player.y * s);
+  mctx.lineTo(player.x * s + Math.cos(player.angle) * 8, player.y * s + Math.sin(player.angle) * 8);
+  mctx.stroke();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (scene === 'menu') {
+    ctx.fillStyle = '#1a4d2e';
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
+  drawScene();
+  drawSprites();
+  drawMinimap();
+  // Hit-cooldown red flash
+  if (player.hitCooldown > 0.7) {
+    ctx.fillStyle = 'rgba(255,23,68,' + ((player.hitCooldown - 0.7) * 0.8) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+// ── Loop ───────────────────────────────────────────────────────────────────
+function loop(now) {
+  var dt = lastTime ? (now - lastTime) / 1000 : 1 / 60;
+  if (dt > 0.1) dt = 0.1;
+  lastTime = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(function(ts) { lastTime = ts; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
