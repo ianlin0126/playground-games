@@ -632,7 +632,20 @@ function drawAsteroid(a) {
   ctx.rotate(a.rot);
   var d = a.radius * 2.2;
   var spriteName = asteroidSpriteName(a.tier);
-  var ok = drawSpriteCentered(spriteName, 0, 0, d, d);
+  // Damaged asteroids render through the offscreen tint helper instead of
+  // a separate overlay pass. Two reasons: (1) one drawImage to the main
+  // canvas means anti-aliasing fringe is consistent — a second tinted
+  // overlay produces a faint halo where the two passes' sub-pixel edges
+  // disagree; (2) we use offscreen tinting (not ctx.filter) because iOS
+  // Safari < 17 silently ignores filter. Tint strength stays subtle —
+  // even at 1 HP from breaking, only ~30% red mixed in.
+  var ok;
+  if (a.hp < a.maxHp) {
+    var tintAlpha = ((1 - a.hp / a.maxHp) * 0.30).toFixed(2);
+    ok = drawSpriteTinted(spriteName, 0, 0, d, d, 'rgba(255, 60, 30, ' + tintAlpha + ')');
+  } else {
+    ok = drawSpriteCentered(spriteName, 0, 0, d, d);
+  }
   if (!ok) {
     var s = a.radius;
     ctx.beginPath();
@@ -648,18 +661,6 @@ function drawAsteroid(a) {
     ag.addColorStop(0, '#9e9e9e'); ag.addColorStop(1, '#37474f');
     ctx.fillStyle = ag; ctx.fill();
     ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.stroke();
-  }
-  // Damage tint — overlay a red-tinted version of the sprite on top of the
-  // original at alpha proportional to damage. Uses an offscreen canvas
-  // (drawSpriteTinted) instead of ctx.filter because iOS Safari before
-  // v17 silently ignores filter, leaving the asteroid grey on the kid's
-  // tablet. The silhouette is preserved because we're masking the tint
-  // through the same sprite's alpha.
-  if (a.hp < a.maxHp && ok) {
-    ctx.save();
-    ctx.globalAlpha = 1 - a.hp / a.maxHp;
-    drawSpriteTinted(spriteName, 0, 0, d, d, 'rgba(255, 60, 30, 0.92)');
-    ctx.restore();
   }
   ctx.restore();
 }
