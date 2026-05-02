@@ -1,0 +1,5 @@
+.DS_Store
+*.zip
+# Runtime catalog files — local working state, not source of truth
+manifest.json
+published.json

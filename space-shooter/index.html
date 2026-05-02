@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Space Shooter</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #000;
+    overflow: hidden;
+    touch-action: none;
+    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  canvas { display: block; }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(0,0,20,0.82);
+    color: #fff;
+    font-size: 22px;
+    z-index: 5;
+    pointer-events: none;
+  }
+  #hud .hud-left { display: flex; gap: 14px; align-items: center; }
+  #shop-hud-btn {
+    pointer-events: all;
+    background: rgba(255,215,0,0.2);
+    border: 2px solid #ffd700;
+    border-radius: 10px;
+    color: #ffd700;
+    font-size: 22px;
+    padding: 4px 10px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #shop-hud-btn:active { background: rgba(255,215,0,0.4); }
+  #lives-el { font-size: 20px; letter-spacing: 1px; }
+  @keyframes shipPop {
+    0%   { transform: scale(0) translateY(-8px); opacity: 0; }
+    60%  { transform: scale(1.4) translateY(0); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .ship-new { display: inline-block; animation: shipPop 0.5s ease forwards; }
+  #overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(20,40,80,0.55) 0%, #000 70%), #000;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    z-index: 20;
+  }
+  #overlay.show { display: flex; }
+  #overlay h2 {
+    color: #fff;
+    font-family: 'Helvetica Neue', 'Arial Black', sans-serif;
+    font-weight: 900;
+    font-size: clamp(46px, 12vw, 78px);
+    letter-spacing: 6px;
+    text-align: center;
+    padding: 0 20px;
+    text-transform: uppercase;
+    line-height: 0.95;
+    text-shadow:
+      0 0 18px #42d7f5,
+      0 0 36px rgba(66,215,245,0.7),
+      2px 2px 0 #ff4081;
+  }
+  #title-rule {
+    width: min(60%, 280px);
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #42d7f5, transparent);
+    box-shadow: 0 0 10px #42d7f5;
+  }
+  #overlay p {
+    color: #42d7f5;
+    font-family: 'Courier New', 'Menlo', monospace;
+    font-size: 16px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 0 28px;
+    text-shadow: 0 0 8px rgba(66,215,245,0.6);
+  }
+  #play-btn {
+    padding: 16px 56px;
+    font-size: 22px;
+    font-family: 'Helvetica Neue', 'Arial Black', sans-serif;
+    font-weight: bold;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    border: 2px solid #42d7f5;
+    border-radius: 4px;
+    background: rgba(66,215,245,0.08);
+    color: #42d7f5;
+    cursor: pointer;
+    text-shadow: 0 0 10px #42d7f5;
+    box-shadow:
+      0 0 16px rgba(66,215,245,0.45),
+      inset 0 0 16px rgba(66,215,245,0.12);
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s, color 0.12s, box-shadow 0.12s, transform 0.06s;
+  }
+  #play-btn:active {
+    background: #42d7f5;
+    color: #000;
+    text-shadow: none;
+    box-shadow: 0 0 28px #42d7f5;
+    transform: scale(0.97);
+  }
+  #difficulty-label {
+    margin-top: -6px;
+    color: rgba(66,215,245,0.65);
+    font-family: 'Courier New', 'Menlo', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-shadow: 0 0 6px rgba(66,215,245,0.4);
+  }
+  #difficulty-selector {
+    display: flex;
+    gap: 0;
+    margin-top: -10px;
+  }
+  .diff-btn {
+    padding: 8px 28px;
+    font-size: 14px;
+    font-family: 'Helvetica Neue', 'Arial Black', sans-serif;
+    font-weight: bold;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    border: 2px solid rgba(66,215,245,0.4);
+    background: transparent;
+    color: rgba(66,215,245,0.65);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s, transform 0.06s;
+  }
+  .diff-btn:first-child {
+    border-radius: 4px 0 0 4px;
+    border-right-width: 1px;
+  }
+  .diff-btn:last-child {
+    border-radius: 0 4px 4px 0;
+    border-left-width: 1px;
+  }
+  .diff-btn.active {
+    background: rgba(66,215,245,0.18);
+    color: #42d7f5;
+    border-color: #42d7f5;
+    box-shadow: inset 0 0 12px rgba(66,215,245,0.25), 0 0 14px rgba(66,215,245,0.3);
+    text-shadow: 0 0 8px #42d7f5;
+  }
+  .diff-btn:active { transform: scale(0.97); }
+  #shop-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,20,0.92);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    z-index: 25;
+  }
+  #shop-overlay.show { display: flex; }
+  #shop-overlay h2 { color: #ffd700; font-size: 34px; }
+  .shop-item {
+    width: 88%;
+    max-width: 380px;
+    background: rgba(255,255,255,0.08);
+    border: 2px solid rgba(255,215,0,0.4);
+    border-radius: 18px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .shop-item-info { flex: 1; }
+  .shop-item-name { font-size: 22px; color: #fff; }
+  .shop-item-desc { font-size: 16px; color: #adf; margin-top: 3px; }
+  .shop-buy-btn {
+    padding: 12px 20px;
+    font-size: 20px;
+    border: none;
+    border-radius: 14px;
+    background: #ffd700;
+    color: #1a1a2e;
+    cursor: pointer;
+    white-space: nowrap;
+    min-width: 44px;
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .shop-buy-btn:active { transform: scale(0.93); }
+  #shop-coins-display { color: #ffd700; font-size: 24px; }
+  #close-shop-btn {
+    padding: 14px 40px;
+    font-size: 22px;
+    border: none;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    margin-top: 4px;
+  }
+  #close-shop-btn:active { background: rgba(255,255,255,0.25); }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="hud-left">
+    <span id="lives-el">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</span>
+    <span>🟡 <span id="coins-el">0</span></span>
+  </div>
+  <span>⭐ <span id="score-el">0</span></span>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <span>🔫 <span id="missile-el">×1</span></span>
+    <button id="shop-hud-btn">🛒</button>
+  </div>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="overlay" class="show">
+  <h2>Space Shooter</h2>
+  <div id="title-rule"></div>
+  <p id="overlay-sub">Slide to move · Blast everything</p>
+  <button id="play-btn">Start</button>
+  <div id="difficulty-label">Difficulty</div>
+  <div id="difficulty-selector" role="radiogroup" aria-label="Difficulty">
+    <button class="diff-btn" data-mode="easy" role="radio" aria-checked="false">Easy</button>
+    <button class="diff-btn active" data-mode="normal" role="radio" aria-checked="true">Normal</button>
+  </div>
+</div>
+
+<div id="shop-overlay">
+  <h2>🛒 Shop</h2>
+  <div id="shop-coins-display">🟡 <span id="shop-coins-el">0</span> coins</div>
+  <div class="shop-item">
+    <div class="shop-item-info">
+      <div class="shop-item-name">❤️ Buy a Life</div>
+      <div class="shop-item-desc">+1 life (max 10)</div>
+    </div>
+    <button class="shop-buy-btn" id="buy-life-btn">5 🟡</button>
+  </div>
+  <div class="shop-item">
+    <div class="shop-item-info">
+      <div class="shop-item-name">🛡️ Full Repair</div>
+      <div class="shop-item-desc">Restore max life (10)</div>
+    </div>
+    <button class="shop-buy-btn" id="buy-shield-btn">25 🟡</button>
+  </div>
+  <div class="shop-item">
+    <div class="shop-item-info">
+      <div class="shop-item-name">⚡ Fast Fire</div>
+      <div class="shop-item-desc" id="fast-fire-desc">Shoot 20% faster! (0/5)</div>
+    </div>
+    <button class="shop-buy-btn" id="buy-fast-btn">10 🟡</button>
+  </div>
+  <div class="shop-item">
+    <div class="shop-item-info">
+      <div class="shop-item-name">💥 Wide Shot</div>
+      <div class="shop-item-desc" id="wide-shot-desc">More missiles! (×1)</div>
+    </div>
+    <button class="shop-buy-btn" id="buy-wide-btn">20 🟡</button>
+  </div>
+  <button id="close-shop-btn">Resume ▶️</button>
+</div>
+
+<script>
+// ── Sprite atlas ──────────────────────────────────────────────────────────
+var ATLAS = new Image();
+ATLAS.src = './assets/space-shooter-atlas.png';
+
+// Generated by tools/atlas-extract.py + manual labeling. Paste in the
+// labeled sprite-map.json contents. Each entry: name → { x, y, w, h }.
+var SPRITES = {
+  player_level: { x: 49, y: 30, w: 148, h: 130 },
+  player_tilt: { x: 238, y: 36, w: 132, h: 129 },
+  player_shield_level: { x: 435, y: 27, w: 164, h: 156 },
+  player_shield_left: { x: 626, y: 28, w: 168, h: 156 },
+  player_shield_right: { x: 812, y: 29, w: 167, h: 155 },
+  explosion_1: { x: 47, y: 211, w: 147, h: 120 },
+  explosion_2: { x: 241, y: 208, w: 155, h: 121 },
+  explosion_3: { x: 424, y: 199, w: 176, h: 133 },
+  explosion_4: { x: 626, y: 211, w: 158, h: 118 },
+  explosion_5: { x: 832, y: 224, w: 144, h: 107 },
+  asteroid_1: { x: 90, y: 415, w: 85, h: 77 },
+  asteroid_2: { x: 253, y: 389, w: 133, h: 117 },
+  asteroid_3: { x: 439, y: 380, w: 145, h: 128 },
+  asteroid_4: { x: 629, y: 367, w: 155, h: 144 },
+  asteroid_5: { x: 821, y: 371, w: 165, h: 141 },
+  alien_normal: { x: 47, y: 548, w: 157, h: 150 },
+  boss_base: { x: 434, y: 547, w: 158, h: 158 },
+  coin_star: { x: 836, y: 913, w: 116, h: 101 },
+};
+
+
+function drawSprite(name, dx, dy, dw, dh) {
+  var s = SPRITES[name];
+  if (!ATLAS.complete || ATLAS.naturalWidth === 0 || !s) return false;
+  ctx.drawImage(ATLAS, s.x, s.y, s.w, s.h, dx, dy, dw, dh);
+  return true;
+}
+
+function drawSpriteCentered(name, cx, cy, dw, dh) {
+  return drawSprite(name, cx - dw / 2, cy - dh / 2, dw, dh);
+}
+
+// Per-sprite (wMul, hMul) overrides applied INSTEAD of bbox-ratio scaling
+// in drawSpriteRel. Use this when the entity inside a sprite isn't at the
+// same pixel scale as the reference sprite's entity, or when the bbox of
+// a hit-state sprite is clipped (not extended) relative to its base.
+var SPRITE_RENDER_OVERRIDES = {
+  // Shield variants: bbox-ratio alone (1.11 wide, 1.20 tall) left the ship
+  // inside the bubble looking slightly smaller than the standalone ship
+  // because the ship occupies less than the full bbox width. An additional
+  // ~8% bump on top of bbox-ratio matches the standalone ship's visible
+  // size while still letting the bubble extend naturally beyond it.
+  player_shield_level: { wMul: 1.20, hMul: 1.30 },
+  player_shield_left:  { wMul: 1.23, hMul: 1.30 },
+  player_shield_right: { wMul: 1.22, hMul: 1.29 },
+};
+
+// Draws a sprite at a destination size proportional to its source bbox,
+// using refName's bbox as the canonical reference. Keeps the source-px →
+// dest-px ratio constant across related sprites (e.g. player_level ↔
+// player_shield_level: the shield bubble extends the bbox beyond the ship,
+// so the shielded sprite needs a proportionally larger destination to keep
+// the ship-inside at the same visible size). For sprites where bbox-ratio
+// is wrong, see SPRITE_RENDER_OVERRIDES above.
+function drawSpriteRel(refName, name, cx, cy, baseDW, baseDH) {
+  var ov = SPRITE_RENDER_OVERRIDES[name];
+  if (ov) {
+    var ox = ov.xOffset || 0, oy = ov.yOffset || 0;
+    return drawSpriteCentered(name, cx + ox, cy + oy, baseDW * ov.wMul, baseDH * ov.hMul);
+  }
+  var ref = SPRITES[refName];
+  var s = SPRITES[name];
+  if (!ref || !s) return drawSpriteCentered(name, cx, cy, baseDW, baseDH);
+  var dw = baseDW * (s.w / ref.w);
+  var dh = baseDH * (s.h / ref.h);
+  return drawSpriteCentered(name, cx, cy, dw, dh);
+}
+
+// ── Original game ──────────────────────────────────────────────────────────
+var canvas = document.getElementById('c');
+var ctx = canvas.getContext('2d');
+var W, H, HUD_H = 56;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+var ASTEROID_RADII = [0, 28, 38, 48, 60, 74, 88, 102, 116, 130, 144];
+var ASTEROID_HP    = [0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10];
+var ASTEROID_PTS   = [0,  1,  2,  3,  4,  5,  7,  9, 12, 15, 20];
+
+var MISSILE_COUNTS = [1, 3, 5, 7];
+var MISSILE_SPREADS = [
+  [[0, 0, 0]],
+  [[0, 0, 0], [-18, 0, -0.9], [18, 0, 0.9]],
+  [[0, 0, 0], [-18, 0, -0.9], [18, 0, 0.9], [-36, -10, -2.0], [36, -10, 2.0]],
+  [[0, 0, 0], [-18, 0, -0.9], [18, 0, 0.9], [-36, -10, -2.0], [36, -10, 2.0], [-54, -18, -3.2], [54, -18, 3.2]]
+];
+
+var score = 0;
+var level = 1;
+var lives = 10;
+var coins = 0;
+var frameCount = 0;
+var gameActive = false;
+var shopOpen = false;
+var missileLevel = 0;
+var fireRateBoosts = 0;
+var FAST_FIRE_COSTS = [10, 20, 30, 40, 50];
+var WIDE_SHOT_COSTS = [20, 40, 60, 80, 100];
+var easyMode = false;
+function bulletDamage() { return easyMode ? 2 : 1; }
+function priceFor(base) { return easyMode ? Math.ceil(base / 2) : base; }
+var shipShake = 0;
+var screenFlash = 0;
+
+var ship = { x: 0, y: 0, targetX: 0, prevX: 0, shieldFrames: 0 };
+var bullets = [];
+var asteroids = [];
+var particles = [];
+var stars = [];
+var coinItems = [];
+var aliens = [];
+var alienBullets = [];
+var boss = null, bossLasers = [], bossNum = 0, bossNextScore = 100, bossAnnounceTimer = 0;
+var playerDeath = null; // { x, y, frame } or null
+var powerupThresholdIdx = 0;
+
+function initStars() {
+  stars = [];
+  for (var i = 0; i < 80; i++) {
+    stars.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.8 + 0.3, speed: Math.random() * 0.6 + 0.2, bright: Math.random() });
+  }
+}
+
+function startGame() {
+  score = 0; level = 1; lives = 10; coins = 0; frameCount = 0;
+  missileLevel = 0; fireRateBoosts = 0; powerupThresholdIdx = 0;
+  shipShake = 0; screenFlash = 0; shopOpen = false;
+  bullets = []; asteroids = []; particles = []; coinItems = []; aliens = []; alienBullets = [];
+  boss = null; bossLasers = []; bossNum = 0; bossNextScore = nextBossThreshold(0); bossAnnounceTimer = 0;
+  playerDeath = null;
+  ship.x = W / 2; ship.targetX = W / 2; ship.prevX = W / 2; ship.shieldFrames = 0;
+  ship.y = H - 80;
+  gameActive = true;
+  document.getElementById('score-el').textContent = 0;
+  updateLivesHUD(false);
+  document.getElementById('coins-el').textContent = 0;
+  document.getElementById('missile-el').textContent = '×1';
+  document.getElementById('fast-fire-desc').textContent = 'Shoot 20% faster! (0/5)';
+  document.getElementById('wide-shot-desc').textContent = 'More missiles! (×1)';
+  document.getElementById('buy-life-btn').textContent = priceFor(5) + ' 🟡';
+  document.getElementById('buy-shield-btn').textContent = priceFor(25) + ' 🟡';
+  document.getElementById('buy-fast-btn').textContent = priceFor(FAST_FIRE_COSTS[0]) + ' 🟡';
+  document.getElementById('buy-wide-btn').textContent = priceFor(WIDE_SHOT_COSTS[0]) + ' 🟡';
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('shop-overlay').classList.remove('show');
+  initStars();
+}
+
+function openShop() {
+  shopOpen = true;
+  document.getElementById('shop-coins-el').textContent = coins;
+  document.getElementById('shop-overlay').classList.add('show');
+}
+
+function closeShop() {
+  shopOpen = false;
+  document.getElementById('shop-overlay').classList.remove('show');
+}
+
+// ---- Spawners ----
+
+function asteroidTier() {
+  var maxTier = Math.min(10, 5 + Math.floor(score * 5 / 200));
+  var weights = [], total = 0;
+  for (var t = 1; t <= maxTier; t++) { var w = maxTier - t + 1; weights.push(w); total += w; }
+  var r = Math.random() * total, cum = 0;
+  for (var i = 0; i < weights.length; i++) { cum += weights[i]; if (r < cum) return i + 1; }
+  return 1;
+}
+
+function spawnAsteroid() {
+  var margin = 30;
+  var x = margin + Math.random() * (W - margin * 2);
+  var tier = asteroidTier();
+  var radius = ASTEROID_RADII[tier];
+  var speed = 1.0 + level * 0.25 + Math.random() * 1.0;
+  asteroids.push({ x: x, y: -radius - 10, tier: tier, radius: radius, speed: speed,
+    angle: (Math.random() - 0.5) * 0.3, rot: Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 0.05, hp: ASTEROID_HP[tier], maxHp: ASTEROID_HP[tier] });
+}
+
+function spawnBullet() {
+  var bspd = 13 + level * 0.4;
+  var spread = MISSILE_SPREADS[missileLevel];
+  for (var i = 0; i < spread.length; i++) {
+    bullets.push({ x: ship.x + spread[i][0], y: ship.y - 30 + spread[i][1], speed: bspd, vx: spread[i][2] });
+  }
+}
+
+function spawnCoinItems(x, y, count) {
+  for (var i = 0; i < count; i++) {
+    coinItems.push({
+      x: x + (Math.random() - 0.5) * 40,
+      y: y,
+      vy: 1.2 + Math.random() * 0.8,
+      vx: (Math.random() - 0.5) * 1.5,
+      rot: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function spawnAlien() {
+  var fromLeft = Math.random() < 0.5;
+  var alienSpeed = 1.2 + Math.random() * 0.6 + Math.floor((score - 30) / 30) * 0.2;
+  aliens.push({
+    x: fromLeft ? -50 : W + 50,
+    y: HUD_H + 50 + Math.random() * (H * 0.3),
+    vx: fromLeft ? alienSpeed : -alienSpeed,
+    hp: 3,
+    shootTimer: 80 + Math.floor(Math.random() * 60)
+  });
+}
+
+function spawnParticles(x, y, color, count) {
+  for (var i = 0; i < count; i++) {
+    var angle = Math.random() * Math.PI * 2;
+    var spd = Math.random() * 5 + 1.5;
+    particles.push({ x: x, y: y, vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd, r: Math.random() * 6 + 2, color: color, life: 1 });
+  }
+}
+
+// ---- Draw functions ----
+
+function drawStars() {
+  for (var i = 0; i < stars.length; i++) {
+    var s = stars[i];
+    ctx.globalAlpha = 0.6 + s.bright * 0.4 * (0.9 + 0.1 * Math.sin(frameCount * 0.05 + i));
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+    s.y += s.speed;
+    if (s.y > H) { s.y = 0; s.x = Math.random() * W; }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawShip(x, y) {
+  ctx.save();
+  var ox = shipShake > 0 ? (Math.random() - 0.5) * shipShake * 2 : 0;
+  var oy = shipShake > 0 ? (Math.random() - 0.5) * shipShake : 0;
+  ctx.translate(x + ox, y + oy);
+
+  // Flame thruster
+  var flameH = 18 + Math.sin(frameCount * 0.4) * 6;
+  ctx.beginPath();
+  ctx.moveTo(-10, 22); ctx.lineTo(10, 22); ctx.lineTo(0, 22 + flameH);
+  ctx.fillStyle = frameCount % 6 < 3 ? '#ff9800' : '#fff176';
+  ctx.fill();
+
+  // Pick sprite based on velocity + shield state
+  var vx = ship.x - ship.prevX;
+  var shielded = ship.shieldFrames > 0;
+  var DW = 72, DH = 72;
+  var spriteName, mirror = false;
+  if (Math.abs(vx) < 0.5) {
+    spriteName = shielded ? 'player_shield_level' : 'player_level';
+  } else if (vx < 0) {
+    spriteName = shielded ? 'player_shield_left' : 'player_tilt';
+  } else {
+    spriteName = shielded ? 'player_shield_right' : 'player_tilt';
+    mirror = !shielded;
+  }
+
+  if (mirror) ctx.scale(-1, 1);
+  // Scale destination by the sprite's bbox ratio against player_level so
+  // shield variants render larger (their bbox includes the bubble) and the
+  // ship-inside-bubble appears the same visible size as the unshielded ship.
+  var ok = drawSpriteRel('player_level', spriteName, 0, 0, DW, DH);
+  if (mirror) ctx.scale(-1, 1);
+
+  if (!ok) {
+    // Canvas fallback
+    ctx.beginPath();
+    ctx.moveTo(0, -26); ctx.lineTo(18, 22); ctx.lineTo(-18, 22); ctx.closePath();
+    var grad = ctx.createLinearGradient(-18, 0, 18, 0);
+    grad.addColorStop(0, '#5c6bc0'); grad.addColorStop(0.5, '#9fa8da'); grad.addColorStop(1, '#5c6bc0');
+    ctx.fillStyle = grad; ctx.fill();
+  }
+  ctx.restore();
+}
+
+function asteroidSpriteName(tier) {
+  var bucket = Math.min(5, Math.ceil(tier / 2));
+  return 'asteroid_' + bucket;
+}
+
+function drawAsteroid(a) {
+  ctx.save();
+  ctx.translate(a.x, a.y);
+  ctx.rotate(a.rot);
+  var d = a.radius * 2.2;
+  var spriteName = asteroidSpriteName(a.tier);
+  var ok = drawSpriteCentered(spriteName, 0, 0, d, d);
+  if (!ok) {
+    var s = a.radius;
+    ctx.beginPath();
+    var pts = 9;
+    for (var i = 0; i < pts; i++) {
+      var ang = (i / pts) * Math.PI * 2;
+      var r = s * (0.72 + 0.28 * Math.sin(ang * 3 + a.rot * 2));
+      var px = Math.cos(ang) * r, py = Math.sin(ang) * r;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    var ag = ctx.createRadialGradient(-s * 0.3, -s * 0.3, s * 0.1, 0, 0, s);
+    ag.addColorStop(0, '#9e9e9e'); ag.addColorStop(1, '#37474f');
+    ctx.fillStyle = ag; ctx.fill();
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  // Damage tint — re-draw the same sprite with a red filter on top of
+  // itself, alpha-blended in proportion to damage taken. The silhouette
+  // is preserved exactly because we're drawing the same shape; only the
+  // colors shift toward red as HP drops.
+  if (a.hp < a.maxHp && ok) {
+    ctx.save();
+    ctx.filter = 'sepia(1) saturate(5) hue-rotate(-50deg) brightness(1.1)';
+    ctx.globalAlpha = 1 - a.hp / a.maxHp;
+    drawSpriteCentered(spriteName, 0, 0, d, d);
+    ctx.restore();
+  }
+  if (a.tier >= 3) {
+    ctx.rotate(-a.rot);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = 'bold ' + Math.round(a.radius * 0.45) + 'px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(a.tier, 0, 0);
+  }
+  ctx.restore();
+}
+
+function drawBullet(b) {
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.shadowColor = '#42d7f5';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#e1f5fe';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 4, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#42d7f5';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 2, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCoinItem(c) {
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  var bob = Math.sin(frameCount * 0.1 + c.x * 0.01) * 2;
+  ctx.translate(0, bob);
+  ctx.rotate(c.rot);
+  var size = 26;
+  ctx.shadowColor = '#ffd700';
+  ctx.shadowBlur = 10;
+  var ok = drawSpriteCentered('coin_star', 0, 0, size, size);
+  ctx.shadowBlur = 0;
+  if (!ok) {
+    ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd700';
+    ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 8;
+    ctx.fill();
+    ctx.fillStyle = '#b8860b';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 0;
+    ctx.fillText('$', 0, 1);
+  }
+  ctx.restore();
+}
+
+function drawAlien(a) {
+  ctx.save();
+  ctx.translate(a.x, a.y);
+  var ok = drawSpriteCentered('alien_normal', 0, 0, 68, 68);
+  if (!ok) {
+    ctx.beginPath(); ctx.ellipse(0, 4, 34, 12, 0, 0, Math.PI * 2);
+    var bg = ctx.createLinearGradient(-34, -4, 34, 12);
+    bg.addColorStop(0, '#424242'); bg.addColorStop(0.5, '#757575'); bg.addColorStop(1, '#424242');
+    ctx.fillStyle = bg; ctx.fill();
+    ctx.strokeStyle = '#212121'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, 0, 18, 14, 0, Math.PI, 0);
+    var dg = ctx.createRadialGradient(-4, -4, 0, 0, 0, 18);
+    dg.addColorStop(0, 'rgba(180,255,180,0.9)'); dg.addColorStop(1, 'rgba(0,160,0,0.6)');
+    ctx.fillStyle = dg; ctx.fill();
+    ctx.strokeStyle = '#00c853'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-18, 26, 36, 5);
+  ctx.fillStyle = '#00e676'; ctx.fillRect(-18, 26, 36 * (a.hp / 3), 5);
+  ctx.restore();
+}
+
+function drawAlienBullet(b) {
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(Math.atan2(b.vy, b.vx) + Math.PI / 2);
+  ctx.shadowColor = '#ff6d00';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#ff9800';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 5, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#ffeb3b';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 2, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// Boss appearance schedule: 100, 400, 1000, then +2000 each.
+// killedCount is the number of bosses already killed (== bossNum after kill).
+var BOSS_SCHEDULE = [100, 400, 1000];
+function nextBossThreshold(killedCount) {
+  var raw = killedCount < BOSS_SCHEDULE.length
+    ? BOSS_SCHEDULE[killedCount]
+    : 1000 + (killedCount - 2) * 2000;
+  return easyMode ? Math.round(raw / 2) : raw;
+}
+
+// Per-tier HP multipliers — tier 2 = 2x tier 1, tier 3 = 4x tier 1
+var BOSS_BASE_HP = 22;
+var BOSS_TIER_HP_MULT = { 1: 1, 2: 2, 3: 4 };
+
+function spawnBoss() {
+  bossNum++;
+  var tier = Math.min(3, bossNum);
+  var hp = BOSS_BASE_HP * BOSS_TIER_HP_MULT[tier];
+  boss = {
+    x: W / 2, y: HUD_H - 80,
+    hp: hp, maxHp: hp,
+    shootTimer: 90, phase: 0,
+    tier: tier,
+  };
+  bossLasers = [];
+  bossAnnounceTimer = 130;
+}
+
+function drawBoss(b) {
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  var pulse = 0.96 + 0.04 * Math.sin(frameCount * 0.1);
+
+  var scale = b.tier === 1 ? 1.0 : (b.tier === 2 ? 1.15 : 1.30);
+  var glowR = b.tier === 1 ? 75 : (b.tier === 2 ? 95 : 120);
+  var glowColor = b.tier === 1 ? 'rgba(180,255,180,0.30)' : (b.tier === 2 ? 'rgba(255,140,80,0.35)' : 'rgba(255,60,60,0.42)');
+  var pulseT3 = b.tier === 3 ? (0.94 + 0.06 * Math.sin(frameCount * 0.18)) : 1;
+
+  var glow = ctx.createRadialGradient(0, 0, 10, 0, 0, glowR * pulseT3);
+  glow.addColorStop(0, glowColor);
+  glow.addColorStop(1, glowColor.replace(/[\d.]+\)/, '0)'));
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(0, 0, glowR * pulseT3, 0, Math.PI * 2); ctx.fill();
+
+  ctx.save();
+  ctx.scale(pulse * scale * pulseT3, pulse * scale * pulseT3);
+  var ok = drawSpriteRel('boss_base', 'boss_base', 0, 0, 140, 140);
+  if (!ok) {
+    ctx.beginPath();
+    ctx.moveTo(0, 58); ctx.lineTo(58, -18); ctx.lineTo(42, -42); ctx.lineTo(-42, -42); ctx.lineTo(-58, -18);
+    ctx.closePath();
+    var hg = ctx.createLinearGradient(-58, -42, 58, 58);
+    hg.addColorStop(0, '#4a148c'); hg.addColorStop(0.5, '#8e24aa'); hg.addColorStop(1, '#4a148c');
+    ctx.fillStyle = hg; ctx.fill();
+    ctx.strokeStyle = '#ce93d8'; ctx.lineWidth = 2.5; ctx.stroke();
+  }
+  ctx.restore();
+
+  if (b.tier >= 2) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = b.tier === 2 ? 0.30 : 0.55;
+    ctx.fillStyle = b.tier === 2 ? '#ff8060' : '#ff3030';
+    ctx.beginPath(); ctx.arc(0, 0, 80 * scale, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  var bw = 140 + b.tier * 20, bh = 11;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-bw / 2, 75, bw, bh);
+  var hpFrac = b.hp / b.maxHp;
+  var hpHi = b.tier === 1 ? '#69f0ae' : (b.tier === 2 ? '#ffa726' : '#ef5350');
+  var hpMid = b.tier === 1 ? '#ffd700' : (b.tier === 2 ? '#ff7043' : '#e53935');
+  var hpLow = '#ff1744';
+  ctx.fillStyle = hpFrac > 0.5 ? hpHi : (hpFrac > 0.25 ? hpMid : hpLow);
+  ctx.fillRect(-bw / 2, 75, bw * hpFrac, bh);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(-bw / 2, 75, bw, bh);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('BOSS · TIER ' + b.tier, 0, 80.5);
+  ctx.restore();
+}
+
+function drawBossLaser(l) {
+  ctx.save();
+  ctx.translate(l.x, l.y);
+  ctx.rotate(Math.atan2(l.vy, l.vx) + Math.PI / 2);
+  var pulse = 0.85 + 0.15 * Math.sin(frameCount * 0.4);
+  ctx.shadowColor = '#ff4081';
+  ctx.shadowBlur = 18 * pulse;
+  ctx.fillStyle = '#ff80ab';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 6, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 2.5, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (var i = particles.length - 1; i >= 0; i--) {
+    var p = particles[i];
+    ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life -= 0.033;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---- Intervals ----
+
+function asteroidSpawnInterval() {
+  var base = Math.max(28, 80 - level * 8);
+  return easyMode ? base * 2 : base;
+}
+function bulletInterval()        { return Math.max(6, Math.floor(Math.max(14, 28 - level * 2) * Math.pow(0.8, fireRateBoosts))); }
+function maxAliensOnScreen() {
+  if (score < 30) return 0;
+  var base = Math.min(6, 1 + Math.floor((score - 30) / 20));
+  return easyMode ? Math.max(1, Math.floor(base / 2)) : base;
+}
+
+function addScore(pts) {
+  score += pts;
+  document.getElementById('score-el').textContent = score;
+}
+
+function addCoins(n) {
+  coins += n;
+  document.getElementById('coins-el').textContent = coins;
+}
+
+function updateLivesHUD(animateLast) {
+  var el = document.getElementById('lives-el');
+  var html = '';
+  for (var i = 0; i < Math.max(0, lives); i++) {
+    if (animateLast && i === lives - 1) {
+      html += '<span class="ship-new">❤️</span>';
+    } else {
+      html += '❤️';
+    }
+  }
+  el.innerHTML = html || '💔';
+}
+
+// ---- Update ----
+
+function update() {
+  frameCount++;
+  ship.prevX = ship.x;
+  ship.x += (ship.targetX - ship.x) * 0.15;
+  if (ship.shieldFrames > 0) ship.shieldFrames--;
+  if (shipShake > 0) shipShake = Math.max(0, shipShake - 1.2);
+  if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - 1);
+
+  if (frameCount % bulletInterval() === 0) spawnBullet();
+  if (frameCount % asteroidSpawnInterval() === 0) spawnAsteroid();
+  if (level >= 3 && frameCount % Math.round(asteroidSpawnInterval() * 1.7) === 0) spawnAsteroid();
+  if (aliens.length < maxAliensOnScreen() && frameCount % 180 === 0) spawnAlien();
+
+  var newLevel = Math.floor(score / 8) + 1;
+  if (newLevel > level) level = newLevel;
+
+  for (var i = bullets.length - 1; i >= 0; i--) {
+    bullets[i].x += bullets[i].vx || 0;
+    bullets[i].y -= bullets[i].speed;
+    if (bullets[i].y < HUD_H) bullets.splice(i, 1);
+  }
+
+  for (var ai = asteroids.length - 1; ai >= 0; ai--) {
+    var a = asteroids[ai];
+    a.y += a.speed;
+    a.x += Math.sin(a.angle + frameCount * 0.018) * 0.7;
+    a.rot += a.rotSpeed;
+    var asteroidHit = false;
+    for (var bi = bullets.length - 1; bi >= 0; bi--) {
+      var b = bullets[bi];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      if (Math.sqrt(dx*dx + dy*dy) < a.radius * 0.9) {
+        bullets.splice(bi, 1); a.hp -= bulletDamage();
+        spawnParticles(b.x, b.y, '#42d7f5', 4); // cyan — matches player laser
+        if (a.hp <= 0) {
+          spawnParticles(a.x, a.y, '#ff7043', 8 + a.tier * 2); // orange burst (kept)
+          spawnParticles(a.x, a.y, '#5d4037', 4 + a.tier);     // brown debris
+          addScore(ASTEROID_PTS[a.tier]);
+          spawnCoinItems(a.x, a.y, Math.ceil(a.tier / 2));
+          asteroids.splice(ai, 1);
+          asteroidHit = true; break;
+        }
+      }
+    }
+    if (asteroidHit) continue;
+    var sx = ship.x - a.x, sy = ship.y - a.y;
+    if (Math.sqrt(sx*sx + sy*sy) < a.radius * 0.78 + 18) {
+      spawnParticles(a.x, a.y, '#ff5722', 12);
+      asteroids.splice(ai, 1);
+      loseLife(); continue;
+    }
+    if (a.y > H + a.radius) asteroids.splice(ai, 1);
+  }
+
+  for (var ci = coinItems.length - 1; ci >= 0; ci--) {
+    var c = coinItems[ci];
+    c.y += c.vy; c.x += c.vx; c.rot += 0.05;
+    var cdx = ship.x - c.x, cdy = ship.y - c.y;
+    if (Math.sqrt(cdx*cdx + cdy*cdy) < 30) {
+      addCoins(1);
+      spawnParticles(c.x, c.y, '#ffd700', 5);
+      coinItems.splice(ci, 1); continue;
+    }
+    if (c.y > H + 20) coinItems.splice(ci, 1);
+  }
+
+  for (var li = aliens.length - 1; li >= 0; li--) {
+    var al = aliens[li];
+    al.x += al.vx;
+    if (al.x > W + 60 || al.x < -60) { aliens.splice(li, 1); continue; }
+    al.shootTimer--;
+    if (al.shootTimer <= 0) {
+      al.shootTimer = 70 + Math.floor(Math.random() * 50);
+      var adx = ship.x - al.x, ady = ship.y - al.y;
+      var dist = Math.sqrt(adx*adx + ady*ady);
+      alienBullets.push({ x: al.x, y: al.y + 14, vx: (adx / dist) * 9.0, vy: (ady / dist) * 9.0 });
+    }
+    var alienHit = false;
+    for (var bi2 = bullets.length - 1; bi2 >= 0; bi2--) {
+      var bul = bullets[bi2];
+      var bdx = bul.x - al.x, bdy = bul.y - al.y;
+      if (Math.sqrt(bdx*bdx + bdy*bdy) < 34) {
+        bullets.splice(bi2, 1); al.hp -= bulletDamage();
+        spawnParticles(bul.x, bul.y, '#ce93d8', 5); // light purple sparks
+        if (al.hp <= 0) {
+          spawnParticles(al.x, al.y, '#9c27b0', 12); // purple
+          spawnParticles(al.x, al.y, '#69f0ae', 8);  // green-yellow accent
+          addScore(5);
+          spawnCoinItems(al.x, al.y, 3);
+          aliens.splice(li, 1); alienHit = true; break;
+        }
+      }
+    }
+    if (alienHit) continue;
+  }
+
+  for (var abi = alienBullets.length - 1; abi >= 0; abi--) {
+    var ab = alienBullets[abi];
+    ab.x += ab.vx; ab.y += ab.vy;
+    if (ab.y > H + 20 || ab.x < -20 || ab.x > W + 20) { alienBullets.splice(abi, 1); continue; }
+    var abdx = ship.x - ab.x, abdy = ship.y - ab.y;
+    if (Math.sqrt(abdx*abdx + abdy*abdy) < 22) {
+      spawnParticles(ab.x, ab.y, '#ff5722', 8);
+      alienBullets.splice(abi, 1);
+      loseLife();
+    }
+  }
+
+  // Boss spawn check
+  if (!boss && score >= bossNextScore) spawnBoss();
+
+  // Boss movement and shooting
+  if (boss) {
+    if (boss.y < HUD_H + 135) boss.y += 1.5;
+    boss.phase += 0.018;
+    boss.x = Math.max(100, Math.min(W - 100, W / 2 + Math.sin(boss.phase) * W * 0.30));
+    boss.shootTimer--;
+    if (boss.shootTimer <= 0) {
+      boss.shootTimer = Math.max(45, 95 - bossNum * 7);
+      var numLasers = Math.min(2 + bossNum, 9);
+      var bBaseAngle = Math.atan2(ship.y - boss.y, ship.x - boss.x);
+      var bFanSpread = Math.PI / 7;
+      var bStartAngle = bBaseAngle - ((numLasers - 1) / 2) * bFanSpread;
+      for (var lfi = 0; lfi < numLasers; lfi++) {
+        var lfAng = bStartAngle + lfi * bFanSpread;
+        bossLasers.push({ x: boss.x, y: boss.y + 60, vx: Math.cos(lfAng) * 6.5, vy: Math.sin(lfAng) * 6.5 });
+      }
+    }
+    for (var bhi = bullets.length - 1; bhi >= 0; bhi--) {
+      var bhBul = bullets[bhi];
+      var bhDx = bhBul.x - boss.x, bhDy = bhBul.y - boss.y;
+      if (Math.sqrt(bhDx * bhDx + bhDy * bhDy) < 63) {
+        bullets.splice(bhi, 1); boss.hp -= bulletDamage();
+        spawnParticles(bhBul.x, bhBul.y, '#ff80ab', 5); // matches boss laser color
+        if (boss.hp <= 0) {
+          spawnParticles(boss.x, boss.y, '#ff4081', 25); // magenta core
+          spawnParticles(boss.x, boss.y, '#ffd700', 20); // gold (kept)
+          spawnParticles(boss.x, boss.y, '#fff', 15);    // white sparks (kept)
+          addScore(15 * bossNum);
+          spawnCoinItems(boss.x, boss.y, 6 * bossNum);
+          bossNextScore = nextBossThreshold(bossNum);
+          shipShake = 30;        // strong shake on boss death
+          screenFlash = 18;      // bright flash
+          boss = null; bossLasers = [];
+          break;
+        }
+      }
+    }
+  }
+
+  // Boss laser movement and player collision
+  for (var bli = bossLasers.length - 1; bli >= 0; bli--) {
+    var bl = bossLasers[bli];
+    bl.x += bl.vx; bl.y += bl.vy;
+    if (bl.y > H + 20 || bl.x < -20 || bl.x > W + 20) { bossLasers.splice(bli, 1); continue; }
+    var blDx = ship.x - bl.x, blDy = ship.y - bl.y;
+    if (Math.sqrt(blDx * blDx + blDy * blDy) < 22) {
+      spawnParticles(bl.x, bl.y, '#ff4081', 8);
+      bossLasers.splice(bli, 1);
+      loseLife();
+    }
+  }
+  if (bossAnnounceTimer > 0) bossAnnounceTimer--;
+}
+
+function loseLife() {
+  if (ship.shieldFrames > 0) return;
+  lives--;
+  ship.shieldFrames = 60;
+  shipShake = 22; screenFlash = 14;
+  spawnParticles(ship.x, ship.y, '#42d7f5', 16);
+  spawnParticles(ship.x, ship.y, '#ff9800', 8);
+  updateLivesHUD(false);
+  if (lives <= 0) {
+    gameActive = false;
+    playerDeath = { x: ship.x, y: ship.y, frame: 0 };
+    spawnParticles(ship.x, ship.y, '#ff5722', 30);
+    spawnParticles(ship.x, ship.y, '#ffeb3b', 18);
+    setTimeout(showEndScreen, 750); // wait for the 30-frame animation + 0.25s pause
+  }
+}
+
+function showEndScreen() {
+  var el = document.getElementById('overlay');
+  var starStr = score >= 50 ? '⭐⭐⭐' : score >= 20 ? '⭐⭐' : '⭐';
+  el.querySelector('h2').textContent = score >= 40 ? 'Amazing pilot! 🏆' : score >= 15 ? 'Great flying! 🚀' : 'Super try! ⭐';
+  document.getElementById('overlay-sub').textContent = starStr + '  Score: ' + score + '  🟡 ' + coins;
+  document.getElementById('play-btn').textContent = 'Play Again! 🚀';
+  el.classList.add('show');
+}
+
+// ---- Game loop ----
+
+function gameLoop() {
+  requestAnimationFrame(gameLoop);
+  ctx.fillStyle = '#030818';
+  ctx.fillRect(0, 0, W, H);
+  drawStars();
+  drawParticles();
+  if (screenFlash > 0) {
+    ctx.fillStyle = 'rgba(255,30,30,' + (screenFlash / 14 * 0.45) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+  if (gameActive && !shopOpen) {
+    update();
+    for (var i = 0; i < coinItems.length; i++) drawCoinItem(coinItems[i]);
+    for (var k = 0; k < asteroids.length; k++) drawAsteroid(asteroids[k]);
+    for (var l = 0; l < aliens.length; l++) drawAlien(aliens[l]);
+    for (var m = 0; m < alienBullets.length; m++) drawAlienBullet(alienBullets[m]);
+    for (var n = 0; n < bullets.length; n++) drawBullet(bullets[n]);
+    if (!playerDeath) {
+      drawShip(ship.x, ship.y);
+    } else {
+      var frameIdx = Math.min(5, Math.floor(playerDeath.frame / 6) + 1);
+      var DW = 90;
+      ctx.save();
+      drawSpriteCentered('explosion_' + frameIdx, playerDeath.x, playerDeath.y, DW, DW);
+      ctx.restore();
+      playerDeath.frame++;
+    }
+    if (boss) drawBoss(boss);
+    for (var bliD = 0; bliD < bossLasers.length; bliD++) drawBossLaser(bossLasers[bliD]);
+    if (bossAnnounceTimer > 0) {
+      ctx.save();
+      // Screen darken — fades in/out with the timer
+      var fade = bossAnnounceTimer > 100 ? (130 - bossAnnounceTimer) / 30
+               : bossAnnounceTimer < 30 ? bossAnnounceTimer / 30
+               : 1;
+      ctx.fillStyle = 'rgba(0,0,0,' + (0.4 * fade) + ')';
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = fade;
+      // Pulsing main text
+      var pulse = 1 + 0.06 * Math.sin(frameCount * 0.25);
+      ctx.font = 'bold ' + Math.round(42 * pulse) + 'px Arial';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#ff4081'; ctx.shadowBlur = 28;
+      ctx.fillStyle = '#fff';
+      ctx.fillText('⚠️ BOSS INCOMING! ⚠️', W / 2, H / 2);
+      // Tier subtitle for tier 2/3
+      if (boss && boss.tier >= 2) {
+        ctx.font = 'bold 26px Arial';
+        ctx.shadowColor = boss.tier === 2 ? '#ff7043' : '#ef5350';
+        ctx.shadowBlur = 22;
+        ctx.fillStyle = boss.tier === 2 ? '#ffab91' : '#ef9a9a';
+        ctx.fillText('TIER ' + boss.tier, W / 2, H / 2 + 56);
+      }
+      ctx.restore();
+    }
+  } else if (!gameActive) {
+    for (var o = 0; o < asteroids.length; o++) drawAsteroid(asteroids[o]);
+    if (playerDeath && playerDeath.frame < 30) {
+      var frameIdx = Math.min(5, Math.floor(playerDeath.frame / 6) + 1);
+      drawSpriteCentered('explosion_' + frameIdx, playerDeath.x, playerDeath.y, 90, 90);
+      playerDeath.frame++;
+    }
+  } else {
+    for (var q = 0; q < asteroids.length; q++) drawAsteroid(asteroids[q]);
+    drawShip(ship.x, ship.y);
+  }
+}
+
+// ---- Controls ----
+
+canvas.addEventListener('touchmove', function(e) {
+  e.preventDefault();
+  ship.targetX = Math.max(36, Math.min(W - 36, e.touches[0].clientX));
+}, { passive: false });
+
+canvas.addEventListener('touchstart', function(e) {
+  e.preventDefault();
+  ship.targetX = Math.max(36, Math.min(W - 36, e.touches[0].clientX));
+}, { passive: false });
+
+canvas.addEventListener('mousemove', function(e) {
+  if (!gameActive || shopOpen) return;
+  ship.targetX = Math.max(36, Math.min(W - 36, e.clientX));
+});
+
+document.getElementById('play-btn').addEventListener('click', startGame);
+
+document.querySelectorAll('.diff-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.diff-btn').forEach(function (b) {
+      b.classList.remove('active');
+      b.setAttribute('aria-checked', 'false');
+    });
+    this.classList.add('active');
+    this.setAttribute('aria-checked', 'true');
+    easyMode = this.getAttribute('data-mode') === 'easy';
+  });
+});
+
+document.getElementById('shop-hud-btn').addEventListener('click', function() {
+  if (!gameActive) return;
+  openShop();
+});
+
+document.getElementById('close-shop-btn').addEventListener('click', closeShop);
+
+document.getElementById('buy-life-btn').addEventListener('click', function() {
+  var cost = priceFor(5);
+  if (coins < cost || lives >= 10) return;
+  coins -= cost; lives++;
+  document.getElementById('coins-el').textContent = coins;
+  document.getElementById('shop-coins-el').textContent = coins;
+  updateLivesHUD(true);
+  spawnParticles(W / 2, H / 2, '#42d7f5', 14);
+});
+
+document.getElementById('buy-shield-btn').addEventListener('click', function() {
+  var cost = priceFor(25);
+  if (coins < cost) return;
+  coins -= cost;
+  lives = 10;
+  document.getElementById('coins-el').textContent = coins;
+  document.getElementById('shop-coins-el').textContent = coins;
+  updateLivesHUD(true);
+  spawnParticles(W / 2, H / 2, '#69f0ae', 20);
+});
+
+document.getElementById('buy-fast-btn').addEventListener('click', function() {
+  var cost = priceFor(FAST_FIRE_COSTS[fireRateBoosts]);
+  if (coins < cost || fireRateBoosts >= 5) return;
+  coins -= cost; fireRateBoosts++;
+  document.getElementById('coins-el').textContent = coins;
+  document.getElementById('shop-coins-el').textContent = coins;
+  document.getElementById('fast-fire-desc').textContent = 'Shoot 20% faster! (' + fireRateBoosts + '/5)';
+  document.getElementById('buy-fast-btn').textContent = fireRateBoosts >= 5 ? 'MAX!' : priceFor(FAST_FIRE_COSTS[fireRateBoosts]) + ' 🟡';
+  spawnParticles(W / 2, H / 2, '#42d7f5', 18);
+});
+
+document.getElementById('buy-wide-btn').addEventListener('click', function() {
+  var cost = priceFor(WIDE_SHOT_COSTS[missileLevel]);
+  if (coins < cost || missileLevel >= 3) return;
+  coins -= cost; missileLevel++;
+  document.getElementById('coins-el').textContent = coins;
+  document.getElementById('shop-coins-el').textContent = coins;
+  document.getElementById('missile-el').textContent = '×' + MISSILE_COUNTS[missileLevel];
+  document.getElementById('wide-shot-desc').textContent = 'More missiles! (×' + MISSILE_COUNTS[missileLevel] + ')';
+  document.getElementById('buy-wide-btn').textContent = missileLevel >= 3 ? 'MAX!' : priceFor(WIDE_SHOT_COSTS[missileLevel]) + ' 🟡';
+  spawnParticles(W / 2, H / 2, '#ffd700', 18);
+});
+
+gameLoop();
+</script>
+</body>
+</html>
