@@ -475,6 +475,8 @@ function updateProjectiles(dt) {
   }
   for (var i = projectiles.length - 1; i >= 0; i--) {
     var p = projectiles[i];
+    // Boss projectiles are stepped by updateBossHazards; skip here to avoid double-step.
+    if (p.kind === 'boss-claw' || p.kind === 'boss-bolt' || p.kind === 'boss-stomp') continue;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.life -= dt;
@@ -996,6 +998,209 @@ function drawVehicle() {
   }
 }
 
+// ── Boss ───────────────────────────────────────────────────────────────────
+var boss = {
+  active: false,
+  x: 4750, y: 0,
+  w: 120, h: 140,
+  phase: 1,
+  hp: 10,
+  hpMaxP1: 10,
+  hpMaxP2: 8,
+  attackT: 3.0,
+  currentAttack: null,
+  hitFlash: 0,
+  invuln: 0,
+};
+var BOSS_TRIGGER_X = 4250;
+
+function activateBoss() {
+  if (boss.active) return;
+  boss.active = true;
+  boss.x = 4750;
+  boss.hp = boss.hpMaxP1;
+  boss.phase = 1;
+  bossRow.style.display = 'block';
+  showBanner('🤖 FOREMAN-BOT 9000', 1500);
+}
+
+function updateBoss(dt) {
+  if (!boss.active) {
+    if (player.x >= BOSS_TRIGGER_X) activateBoss();
+    return;
+  }
+  if (boss.hitFlash > 0) boss.hitFlash -= dt;
+  if (boss.invuln > 0) boss.invuln -= dt;
+
+  // Update HP bar fill
+  var maxHpForPhase = boss.phase === 1 ? boss.hpMaxP1 : boss.hpMaxP2;
+  bossFill.style.width = Math.max(0, (boss.hp / maxHpForPhase) * 100) + '%';
+
+  // Attack rotation
+  if (boss.invuln <= 0 && boss.currentAttack === null) {
+    boss.attackT -= dt;
+    if (boss.attackT <= 0) {
+      var roll = Math.random();
+      if (boss.phase === 1) {
+        boss.currentAttack = roll < 0.5
+          ? { kind: 'claw',   t: 0, life: 0.5 + 0.7 }
+          : { kind: 'volley', t: 0, life: 0.5 + 0.5 };
+      } else {
+        // Phase 2 attack table — extended in Task 14
+        boss.currentAttack = roll < 0.33
+          ? { kind: 'claw',   t: 0, life: 1.2 }
+          : roll < 0.66
+          ? { kind: 'volley', t: 0, life: 1.0 }
+          : { kind: 'stomp',  t: 0, life: 0.5 + 0.8 };
+      }
+      boss.attackT = 3.0;
+    }
+  }
+
+  // Run current attack
+  if (boss.currentAttack) {
+    var a = boss.currentAttack;
+    a.t += dt;
+    if (a.kind === 'claw') {
+      if (a.t > 0.5 && !a.fired) {
+        a.fired = true;
+        projectiles.push({
+          x: boss.x - 30, y: GROUND_Y - 30,
+          vx: -400, vy: 0, life: 0.7, kind: 'boss-claw',
+        });
+      }
+    } else if (a.kind === 'volley') {
+      if (a.t > 0.5 && !a.fired) {
+        a.fired = true;
+        for (var k = -1; k <= 1; k++) {
+          projectiles.push({
+            x: boss.x - 20, y: GROUND_Y - boss.h * 0.6,
+            vx: -300 + k * 50, vy: -200, life: 2.0, kind: 'boss-bolt',
+            grav: true,
+          });
+        }
+      }
+    } else if (a.kind === 'stomp') {
+      // T14 wires this; placeholder so the attack-table doesn't crash
+      if (a.t > 0.5 && !a.fired) {
+        a.fired = true;
+        projectiles.push({
+          x: boss.x - 30, y: GROUND_Y - 16,
+          vx: -350, vy: 0, life: 1.5, kind: 'boss-stomp',
+        });
+      }
+    }
+    if (a.t >= a.life) {
+      boss.currentAttack = null;
+    }
+  }
+
+  // Player projectiles vs boss
+  for (var j = projectiles.length - 1; j >= 0; j--) {
+    var p = projectiles[j];
+    if (p.kind !== 'foam' && p.kind !== 'spark' && p.kind !== 'mech-piston') continue;
+    if (boss.invuln > 0) continue;
+    if (rectsOverlap(p.x - 6, p.y - 6, 12, 12, boss.x - boss.w / 2, GROUND_Y - boss.h, boss.w, boss.h)) {
+      var dmg = p.kind === 'mech-piston' ? (p.damage || 1.5) : 1;
+      boss.hp -= dmg;
+      boss.hitFlash = 0.15;
+      if (p.kind !== 'mech-piston') projectiles.splice(j, 1);
+      if (boss.hp <= 0 && boss.phase === 1) {
+        // Phase 1 → Phase 2 transition (T14 wires the visuals)
+        boss.phase = 2;
+        boss.hp = boss.hpMaxP2;
+        boss.invuln = 1.0;
+        showBanner('⚡ Phase 2!', 1500);
+        spawnPickup('heart', boss.x - 60, GROUND_Y - 20);
+      } else if (boss.hp <= 0 && boss.phase === 2) {
+        onBossDefeated();
+      }
+    }
+  }
+}
+
+function onBossDefeated() {
+  // Stub for T15. Just deactivates the boss for now.
+  boss.active = false;
+  bossRow.style.display = 'none';
+  scene = 'win';
+}
+
+function updateBossHazards(dt) {
+  for (var i = projectiles.length - 1; i >= 0; i--) {
+    var p = projectiles[i];
+    if (p.kind !== 'boss-claw' && p.kind !== 'boss-bolt' && p.kind !== 'boss-stomp') continue;
+    if (p.grav) p.vy += GRAVITY * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    if (p.life <= 0) { projectiles.splice(i, 1); continue; }
+    // Hit player
+    if (player.invuln <= 0 && shieldBubble <= 0 && !vehicle.mounted &&
+        rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
+                     p.x - 12, p.y - 12, 24, 24)) {
+      var dmg = p.kind === 'boss-stomp' ? 2 : 1;
+      hurtPlayer(dmg, p.x);
+    }
+  }
+}
+
+function drawBoss() {
+  if (!boss.active) return;
+  var bx = boss.x - boss.w / 2;
+  var by = GROUND_Y - boss.h;
+  var flash = boss.hitFlash > 0;
+  ctx.fillStyle = flash ? '#FFFFFF' : '#9E9E9E';
+  ctx.fillRect(bx, by, boss.w, boss.h);
+  ctx.fillStyle = '#FFC107';
+  for (var s = 0; s < 4; s++) ctx.fillRect(bx, by + 12 + s * 26, boss.w, 6);
+  ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 3;
+  ctx.strokeRect(bx, by, boss.w, boss.h);
+  // Optical sensor
+  ctx.fillStyle = boss.phase === 1 ? '#FF1744' : '#FF6F00';
+  ctx.beginPath();
+  ctx.arc(bx + boss.w * 0.3, by + boss.h * 0.25, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#1A1A1A';
+  ctx.beginPath();
+  ctx.arc(bx + boss.w * 0.3, by + boss.h * 0.25, 14, 0, Math.PI * 2);
+  ctx.stroke();
+  // Claw arm
+  ctx.fillStyle = '#37474F';
+  ctx.fillRect(bx - 30, by + boss.h * 0.45, 30, 14);
+  // Telegraph: claw rears back
+  if (boss.currentAttack && boss.currentAttack.kind === 'claw' && boss.currentAttack.t < 0.5) {
+    ctx.save();
+    ctx.translate(bx, by + boss.h * 0.45);
+    ctx.rotate(-Math.PI / 6);
+    ctx.fillStyle = '#FF1744';
+    ctx.fillRect(-30, 0, 30, 14);
+    ctx.restore();
+  }
+}
+
+function drawBossProjectiles() {
+  for (var i = 0; i < projectiles.length; i++) {
+    var p = projectiles[i];
+    if (p.kind === 'boss-claw') {
+      ctx.fillStyle = '#FFEB3B';
+      ctx.fillRect(p.x - 12, p.y - 6, 24, 12);
+      ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
+      ctx.strokeRect(p.x - 12, p.y - 6, 24, 12);
+    } else if (p.kind === 'boss-bolt') {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#FF1744'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.stroke();
+    } else if (p.kind === 'boss-stomp') {
+      ctx.fillStyle = '#FFEB3B';
+      ctx.fillRect(p.x - 30, p.y, 60, 16);
+      ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
+      ctx.strokeRect(p.x - 30, p.y, 60, 16);
+    }
+  }
+}
+
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
 function loop(now) {
@@ -1009,6 +1214,8 @@ function loop(now) {
 function update(dt) {
   resolveLevelGeometry();
   updateVehicle(dt);
+  updateBoss(dt);
+  updateBossHazards(dt);
   updatePlayer(dt);
   updateProjectiles(dt);
   updateEnemyProjectiles(dt);
@@ -1043,6 +1250,8 @@ function draw() {
   drawPickups();
   drawEnemies();
   drawBolts();
+  drawBoss();
+  drawBossProjectiles();
   drawProjectiles();
   drawPlayer();
   ctx.restore();
