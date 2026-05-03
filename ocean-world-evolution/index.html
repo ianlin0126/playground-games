@@ -1080,12 +1080,30 @@ function drawPlayer() {
   if(inv) return;
   ctx.save();ctx.translate(px,py);ctx.rotate(pAngle);
   if(cloakActive) ctx.globalAlpha=0.22;
-  if(isOctopus){ drawSquid(SQUID.size,OCTOPUS_COLOR); }
-  else if(isSquid){ drawSquid(SQUID.size,SQUID.color); }
-  else if(si===0){ drawFishBody(FISH_STAGES[si].size,FISH_STAGES[si].color,'#1565c0'); }
-  else if(si<=2){ drawShark(FISH_STAGES[si].size,FISH_STAGES[si].color); }
-  else if(si===3){ drawOrca(FISH_STAGES[si].size); }
-  else { drawWhale(FISH_STAGES[si].size,FISH_STAGES[si].color); }
+  var psize = isSquid ? SQUID.size : FISH_STAGES[si].size;
+  var dw = psize * 2.4, dh = psize * 1.6;
+  var spriteName;
+  if (isOctopus) spriteName = 'octopus';
+  else if (isSquid) spriteName = 'squid';
+  else spriteName = ['tiny_fish','shark','mega_shark','orca','blue_whale'][si];
+
+  var ok = false;
+  if (spriteName === 'mega_shark') {
+    // mega_shark sprite is missing from the atlas — tint the shark sprite warm orange instead.
+    ok = drawSpriteTinted(OCEAN_ATLAS, 'shark', 0, 0, dw, dh, 'rgba(255,112,67,0.55)');
+  } else {
+    ok = drawSpriteRel(OCEAN_ATLAS, spriteName, spriteName, 0, 0, dw, dh);
+  }
+
+  if (!ok) {
+    // Procedural fallback to the existing canvas-shape draw.
+    if(isOctopus){ drawSquid(SQUID.size,OCTOPUS_COLOR); }
+    else if(isSquid){ drawSquid(SQUID.size,SQUID.color); }
+    else if(si===0){ drawFishBody(FISH_STAGES[si].size,FISH_STAGES[si].color,'#1565c0'); }
+    else if(si<=2){ drawShark(FISH_STAGES[si].size,FISH_STAGES[si].color); }
+    else if(si===3){ drawOrca(FISH_STAGES[si].size); }
+    else { drawWhale(FISH_STAGES[si].size,FISH_STAGES[si].color); }
+  }
   ctx.restore();
   if(cloakActive){
     ctx.save();
