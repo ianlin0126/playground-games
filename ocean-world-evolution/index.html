@@ -1440,42 +1440,42 @@ function drawRedFish(x,y,sz,ang,big) {
 function drawBoss1() {
   if(!boss) return;
   var bs=boss.size, flash=boss.hitFlash>0;
-  ctx.save(); ctx.translate(boss.x,boss.y); ctx.rotate(boss.angle);
 
-  // Outer warm-glow halo (procedural — keeps the boss feeling powered)
+  // Outer warm-glow halo (rotation-invariant; drawn outside withOrientation)
+  ctx.save(); ctx.translate(boss.x, boss.y);
   var glow=ctx.createRadialGradient(0,0,bs*.5,0,0,bs*1.5);
   glow.addColorStop(0,'rgba(255,100,0,.22)'); glow.addColorStop(1,'rgba(255,100,0,0)');
   ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0,bs*1.5,0,Math.PI*2); ctx.fill();
+  ctx.restore();
 
-  // Body: pick base or damaged sprite by HP threshold
   var hpFrac = bossHp / BOSS1_MAX;
   var spriteName = hpFrac < 0.5 ? 'boss_robot_dmg' : 'boss_robot';
   var dw = bs * 2.4, dh = bs * 1.6;
 
-  var ok;
-  if (flash) {
-    ok = drawSpriteTinted(OCEAN_ATLAS, spriteName, 0, 0, dw, dh, 'rgba(255,255,255,0.85)');
-  } else {
-    ok = drawSpriteCentered(OCEAN_ATLAS, spriteName, 0, 0, dw, dh);
-  }
-
-  if (!ok) {
-    // Procedural fallback — original boss1 body shapes (halo already drawn above)
-    ctx.fillStyle=flash?'#fff':'#37474f';
-    ctx.beginPath();ctx.ellipse(0,0,bs,bs*.48,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle=flash?'#ccc':'#546e7a';ctx.lineWidth=3;
-    for(var p=-2;p<=2;p++){ctx.beginPath();ctx.moveTo(p*bs*.25,-bs*.48);ctx.lineTo(p*bs*.25,bs*.48);ctx.stroke();}
-    ctx.fillStyle=flash?'#eee':'#455a64';
-    ctx.beginPath();ctx.moveTo(bs*.12,-bs*.48);ctx.lineTo(bs*.38,-bs*.95);ctx.lineTo(bs*.62,-bs*.48);ctx.closePath();ctx.fill();
-    ctx.beginPath();ctx.moveTo(bs*.12,bs*.48);ctx.lineTo(bs*.3,bs*.88);ctx.lineTo(bs*.52,bs*.48);ctx.closePath();ctx.fill();
-    ctx.fillStyle=flash?'#eee':'#2e3b40';
-    ctx.fillRect(bs*.28,-bs*.2,bs*.46,bs*.12); ctx.fillRect(bs*.28,bs*.08,bs*.46,bs*.12);
-    var pulse=0.65+Math.sin(Date.now()/180)*.35;
-    ctx.fillStyle=flash?'#fff':'rgba(255,60,60,'+pulse+')';
-    ctx.beginPath();ctx.arc(bs*.5,0,bs*.22,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bs*.5,0,bs*.1,0,Math.PI*2);ctx.fill();
-  }
-  ctx.restore();
+  var drew = false;
+  withOrientation(boss.x, boss.y, boss.angle, function() {
+    if (flash) {
+      drew = drawSpriteTinted(OCEAN_ATLAS, spriteName, 0, 0, dw, dh, 'rgba(255,255,255,0.85)');
+    } else {
+      drew = drawSpriteCentered(OCEAN_ATLAS, spriteName, 0, 0, dw, dh);
+    }
+    if (!drew) {
+      // Procedural fallback — original boss1 body shapes
+      ctx.fillStyle=flash?'#fff':'#37474f';
+      ctx.beginPath();ctx.ellipse(0,0,bs,bs*.48,0,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=flash?'#ccc':'#546e7a';ctx.lineWidth=3;
+      for(var p=-2;p<=2;p++){ctx.beginPath();ctx.moveTo(p*bs*.25,-bs*.48);ctx.lineTo(p*bs*.25,bs*.48);ctx.stroke();}
+      ctx.fillStyle=flash?'#eee':'#455a64';
+      ctx.beginPath();ctx.moveTo(bs*.12,-bs*.48);ctx.lineTo(bs*.38,-bs*.95);ctx.lineTo(bs*.62,-bs*.48);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(bs*.12,bs*.48);ctx.lineTo(bs*.3,bs*.88);ctx.lineTo(bs*.52,bs*.48);ctx.closePath();ctx.fill();
+      ctx.fillStyle=flash?'#eee':'#2e3b40';
+      ctx.fillRect(bs*.28,-bs*.2,bs*.46,bs*.12); ctx.fillRect(bs*.28,bs*.08,bs*.46,bs*.12);
+      var pulse=0.65+Math.sin(Date.now()/180)*.35;
+      ctx.fillStyle=flash?'#fff':'rgba(255,60,60,'+pulse+')';
+      ctx.beginPath();ctx.arc(bs*.5,0,bs*.22,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bs*.5,0,bs*.1,0,Math.PI*2);ctx.fill();
+    }
+  });
 }
 
 function drawKraken() {
@@ -1696,24 +1696,37 @@ function updFakeRobotDecoy(dt) {
 function drawFakeRobotDecoy() {
   var rf=fakeRobotDecoy; if(!rf||!rf.alive) return;
   var sz=rf.size;
-  ctx.save();ctx.translate(rf.x,rf.y);ctx.rotate(Math.atan2(rf.vy||0,rf.vx||0.01));
+  var ang=Math.atan2(rf.vy||0,rf.vx||0.01);
+
+  // Cyan glow halo (rotation-invariant friendly-decoy indicator)
+  ctx.save(); ctx.translate(rf.x, rf.y);
   var sp=0.5+Math.sin(Date.now()/280)*.5;
   ctx.globalAlpha=sp*.4; ctx.fillStyle='#00e5ff';
   ctx.beginPath();ctx.arc(0,0,sz*1.7,0,Math.PI*2);ctx.fill();
-  ctx.globalAlpha=1;
-  ctx.fillStyle='#4dd0e1';
-  ctx.beginPath();ctx.moveTo(-sz*.7,0);ctx.lineTo(-sz*1.12,-sz*.47);ctx.lineTo(-sz*1.12,sz*.47);ctx.closePath();ctx.fill();cOutline(sz*.1);
-  ctx.fillStyle='#4dd0e1';
-  ctx.beginPath();ctx.ellipse(0,0,sz,sz*.5,0,0,Math.PI*2);ctx.fill();cOutline(sz*.1);
-  ctx.strokeStyle='#00acc1';ctx.lineWidth=1.8;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(-sz*.2,-sz*.45);ctx.lineTo(-sz*.2,sz*.45);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(sz*.15,-sz*.45);ctx.lineTo(sz*.15,sz*.45);ctx.stroke();
-  ctx.strokeStyle='#e0f7fa';ctx.lineWidth=2.5;
-  ctx.beginPath();ctx.moveTo(sz*.6,-sz*.5);ctx.lineTo(sz*.74,-sz*.96);ctx.stroke();
-  ctx.fillStyle='#ffd700';ctx.beginPath();ctx.arc(sz*.74,-sz*.96,5,0,Math.PI*2);ctx.fill();cOutline(2);
-  ctx.fillStyle='#00e5ff';ctx.beginPath();ctx.arc(sz*.44,0,sz*.24,0,Math.PI*2);ctx.fill();cOutline(sz*.08);
-  ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(sz*.36,-sz*.07,sz*.1,0,Math.PI*2);ctx.fill();
   ctx.restore();
+
+  var dw=sz*2.4, dh=sz*1.6;
+  var drew=false;
+  withOrientation(rf.x, rf.y, ang, function() {
+    drew = drawSpriteCentered(OCEAN_ATLAS, 'robo_fish', 0, 0, dw, dh);
+  });
+  if (!drew) {
+    // Procedural fallback (cyan body — original drawing)
+    ctx.save(); ctx.translate(rf.x,rf.y); ctx.rotate(ang);
+    ctx.fillStyle='#4dd0e1';
+    ctx.beginPath();ctx.moveTo(-sz*.7,0);ctx.lineTo(-sz*1.12,-sz*.47);ctx.lineTo(-sz*1.12,sz*.47);ctx.closePath();ctx.fill();cOutline(sz*.1);
+    ctx.fillStyle='#4dd0e1';
+    ctx.beginPath();ctx.ellipse(0,0,sz,sz*.5,0,0,Math.PI*2);ctx.fill();cOutline(sz*.1);
+    ctx.strokeStyle='#00acc1';ctx.lineWidth=1.8;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(-sz*.2,-sz*.45);ctx.lineTo(-sz*.2,sz*.45);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(sz*.15,-sz*.45);ctx.lineTo(sz*.15,sz*.45);ctx.stroke();
+    ctx.strokeStyle='#e0f7fa';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(sz*.6,-sz*.5);ctx.lineTo(sz*.74,-sz*.96);ctx.stroke();
+    ctx.fillStyle='#ffd700';ctx.beginPath();ctx.arc(sz*.74,-sz*.96,5,0,Math.PI*2);ctx.fill();cOutline(2);
+    ctx.fillStyle='#00e5ff';ctx.beginPath();ctx.arc(sz*.44,0,sz*.24,0,Math.PI*2);ctx.fill();cOutline(sz*.08);
+    ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(sz*.36,-sz*.07,sz*.1,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
 }
 
 // ── Land World ────────────────────────────────────────────────────────────
