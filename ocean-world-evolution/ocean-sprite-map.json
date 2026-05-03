@@ -77,7 +77,7 @@
     "w": 220,
     "h": 174,
     "row": 2,
-    "name": "boss_anglerfish"
+    "name": "boss_robot"
   },
   {
     "x": 525,
@@ -93,7 +93,7 @@
     "w": 219,
     "h": 183,
     "row": 2,
-    "name": "boss_robot"
+    "name": "boss_anglerfish"
   },
   {
     "x": 40,

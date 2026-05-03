@@ -84,7 +84,7 @@ body { background:#001122; overflow:hidden; touch-action:none; user-select:none;
   <div id="evo-bg"><div id="evo-fill"></div></div>
 </div>
 <div id="boss-wrap">
-  <div id="boss-label">🤖 OCEAN BOSS</div>
+  <div id="boss-label">🤖 ROBOT FISH</div>
   <div id="boss-bg"><div id="boss-fill"></div></div>
 </div>
 <button id="ink-btn" onclick="fireInk()">🦑<span id="ink-cd"></span></button>
@@ -187,12 +187,15 @@ var OCEAN_ATLAS = new Image();
 OCEAN_ATLAS.src = './assets/ocean-atlas.png';
 
 // Sprite bboxes embedded from ocean-sprite-map.json. The atlas (gpt-image-1)
-// produced 4 columns × 5 rows = 20 sprites instead of 5×5 = 25. The cell at
-// row 2 col 3 was reassigned from boss_anglerfish_dmg to boss_robot per
-// playtest feedback. Sprites with {x:0,y:0,w:0,h:0} fall back to procedural
-// draws or code-side compensation: mega_shark (rendered as code-tinted
-// shark), coin (procedural), boss_anglerfish_dmg (procedural — same body as
-// base), explosion_3 (drawExplosions fades frame 2).
+// produced 4 columns × 5 rows = 20 sprites. After playtest feedback the
+// boss assignments are: row 2 col 1 → boss_robot ("Robot Fish"), row 2
+// col 2 → boss_kraken, row 2 col 3 → boss_anglerfish. Damaged variants
+// reuse the base sprite (no separate dmg art) for boss_robot and
+// boss_anglerfish; boss_kraken_dmg has its own sprite at row 3 col 1.
+// Sprites with {x:0,y:0,w:0,h:0} fall back to procedural: mega_shark
+// (renders the shark sprite at the larger size — size differentiates),
+// coin (procedural gold $ disc), explosion_3 (drawExplosions fades
+// explosion_2 in the third slot).
 var SPRITES_OCEAN = {
   tiny_fish:           { x: 41,  y: 64,  w: 173, h: 142 },
   shark:               { x: 255, y: 51,  w: 249, h: 160 },
@@ -205,13 +208,13 @@ var SPRITES_OCEAN = {
   small_fish_base:     { x: 770, y: 254, w: 215, h: 165 },
   coin:                { x: 0,   y: 0,   w: 0,   h: 0   },
   red_predator:        { x: 37,  y: 480, w: 198, h: 178 },
-  boss_robot:          { x: 769, y: 465, w: 219, h: 183 },
+  boss_robot:          { x: 273, y: 480, w: 220, h: 174 },
   boss_kraken:         { x: 525, y: 465, w: 208, h: 195 },
-  boss_anglerfish:     { x: 273, y: 480, w: 220, h: 174 },
+  boss_anglerfish:     { x: 769, y: 465, w: 219, h: 183 },
   robo_fish:           { x: 40,  y: 685, w: 196, h: 159 },
-  boss_robot_dmg:      { x: 769, y: 465, w: 219, h: 183 },
+  boss_robot_dmg:      { x: 273, y: 480, w: 220, h: 174 },
   boss_kraken_dmg:     { x: 291, y: 677, w: 173, h: 168 },
-  boss_anglerfish_dmg: { x: 0,   y: 0,   w: 0,   h: 0   },
+  boss_anglerfish_dmg: { x: 769, y: 465, w: 219, h: 183 },
   explosion_1:         { x: 52,  y: 861, w: 187, h: 144 },
   explosion_2:         { x: 277, y: 860, w: 204, h: 145 },
   explosion_3:         { x: 0,   y: 0,   w: 0,   h: 0   }
@@ -409,7 +412,7 @@ function updateHUD() {
     evoLabel.textContent='🦑 Power up! '+squidEvo+' / '+SQUID.needed;
     evoWrap.style.display='block'; bossWrap.style.display='none';
   } else if (phase==='boss1') {
-    bossLabel.textContent='🤖 OCEAN BOSS';
+    bossLabel.textContent='🤖 ROBOT FISH';
     evoWrap.style.display='none'; bossWrap.style.display='block';
     bossFill.style.width=Math.max(0,(bossHp/BOSS1_MAX)*100)+'%';
   } else if (phase==='boss2') {
@@ -712,7 +715,7 @@ function startBoss1() {
   phase='boss1'; bossHp=BOSS1_MAX; bossHitCool=0; bossAtkTimer=3; bossPhase2=false;
   boss={x:W*.78,y:H/2,vx:-1.4,vy:0,angle:Math.PI,hitFlash:0,size:88};
   roboFish=[]; tornados=[];
-  showAnnounce('🤖 OCEAN BOSS! Charge into it! 🤖',3000);
+  showAnnounce('🤖 ROBOT FISH! Charge into it! 🤖',3000);
   bossWrap.style.display='block'; updateHUD();
 }
 
@@ -1141,12 +1144,10 @@ function drawPlayer() {
     else if (isSquid) spriteName = 'squid';
     else spriteName = ['tiny_fish','shark','mega_shark','orca','blue_whale'][si];
 
-    var ok = false;
-    if (spriteName === 'mega_shark') {
-      ok = drawSpriteTinted(OCEAN_ATLAS, 'shark', 0, 0, dw, dh, 'rgba(255,112,67,0.55)');
-    } else {
-      ok = drawSpriteRel(OCEAN_ATLAS, spriteName, spriteName, 0, 0, dw, dh);
-    }
+    // mega_shark sprite is missing — render the plain shark sprite at the
+    // larger FISH_STAGES[2] size; the size alone differentiates the stage.
+    var renderName = spriteName === 'mega_shark' ? 'shark' : spriteName;
+    var ok = drawSpriteRel(OCEAN_ATLAS, renderName, renderName, 0, 0, dw, dh);
 
     if (!ok) {
       if(isOctopus){ drawSquid(SQUID.size,OCTOPUS_COLOR); }
