@@ -588,6 +588,7 @@ function updFoods(dt) {
     var fdx=f.x-px,fdy=f.y-py,fd=Math.sqrt(fdx*fdx+fdy*fdy);
     if(canEat(f.type)&&fd<ps*.9+f.size*.6){
       f.alive=false; score+=fPt(f.type); evoPoints+=fPt(f.type);
+      if(f.type==='xlf') spawnExplosion(f.x, f.y, f.size * 1.6);
       respawnQ.push(Date.now()+1400);
       if(evoPoints>=FISH_STAGES[si].needed) evolve();
     }
@@ -713,6 +714,7 @@ function updBoss1(dt) {
     boss.vx=Math.cos(bdir)*5.5; boss.vy=Math.sin(bdir)*3;
     pvx=Math.cos(bdir+Math.PI)*7; pvy=Math.sin(bdir+Math.PI)*7;
     if(bossHp<=0){
+      spawnExplosion(boss.x, boss.y, boss.size * 2.4);
       boss=null;
       lives=Math.min(MAX_LIVES,lives+2);
       showAnnounce('🎉 BOSS BEATEN!\n🦑 You became a SQUID!! +2❤️',4200);
@@ -851,7 +853,7 @@ function updKraken(dt) {
     var kdir=Math.atan2(kraken.y-py,kraken.x-px);
     kraken.vx=Math.cos(kdir)*4; kraken.vy=Math.sin(kdir)*2.5;
     pvx=Math.cos(kdir+Math.PI)*8; pvy=Math.sin(kdir+Math.PI)*8;
-    if(kraken.hp<=0){ showChoiceScreen(); return; }
+    if(kraken.hp<=0){ spawnExplosion(kraken.x, kraken.y, kraken.size * 2.4); showChoiceScreen(); return; }
     if(!krakenPhase2&&kraken.hp<=Math.ceil(BOSS2_MAX/2)){
       krakenPhase2=true;
       showAnnounce('🐙 KRAKEN ENRAGED!! 🐙',2000);
@@ -956,6 +958,7 @@ function updAnglerfish(dt) {
     af.vx=Math.cos(adir)*3.5; af.vy=Math.sin(adir)*2;
     pvx=Math.cos(adir+Math.PI)*7; pvy=Math.sin(adir+Math.PI)*7;
     if(af.hp<=0){
+      spawnExplosion(af.x, af.y, af.size * 2.4);
       anglerfish=null;
       winTitle.textContent='🎣 ANGLERFISH DEFEATED!! 🎣';
       winMsg.textContent='You conquered the deep sea!!\nNothing can stop you!! 🦑🌊';
