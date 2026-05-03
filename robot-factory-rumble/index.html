@@ -469,7 +469,7 @@ function fireSpark() {
 }
 
 function updateProjectiles(dt) {
-  if (scene === 'playing') {
+  if (scene === 'playing' && !vehicle.mounted) {
     fireCooldown -= dt;
     if (fireCooldown <= 0) fireWeapon();
   }
@@ -567,6 +567,10 @@ function setupLevelEnemies() {
   // Segment B bolts
   spawnEnemy('bolt', 2400);
   spawnEnemy('bolt', 3300);
+  // Segment B vehicle-stretch cluster
+  spawnEnemy('walker', 3700);
+  spawnEnemy('walker', 3850);
+  spawnEnemy('bolt',   4000);
 }
 
 function updateEnemies(dt) {
@@ -618,21 +622,34 @@ function updateEnemies(dt) {
 
     // Player-contact damage
     if (rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
-                     e.x - e.w / 2, e.y - e.h, e.w, e.h)
-        && player.invuln <= 0 && shieldBubble <= 0) {
-      hurtPlayer(1, e.x);
+                     e.x - e.w / 2, e.y - e.h, e.w, e.h)) {
+      if (vehicle.mounted) {
+        if (vehicle.shield > 0 && e.contactCool <= 0) {
+          vehicle.shield -= 1;
+          e.contactCool = 0.5;
+        }
+      } else if (player.invuln <= 0 && shieldBubble <= 0) {
+        hurtPlayer(1, e.x);
+      }
     }
 
     // Projectile-vs-enemy
     for (var j = projectiles.length - 1; j >= 0; j--) {
       var p = projectiles[j];
-      if (p.kind !== 'foam' && p.kind !== 'spark') continue;
-      // (enemy-blob projectiles are filtered by the kind check above)
-      if (p.x > e.x - e.w / 2 && p.x < e.x + e.w / 2
-          && p.y > e.y - e.h && p.y < e.y) {
-        e.hp -= 1;
-        projectiles.splice(j, 1);
-        if (e.hp <= 0) { e.alive = false; spawnBoltBurst(e.x, e.y - e.h * 0.5); break; }
+      if (p.kind === 'enemy-blob') continue;
+      if (p.kind === 'mech-piston') {
+        if (rectsOverlap(p.x, p.y - 8, 40, 16, e.x - e.w / 2, e.y - e.h, e.w, e.h)) {
+          e.hp -= (p.damage || 1.5);
+          if (e.hp <= 0) { e.alive = false; spawnBoltBurst(e.x, e.y - e.h * 0.5); break; }
+          // Don't despawn the piston — it lasts 0.2s and can hit multiple enemies
+        }
+      } else if (p.kind === 'foam' || p.kind === 'spark') {
+        if (p.x > e.x - e.w / 2 && p.x < e.x + e.w / 2
+            && p.y > e.y - e.h && p.y < e.y) {
+          e.hp -= 1;
+          projectiles.splice(j, 1);
+          if (e.hp <= 0) { e.alive = false; spawnBoltBurst(e.x, e.y - e.h * 0.5); break; }
+        }
       }
     }
   }
@@ -665,10 +682,16 @@ function updateEnemyProjectiles(dt) {
     var p = projectiles[i];
     if (p.kind !== 'enemy-blob') continue;
     if (p.x > player.x && p.x < player.x + player.w
-        && p.y > player.y - player.h && p.y < player.y
-        && player.invuln <= 0 && shieldBubble <= 0) {
-      hurtPlayer(1, p.x);
-      projectiles.splice(i, 1);
+        && p.y > player.y - player.h && p.y < player.y) {
+      if (vehicle.mounted) {
+        if (vehicle.shield > 0) {
+          vehicle.shield -= 1;
+          projectiles.splice(i, 1);
+        }
+      } else if (player.invuln <= 0 && shieldBubble <= 0) {
+        hurtPlayer(1, p.x);
+        projectiles.splice(i, 1);
+      }
     } else if (p.y > GROUND_Y) {
       // Hit floor — splat
       projectiles.splice(i, 1);
@@ -880,6 +903,99 @@ function drawCheckpoints() {
   }
 }
 
+// ── Vehicle ────────────────────────────────────────────────────────────────
+var vehicle = {
+  x: 3500, y: 0,
+  w: 64, h: 56,
+  mounted: false,
+  shield: 4,
+  pistonT: 0,
+  pistonCool: 0,
+  alive: true,
+  promptVisible: false,
+};
+var BEAM_X = 4200;
+
+function updateVehicle(dt) {
+  if (!vehicle.alive) return;
+  if (!vehicle.mounted) {
+    var near = Math.abs(player.x - vehicle.x) < 36 && player.onGround;
+    vehicle.promptVisible = near;
+    if (near && input.jumpJustPressed) {
+      vehicle.mounted = true;
+      vehicle.promptVisible = false;
+    }
+    return;
+  }
+  // Mounted: vehicle pins to player x
+  vehicle.x = player.x;
+  vehicle.pistonCool -= dt;
+  if (vehicle.pistonCool <= 0) {
+    vehicle.pistonT = 0.4;
+    vehicle.pistonCool = 0.5;
+    var f = player.facing || 1;
+    var pistonX = (f > 0) ? (vehicle.x + vehicle.w + 20) : (vehicle.x - 20 - 40);
+    projectiles.push({
+      x: pistonX, y: GROUND_Y - vehicle.h * 0.5,
+      vx: 0, vy: 0, life: 0.2, kind: 'mech-piston', damage: 1.5, facing: f,
+    });
+  }
+  if (vehicle.pistonT > 0) vehicle.pistonT -= dt;
+  // Dismount triggers
+  if (player.x >= BEAM_X) {
+    vehicle.mounted = false;
+    showBanner('🚪 Dismounting!', 800);
+  }
+  if (vehicle.shield <= 0) {
+    vehicle.mounted = false;
+    vehicle.alive = false;
+    spawnBoltBurst(vehicle.x + vehicle.w / 2, GROUND_Y - vehicle.h / 2);
+    spawnBoltBurst(vehicle.x + vehicle.w / 4, GROUND_Y - vehicle.h / 3);
+    player.vy = -350;
+    player.invuln = 1.5;
+    showBanner('Mech down — keep going!', 1200);
+  }
+}
+
+function drawVehicle() {
+  if (!vehicle.alive && !vehicle.mounted) return;
+  var vx = vehicle.x, vy = GROUND_Y - vehicle.h;
+  ctx.fillStyle = '#FFC107';
+  ctx.fillRect(vx, vy, vehicle.w, vehicle.h);
+  ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
+  ctx.strokeRect(vx, vy, vehicle.w, vehicle.h);
+  ctx.fillStyle = '#37474F';
+  ctx.beginPath(); ctx.arc(vx + 12, GROUND_Y - 8, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(vx + vehicle.w - 12, GROUND_Y - 8, 10, 0, Math.PI * 2); ctx.fill();
+  // Forks (face the direction of travel; default right when not mounted)
+  var f = vehicle.mounted ? (player.facing || 1) : 1;
+  ctx.fillStyle = '#9E9E9E';
+  if (f > 0) {
+    ctx.fillRect(vx + vehicle.w, vy + vehicle.h * 0.3, 30, 6);
+    ctx.fillRect(vx + vehicle.w, vy + vehicle.h * 0.6, 30, 6);
+  } else {
+    ctx.fillRect(vx - 30, vy + vehicle.h * 0.3, 30, 6);
+    ctx.fillRect(vx - 30, vy + vehicle.h * 0.6, 30, 6);
+  }
+  // Piston (when extended)
+  if (vehicle.pistonT > 0.2) {
+    ctx.fillStyle = '#6D4C41';
+    if (f > 0) ctx.fillRect(vx + vehicle.w + 30, vy + vehicle.h * 0.42, 40, 16);
+    else       ctx.fillRect(vx - 30 - 40,        vy + vehicle.h * 0.42, 40, 16);
+  }
+  // Antenna LED
+  ctx.fillStyle = (Math.floor(Date.now() / 300) % 2) ? '#FFEB3B' : '#9E9E9E';
+  ctx.fillRect(vx + vehicle.w / 2 - 1, vy - 12, 2, 12);
+  ctx.beginPath(); ctx.arc(vx + vehicle.w / 2, vy - 14, 4, 0, Math.PI * 2); ctx.fill();
+  // Mount prompt
+  if (vehicle.promptVisible) {
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('↑ Press Jump to ride!', vx + vehicle.w / 2, vy - 28);
+  }
+}
+
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
 function loop(now) {
@@ -892,6 +1008,7 @@ function loop(now) {
 }
 function update(dt) {
   resolveLevelGeometry();
+  updateVehicle(dt);
   updatePlayer(dt);
   updateProjectiles(dt);
   updateEnemyProjectiles(dt);
@@ -899,6 +1016,17 @@ function update(dt) {
   updatePickups(dt);
   updateCheckpoints(dt);
   updateBolts(dt);
+
+  // Sync shield HP HUD row
+  if (vehicle.mounted) {
+    shieldEl.style.display = 'block';
+    var s = '';
+    for (var ii = 0; ii < vehicle.shield; ii++) s += '▣';
+    for (var jj = vehicle.shield; jj < 4; jj++) s += '▢';
+    shieldEl.textContent = s;
+  } else {
+    shieldEl.style.display = 'none';
+  }
 }
 function draw() {
   ctx.fillStyle = '#2a2a2a';
@@ -911,6 +1039,7 @@ function draw() {
   drawFloor();
   drawPlatforms();
   drawCheckpoints();
+  drawVehicle();
   drawPickups();
   drawEnemies();
   drawBolts();
