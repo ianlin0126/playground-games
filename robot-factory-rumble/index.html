@@ -491,8 +491,18 @@ function spawnEnemy(kind, x) {
       dropT: 1.0,
       contactCool: 0,
     });
+  } else if (kind === 'bolt') {
+    enemies.push({
+      kind: 'bolt', x: x, y: GROUND_Y, w: 24, h: 30,
+      hp: 1, alive: true,
+      hopT: 0,
+      hopDir: -1,
+      hopCount: 0,
+      homeY: GROUND_Y,
+      squashY: 0,
+      contactCool: 0,
+    });
   }
-  // Other kinds (bolt) wired in Task 9
 }
 
 function setupLevelEnemies() {
@@ -505,6 +515,9 @@ function setupLevelEnemies() {
   spawnEnemy('copter', 1000);
   // Segment B copter
   spawnEnemy('copter', 2700);
+  // Segment B bolts
+  spawnEnemy('bolt', 2400);
+  spawnEnemy('bolt', 3300);
 }
 
 function updateEnemies(dt) {
@@ -531,6 +544,26 @@ function updateEnemies(dt) {
           kind: 'enemy-blob',
         });
         e.dropT = 2.0;
+      }
+    } else if (e.kind === 'bolt') {
+      e.hopT += dt;
+      if (e.hopT < 1.0) {
+        // In air: parabolic trajectory
+        var t = e.hopT;
+        e.x += e.hopDir * 100 * dt;
+        // 200px peak at t=0.5, standard parabola
+        var peakOffset = 200 * 4 * t * (1 - t);
+        e.y = e.homeY - peakOffset;
+        e.squashY = -peakOffset / 200;
+      } else if (e.hopT < 1.5) {
+        // Resting on the ground
+        e.y = e.homeY;
+        e.squashY = 1;
+      } else {
+        e.hopT = 0;
+        e.hopCount += 1;
+        if (e.hopCount >= 4) { e.hopCount = 0; e.hopDir *= -1; }
+        e.squashY = 0;
       }
     }
 
@@ -637,6 +670,22 @@ function drawEnemies() {
       ctx.fillStyle = '#9E9E9E';
       ctx.fillRect(-e.w / 2 - 6, -2 + flap, 6, 3);
       ctx.fillRect( e.w / 2,     -2 + flap, 6, 3);
+      ctx.restore();
+    } else if (e.kind === 'bolt') {
+      ctx.save();
+      ctx.translate(e.x, e.y - e.h / 2);
+      var sy = 1 + e.squashY * 0.3;
+      var sx = 1 - e.squashY * 0.15;
+      ctx.scale(sx, sy);
+      ctx.fillStyle = '#66BB6A';
+      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 5);
+      ctx.fill();
+      ctx.strokeStyle = '#1B5E20'; ctx.lineWidth = 2;
+      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 5);
+      ctx.stroke();
+      ctx.fillStyle = '#1A1A1A';
+      ctx.beginPath(); ctx.arc(-5, -8, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc( 5, -8, 2.5, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
   }
