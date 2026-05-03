@@ -317,6 +317,16 @@ function drawPlayer() {
   ctx.strokeStyle = '#0d3a6b'; ctx.lineWidth = 2;
   roundRect(px, py, player.w, player.h, 8);
   ctx.stroke();
+  if (shieldBubble > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.35 + 0.25 * Math.sin(Date.now() / 100);
+    ctx.strokeStyle = '#00E5FF';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(px + player.w / 2, py + player.h / 2, player.w * 0.85, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.fillStyle = '#37474F';
   var legSwap = player.walkAnim < 0.5;
   if (legSwap) {
@@ -429,8 +439,30 @@ function fireWeapon() {
   if (weapon === 'foam') {
     fireFoam();
     fireCooldown = FOAM_INTERVAL;
+  } else if (weapon === 'spark') {
+    fireSpark();
+    fireCooldown = SPARK_INTERVAL;
+    weaponShotsLeft -= 3;
   }
-  // Spark spread fires here too in Task 10
+}
+
+function fireSpark() {
+  var f = player.facing;     // +1 = right, -1 = left
+  var muzzleX = (f > 0) ? (player.x + player.w * 0.7) : (player.x + player.w * 0.3);
+  var muzzleY = player.y - player.h * 0.5;
+  var baseVx = FOAM_SPEED * f, baseVy = 0;
+  if (input.aimUp) {
+    baseVx = FOAM_SPEED * f * Math.SQRT1_2;
+    baseVy = -FOAM_SPEED * Math.SQRT1_2;
+  }
+  var fanRad = SPARK_FAN_DEG * Math.PI / 360; // half-fan
+  for (var k = -1; k <= 1; k++) {
+    var ang = fanRad * k;
+    var c = Math.cos(ang), s = Math.sin(ang);
+    var vx = baseVx * c - baseVy * s;
+    var vy = baseVx * s + baseVy * c;
+    projectiles.push({ x: muzzleX, y: muzzleY, vx: vx, vy: vy, life: 1.6, kind: 'spark' });
+  }
 }
 
 function updateProjectiles(dt) {
@@ -466,6 +498,20 @@ function drawProjectiles() {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
       ctx.fill();
+    } else if (p.kind === 'spark') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(Math.atan2(p.vy, p.vx));
+      ctx.fillStyle = '#FFEB3B';
+      ctx.beginPath();
+      for (var sp = 0; sp < 5; sp++) {
+        var a = (sp / 5) * Math.PI * 2 - Math.PI / 2;
+        var rOut = sp % 2 === 0 ? 6 : 3;
+        ctx.lineTo(Math.cos(a) * rOut, Math.sin(a) * rOut);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
     }
   }
 }
@@ -570,7 +616,7 @@ function updateEnemies(dt) {
     // Player-contact damage
     if (rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
                      e.x - e.w / 2, e.y - e.h, e.w, e.h)
-        && player.invuln <= 0) {
+        && player.invuln <= 0 && shieldBubble <= 0) {
       hurtPlayer(1, e.x);
     }
 
@@ -617,7 +663,7 @@ function updateEnemyProjectiles(dt) {
     if (p.kind !== 'enemy-blob') continue;
     if (p.x > player.x && p.x < player.x + player.w
         && p.y > player.y - player.h && p.y < player.y
-        && player.invuln <= 0) {
+        && player.invuln <= 0 && shieldBubble <= 0) {
       hurtPlayer(1, p.x);
       projectiles.splice(i, 1);
     } else if (p.y > GROUND_Y) {
@@ -718,6 +764,81 @@ function onPlayerOut() {
   player.invuln = 1.5;
 }
 
+// ── Power-ups ──────────────────────────────────────────────────────────────
+var pickups = [];        // { kind, x, y, alive }
+var shieldBubble = 0;    // s remaining of shield-bubble invuln
+var SPARK_INTERVAL = 0.30;
+var SPARK_FAN_DEG = 30;
+var SPARK_DURATION = 12;
+var SPARK_SHOT_LIMIT = 40;
+
+function spawnPickup(kind, x, y) {
+  pickups.push({ kind: kind, x: x, y: y === undefined ? GROUND_Y - 20 : y, alive: true });
+}
+
+function setupLevelPickups() {
+  // Spec: Spark crate end of Seg A; Shield mid-Seg B; Heart before Checkpoint 2
+  spawnPickup('spark',  1700);
+  spawnPickup('shield', 2900);
+  spawnPickup('heart',  4100);
+}
+
+function updatePickups(dt) {
+  for (var i = pickups.length - 1; i >= 0; i--) {
+    var pk = pickups[i];
+    if (!pk.alive) { pickups.splice(i, 1); continue; }
+    if (rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
+                     pk.x - 12, pk.y - 24, 24, 24)) {
+      pk.alive = false;
+      onPickup(pk.kind);
+    }
+  }
+  if (shieldBubble > 0) shieldBubble -= dt;
+  if (weapon === 'spark') {
+    weaponDuration -= dt;
+    if (weaponDuration <= 0 || weaponShotsLeft <= 0) {
+      weapon = 'foam';
+      weaponEl.textContent = '⚡ Foam Blaster';
+    } else {
+      weaponEl.textContent = '⚡ Spark · ' + Math.max(0, Math.ceil(weaponDuration)) + 's';
+    }
+  }
+}
+
+function onPickup(kind) {
+  if (kind === 'spark') {
+    weapon = 'spark';
+    weaponDuration = SPARK_DURATION;
+    weaponShotsLeft = SPARK_SHOT_LIMIT;
+    showBanner('⚡ Spark Spread!', 1500);
+  } else if (kind === 'shield') {
+    shieldBubble = 6;
+    showBanner('🛡 Shield Bubble!', 1500);
+  } else if (kind === 'heart') {
+    if (hp < maxHp) hp += 1;
+    refreshHud();
+    showBanner('+1 Heart!', 1500);
+  }
+}
+
+function drawPickups() {
+  for (var i = 0; i < pickups.length; i++) {
+    var pk = pickups[i];
+    if (!pk.alive) continue;
+    var bob = Math.sin(Date.now() / 300 + pk.x * 0.01) * 4;
+    var color = pk.kind === 'spark' ? '#FFEB3B' : pk.kind === 'shield' ? '#00E5FF' : '#FF1744';
+    var label = pk.kind === 'spark' ? 'SS' : pk.kind === 'shield' ? 'S' : '♥';
+    ctx.fillStyle = color;
+    ctx.fillRect(pk.x - 12, pk.y - 24 + bob, 24, 24);
+    ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
+    ctx.strokeRect(pk.x - 12, pk.y - 24 + bob, 24, 24);
+    ctx.fillStyle = '#1A1A1A';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, pk.x, pk.y - 12 + bob);
+  }
+}
+
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
 function loop(now) {
@@ -734,6 +855,7 @@ function update(dt) {
   updateProjectiles(dt);
   updateEnemyProjectiles(dt);
   updateEnemies(dt);
+  updatePickups(dt);
   updateBolts(dt);
 }
 function draw() {
@@ -746,6 +868,7 @@ function draw() {
   ctx.translate(-camera.x, 0);
   drawFloor();
   drawPlatforms();
+  drawPickups();
   drawEnemies();
   drawBolts();
   drawProjectiles();
@@ -805,6 +928,7 @@ function drawPlatforms() {
 }
 resolveLevelGeometry();
 setupLevelEnemies();
+setupLevelPickups();
 requestAnimationFrame(function(ts) { lastTime = ts; requestAnimationFrame(loop); });
 </script>
 </body>
