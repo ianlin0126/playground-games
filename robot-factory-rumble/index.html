@@ -369,7 +369,7 @@ function updatePlayer(dt) {
   player.x += player.vx * dt;
   player.y += player.vy * dt;
 
-  var standY = resolveStandY(player.x + player.w * 0.5);
+  var standY = resolveStandY(player.x + player.w * 0.5, player.y);
   // Belt horizontal modifier when standing on a conveyor
   var beltMod = 0;
   for (var pli = 0; pli < level.platforms.length; pli++) {
@@ -488,7 +488,7 @@ function resolveLevelGeometry() {
   FLOOR_Y  = GROUND_Y;
 }
 
-function resolveStandY(px) {
+function resolveStandY(px, playerY) {
   var candidates = [];
   var overPit = false;
   for (var i = 0; i < level.pits.length; i++) {
@@ -498,7 +498,12 @@ function resolveStandY(px) {
   if (!overPit) candidates.push(GROUND_Y);
   for (var k = 0; k < level.platforms.length; k++) {
     var pl = level.platforms[k];
-    if (px >= pl.x && px <= pl.x + pl.w) candidates.push(GROUND_Y + pl.top);
+    if (px >= pl.x && px <= pl.x + pl.w) {
+      var top = GROUND_Y + pl.top;
+      // One-way platform: only stand on it if approaching from above
+      // (or already standing within 1px of it).
+      if (playerY <= top + 4) candidates.push(top);
+    }
   }
   if (candidates.length === 0) return Infinity;
   var ystand = Infinity;
@@ -548,7 +553,6 @@ function fireWeapon() {
   } else if (weapon === 'spark') {
     fireSpark();
     fireCooldown = SPARK_INTERVAL;
-    weaponShotsLeft -= 3;
   }
 }
 
@@ -606,6 +610,15 @@ function drawProjectiles() {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
       ctx.fill();
+    } else if (p.kind === 'enemy-laser') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(Math.atan2(p.vy, p.vx));
+      ctx.fillStyle = '#FF1744';
+      ctx.fillRect(-8, -2, 16, 4);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(-3, -1, 6, 2);
+      ctx.restore();
     } else if (p.kind === 'spark') {
       ctx.save();
       ctx.translate(p.x, p.y);
@@ -636,6 +649,7 @@ function spawnEnemy(kind, x) {
       patrolMin: x - 80, patrolMax: x + 80,
       wobbleT: 0,
       contactCool: 0,
+      shotT: 2.0 + Math.random() * 2.0,
     });
   } else if (kind === 'copter') {
     enemies.push({
@@ -692,27 +706,60 @@ function updateEnemies(dt) {
         if (e.x <= e.patrolMin && e.vx < 0) { e.wobbleT = 0.3; e.vx = 60; }
         if (e.x >= e.patrolMax && e.vx > 0) { e.wobbleT = 0.3; e.vx = -60; }
       }
+      // Laser shot at player when nearby + on cadence
+      e.shotT -= dt;
+      if (e.shotT <= 0 && Math.abs(player.x - e.x) < 360) {
+        var lx = e.x, ly = e.y - e.h * 0.5;
+        var ldx = (player.x + player.w * 0.5) - lx;
+        var ldy = (player.y - player.hbH * 0.5) - ly;
+        var ldist = Math.max(40, Math.sqrt(ldx * ldx + ldy * ldy));
+        var laserSpeed = 360;
+        projectiles.push({
+          x: lx, y: ly,
+          vx: (ldx / ldist) * laserSpeed,
+          vy: (ldy / ldist) * laserSpeed,
+          life: 2.2, kind: 'enemy-laser',
+        });
+        e.shotT = 3.5 + Math.random() * 1.5;
+      }
     } else if (e.kind === 'copter') {
       e.bobT += dt * 4;
       e.y = (GROUND_Y - 160) + Math.sin(e.bobT) * 6;
       e.dropT -= dt;
       if (e.dropT <= 0) {
+        // Aim toward the player at fire time.
+        var dx = (player.x + player.w * 0.5) - e.x;
+        var dy = (player.y - player.h * 0.5) - e.y;
+        var dist = Math.max(40, Math.sqrt(dx * dx + dy * dy));
+        var blobSpeed = 280;
         projectiles.push({
-          x: e.x, y: e.y, vx: 0, vy: 200, life: 5,
-          kind: 'enemy-blob',
+          x: e.x, y: e.y,
+          vx: (dx / dist) * blobSpeed,
+          vy: (dy / dist) * blobSpeed,
+          life: 3, kind: 'enemy-blob',
         });
-        e.dropT = 2.0;
+        e.dropT = 1.6;  // a touch faster cadence
       }
     } else if (e.kind === 'bolt') {
       e.hopT += dt;
       if (e.hopT < 1.0) {
-        // In air: parabolic trajectory
+        var prevT = e.hopT - dt;
         var t = e.hopT;
         e.x += e.hopDir * 100 * dt;
-        // 200px peak at t=0.5, standard parabola
         var peakOffset = 200 * 4 * t * (1 - t);
         e.y = e.homeY - peakOffset;
         e.squashY = -peakOffset / 200;
+        // Fire one shot at peak (when crossing t=0.5)
+        if (prevT < 0.5 && t >= 0.5 && Math.abs(player.x - e.x) < 320) {
+          var dx2 = (player.x + player.w * 0.5) - e.x;
+          var dy2 = (player.y - player.hbH * 0.5) - e.y;
+          var d2 = Math.max(40, Math.sqrt(dx2 * dx2 + dy2 * dy2));
+          projectiles.push({
+            x: e.x, y: e.y,
+            vx: (dx2 / d2) * 320, vy: (dy2 / d2) * 320,
+            life: 2.0, kind: 'enemy-laser',
+          });
+        }
       } else if (e.hopT < 1.5) {
         // Resting on the ground
         e.y = e.homeY;
@@ -785,7 +832,7 @@ function updateBolts(dt) {
 function updateEnemyProjectiles(dt) {
   for (var i = projectiles.length - 1; i >= 0; i--) {
     var p = projectiles[i];
-    if (p.kind !== 'enemy-blob') continue;
+    if (p.kind !== 'enemy-blob' && p.kind !== 'enemy-laser') continue;
     if (p.x > player.x && p.x < player.x + player.w
         && p.y > player.y - player.h && p.y < player.y) {
       if (vehicle.mounted) {
@@ -925,22 +972,13 @@ function updatePickups(dt) {
     }
   }
   if (shieldBubble > 0) shieldBubble -= dt;
-  if (weapon === 'spark') {
-    weaponDuration -= dt;
-    if (weaponDuration <= 0 || weaponShotsLeft <= 0) {
-      weapon = 'foam';
-      weaponEl.textContent = '⚡ Foam Blaster';
-    } else {
-      weaponEl.textContent = '⚡ Spark · ' + Math.max(0, Math.ceil(weaponDuration)) + 's';
-    }
-  }
+  // Spark is persistent now — no duration / shot decrement. HUD label set on pickup.
 }
 
 function onPickup(kind) {
   if (kind === 'spark') {
     weapon = 'spark';
-    weaponDuration = SPARK_DURATION;
-    weaponShotsLeft = SPARK_SHOT_LIMIT;
+    weaponEl.textContent = '⚡ Spark Spread';
     showBanner('⚡ Spark Spread!', 1500);
   } else if (kind === 'shield') {
     shieldBubble = 6;
@@ -1019,7 +1057,6 @@ var vehicle = {
   alive: true,
   promptVisible: false,
 };
-var BEAM_X = 4200;
 
 function updateVehicle(dt) {
   if (!vehicle.alive) return;
@@ -1046,11 +1083,7 @@ function updateVehicle(dt) {
     });
   }
   if (vehicle.pistonT > 0) vehicle.pistonT -= dt;
-  // Dismount triggers
-  if (player.x >= BEAM_X) {
-    vehicle.mounted = false;
-    showBanner('🚪 Dismounting!', 800);
-  }
+  // Dismount only on shield-zero (mech destroyed). Mech persists into boss fight.
   if (vehicle.shield <= 0) {
     vehicle.mounted = false;
     vehicle.alive = false;
@@ -1107,10 +1140,10 @@ var boss = {
   x: 4750, y: 0,
   w: 120, h: 140,
   phase: 1,
-  hp: 10,
-  hpMaxP1: 10,
-  hpMaxP2: 8,
-  attackT: 3.0,
+  hp: 18,
+  hpMaxP1: 18,
+  hpMaxP2: 14,
+  attackT: 1.6,
   currentAttack: null,
   hitFlash: 0,
   invuln: 0,
@@ -1146,7 +1179,7 @@ function updateBoss(dt) {
       var roll = Math.random();
       if (boss.phase === 1) {
         boss.currentAttack = roll < 0.5
-          ? { kind: 'claw',   t: 0, life: 0.5 + 0.7 }
+          ? { kind: 'claw',   t: 0, life: 0.5 + 0.6 }
           : { kind: 'volley', t: 0, life: 0.5 + 0.5 };
       } else {
         // Phase 2 attack table — extended in Task 14
@@ -1156,7 +1189,8 @@ function updateBoss(dt) {
           ? { kind: 'volley', t: 0, life: 1.0 }
           : { kind: 'stomp',  t: 0, life: 0.5 + 0.8 };
       }
-      boss.attackT = 3.0;
+      // Phase 2 attacks fire faster to keep the kid honest.
+      boss.attackT = boss.phase === 1 ? 1.6 : 1.2;
     }
   }
 
@@ -1169,16 +1203,16 @@ function updateBoss(dt) {
         a.fired = true;
         projectiles.push({
           x: boss.x - 30, y: GROUND_Y - 30,
-          vx: -400, vy: 0, life: 0.7, kind: 'boss-claw',
+          vx: -540, vy: 0, life: 0.65, kind: 'boss-claw',
         });
       }
     } else if (a.kind === 'volley') {
       if (a.t > 0.5 && !a.fired) {
         a.fired = true;
-        for (var k = -1; k <= 1; k++) {
+        for (var k = -2; k <= 2; k++) {
           projectiles.push({
             x: boss.x - 20, y: GROUND_Y - boss.h * 0.6,
-            vx: -300 + k * 50, vy: -200, life: 2.0, kind: 'boss-bolt',
+            vx: -360 + k * 35, vy: -260, life: 2.0, kind: 'boss-bolt',
             grav: true,
           });
         }
