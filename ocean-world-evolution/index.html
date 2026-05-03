@@ -186,13 +186,13 @@ var PREY_COLORS = ['#ffee58','#ffa726','#ab47bc','#26c6da','#66bb6a','#ff7eb3'];
 var OCEAN_ATLAS = new Image();
 OCEAN_ATLAS.src = './assets/ocean-atlas.png';
 
-// Sprite bboxes embedded from ocean-sprite-map.json (atlas was generated
-// by GPT Image 1; gpt-image-2 wasn't available to this org). The atlas
-// produced 4 columns × 5 rows = 20 sprites instead of 5×5 = 25, so the
-// following names get {x:0,y:0,w:0,h:0} and fall back to procedural draws
-// or code-side compensation: mega_shark (rendered as code-tinted shark),
-// coin (procedural fallback), boss_robot (procedural fallback in drawBoss1),
-// boss_robot_dmg (procedural), explosion_3 (drawExplosions fades frame 2).
+// Sprite bboxes embedded from ocean-sprite-map.json. The atlas (gpt-image-1)
+// produced 4 columns × 5 rows = 20 sprites instead of 5×5 = 25. The cell at
+// row 2 col 3 was reassigned from boss_anglerfish_dmg to boss_robot per
+// playtest feedback. Sprites with {x:0,y:0,w:0,h:0} fall back to procedural
+// draws or code-side compensation: mega_shark (rendered as code-tinted
+// shark), coin (procedural), boss_anglerfish_dmg (procedural — same body as
+// base), explosion_3 (drawExplosions fades frame 2).
 var SPRITES_OCEAN = {
   tiny_fish:           { x: 41,  y: 64,  w: 173, h: 142 },
   shark:               { x: 255, y: 51,  w: 249, h: 160 },
@@ -205,13 +205,13 @@ var SPRITES_OCEAN = {
   small_fish_base:     { x: 770, y: 254, w: 215, h: 165 },
   coin:                { x: 0,   y: 0,   w: 0,   h: 0   },
   red_predator:        { x: 37,  y: 480, w: 198, h: 178 },
-  boss_robot:          { x: 0,   y: 0,   w: 0,   h: 0   },
+  boss_robot:          { x: 769, y: 465, w: 219, h: 183 },
   boss_kraken:         { x: 525, y: 465, w: 208, h: 195 },
   boss_anglerfish:     { x: 273, y: 480, w: 220, h: 174 },
   robo_fish:           { x: 40,  y: 685, w: 196, h: 159 },
-  boss_robot_dmg:      { x: 0,   y: 0,   w: 0,   h: 0   },
+  boss_robot_dmg:      { x: 769, y: 465, w: 219, h: 183 },
   boss_kraken_dmg:     { x: 291, y: 677, w: 173, h: 168 },
-  boss_anglerfish_dmg: { x: 769, y: 465, w: 219, h: 183 },
+  boss_anglerfish_dmg: { x: 0,   y: 0,   w: 0,   h: 0   },
   explosion_1:         { x: 52,  y: 861, w: 187, h: 144 },
   explosion_2:         { x: 277, y: 860, w: 204, h: 145 },
   explosion_3:         { x: 0,   y: 0,   w: 0,   h: 0   }
@@ -266,6 +266,26 @@ function drawSpriteTinted(atlas, name, cx, cy, dw, dh, tintFill) {
   TINT_CTX.globalCompositeOperation = 'source-over';
   ctx.drawImage(TINT_CANVAS, 0, 0, dw, dh, cx - dw / 2, cy - dh / 2, dw, dh);
   return true;
+}
+
+// Apply a flip-past-90° aware translate+rotate around (x, y) so a fish-style
+// sprite drawn facing +x stays right-side-up at any angle. The caller passes
+// the *base* (x, y, angle) and a body to run inside the transform; on return
+// the canvas state is restored.
+function withOrientation(x, y, angle, body) {
+  var ang = angle;
+  while (ang > Math.PI) ang -= 2 * Math.PI;
+  while (ang <= -Math.PI) ang += 2 * Math.PI;
+  ctx.save();
+  ctx.translate(x, y);
+  if (Math.abs(ang) > Math.PI / 2) {
+    ctx.scale(-1, 1);
+    ctx.rotate(Math.PI - ang);
+  } else {
+    ctx.rotate(ang);
+  }
+  body();
+  ctx.restore();
 }
 
 // Boss-death + xlf-prey-eat explosion system. Spawn triggers added in Task 9.
@@ -1062,14 +1082,12 @@ function drawFoods() {
       if (!ok) drawPlankton(f.x,f.y,f.size,f.wobble);
     } else {
       var ang = Math.atan2(f.vy||0, f.vx||0.1);
-      var tint = {sf:null, mf:'rgba(255,167,38,0.55)', lf:'rgba(239,83,80,0.65)', xlf:'rgba(171,71,188,0.65)'}[f.type];
       var fdw = f.size * 2.4, fdh = f.size * 1.6;
-      ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(ang);
-      var ok2;
-      if (tint) ok2 = drawSpriteTinted(OCEAN_ATLAS, 'small_fish_base', 0, 0, fdw, fdh, tint);
-      else ok2 = drawSpriteCentered(OCEAN_ATLAS, 'small_fish_base', 0, 0, fdw, fdh);
-      ctx.restore();
-      if (!ok2) {
+      var drew = false;
+      withOrientation(f.x, f.y, ang, function() {
+        drew = drawSpriteCentered(OCEAN_ATLAS, 'small_fish_base', 0, 0, fdw, fdh);
+      });
+      if (!drew) {
         var fc={sf:'#ffee58',mf:'#ffa726',lf:'#ef5350',xlf:'#ab47bc'}[f.type]||'#ffee58';
         drawSmallFish(f.x,f.y,f.size,fc,ang);
       }
@@ -1085,27 +1103,19 @@ function drawEnemies() {
     if(e.isPred){
       var pang = Math.atan2(py-e.y, px-e.x);
       var pdw = e.size * 2.4, pdh = e.size * 1.6;
-      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(pang);
-      var ok = drawSpriteCentered(OCEAN_ATLAS, 'red_predator', 0, 0, pdw, pdh);
-      ctx.restore();
-      if (!ok) drawRedFish(e.x,e.y,e.size,pang,e.size>ps*1.5);
+      var drew = false;
+      withOrientation(e.x, e.y, pang, function() {
+        drew = drawSpriteCentered(OCEAN_ATLAS, 'red_predator', 0, 0, pdw, pdh);
+      });
+      if (!drew) drawRedFish(e.x,e.y,e.size,pang,e.size>ps*1.5);
     } else {
       var ang = Math.atan2(e.vy||0, e.vx||0.1);
-      var c = e.color;
-      var tint =
-        c === '#ffee58' ? null :
-        c === '#ffa726' ? 'rgba(255,167,38,0.55)' :
-        c === '#ab47bc' ? 'rgba(171,71,188,0.65)' :
-        c === '#26c6da' ? 'rgba(38,198,218,0.55)' :
-        c === '#66bb6a' ? 'rgba(102,187,106,0.55)' :
-        c === '#ff7eb3' ? 'rgba(255,126,179,0.55)' : null;
       var edw = e.size * 2.4, edh = e.size * 1.6;
-      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(ang);
-      var ok2;
-      if (tint) ok2 = drawSpriteTinted(OCEAN_ATLAS, 'small_fish_base', 0, 0, edw, edh, tint);
-      else ok2 = drawSpriteCentered(OCEAN_ATLAS, 'small_fish_base', 0, 0, edw, edh);
-      ctx.restore();
-      if (!ok2) drawSmallFish(e.x,e.y,e.size,c,ang);
+      var drew2 = false;
+      withOrientation(e.x, e.y, ang, function() {
+        drew2 = drawSpriteCentered(OCEAN_ATLAS, 'small_fish_base', 0, 0, edw, edh);
+      });
+      if (!drew2) drawSmallFish(e.x,e.y,e.size,e.color,ang);
     }
     ctx.restore();
   }
@@ -1114,33 +1124,39 @@ function drawEnemies() {
 function drawPlayer() {
   var inv=invTimer>0&&(Math.floor(invTimer*8)%2===0);
   if(inv) return;
-  ctx.save();ctx.translate(px,py);ctx.rotate(pAngle);
-  if(cloakActive) ctx.globalAlpha=0.22;
+
   var psize = isSquid ? SQUID.size : FISH_STAGES[si].size;
-  var dw = psize * 2.4, dh = psize * 1.6;
-  var spriteName;
-  if (isOctopus) spriteName = 'octopus';
-  else if (isSquid) spriteName = 'squid';
-  else spriteName = ['tiny_fish','shark','mega_shark','orca','blue_whale'][si];
-
-  var ok = false;
-  if (spriteName === 'mega_shark') {
-    // mega_shark sprite is missing from the atlas — tint the shark sprite warm orange instead.
-    ok = drawSpriteTinted(OCEAN_ATLAS, 'shark', 0, 0, dw, dh, 'rgba(255,112,67,0.55)');
+  var dw, dh;
+  if (isSquid || isOctopus) {
+    dw = psize * 2.0; dh = psize * 2.0;
   } else {
-    ok = drawSpriteRel(OCEAN_ATLAS, spriteName, spriteName, 0, 0, dw, dh);
+    dw = psize * 2.4; dh = psize * 1.6;
   }
 
-  if (!ok) {
-    // Procedural fallback to the existing canvas-shape draw.
-    if(isOctopus){ drawSquid(SQUID.size,OCTOPUS_COLOR); }
-    else if(isSquid){ drawSquid(SQUID.size,SQUID.color); }
-    else if(si===0){ drawFishBody(FISH_STAGES[si].size,FISH_STAGES[si].color,'#1565c0'); }
-    else if(si<=2){ drawShark(FISH_STAGES[si].size,FISH_STAGES[si].color); }
-    else if(si===3){ drawOrca(FISH_STAGES[si].size); }
-    else { drawWhale(FISH_STAGES[si].size,FISH_STAGES[si].color); }
-  }
-  ctx.restore();
+  withOrientation(px, py, pAngle, function() {
+    if (cloakActive) ctx.globalAlpha = 0.22;
+
+    var spriteName;
+    if (isOctopus) spriteName = 'octopus';
+    else if (isSquid) spriteName = 'squid';
+    else spriteName = ['tiny_fish','shark','mega_shark','orca','blue_whale'][si];
+
+    var ok = false;
+    if (spriteName === 'mega_shark') {
+      ok = drawSpriteTinted(OCEAN_ATLAS, 'shark', 0, 0, dw, dh, 'rgba(255,112,67,0.55)');
+    } else {
+      ok = drawSpriteRel(OCEAN_ATLAS, spriteName, spriteName, 0, 0, dw, dh);
+    }
+
+    if (!ok) {
+      if(isOctopus){ drawSquid(SQUID.size,OCTOPUS_COLOR); }
+      else if(isSquid){ drawSquid(SQUID.size,SQUID.color); }
+      else if(si===0){ drawFishBody(FISH_STAGES[si].size,FISH_STAGES[si].color,'#1565c0'); }
+      else if(si<=2){ drawShark(FISH_STAGES[si].size,FISH_STAGES[si].color); }
+      else if(si===3){ drawOrca(FISH_STAGES[si].size); }
+      else { drawWhale(FISH_STAGES[si].size,FISH_STAGES[si].color); }
+    }
+  });
   if(cloakActive){
     ctx.save();
     ctx.globalAlpha=0.22+0.14*Math.sin(Date.now()/150);
@@ -1557,10 +1573,12 @@ function drawKFishPiles() {
 function drawInkClouds() {
   for(var ci=0;ci<inkClouds.length;ci++){
     var ic=inkClouds[ci]; if(!ic.alive) continue;
-    var a=Math.min(1,ic.life/1.5)*.55;
+    var a=Math.min(1,ic.life/1.5)*.92;
     var ig=ctx.createRadialGradient(ic.x,ic.y,0,ic.x,ic.y,ic.r);
-    ig.addColorStop(0,'rgba(70,0,110,'+a+')');
-    ig.addColorStop(1,'rgba(20,0,50,0)');
+    ig.addColorStop(0,'rgba(20,0,40,'+a+')');
+    ig.addColorStop(0.35,'rgba(60,10,120,'+(a*0.85)+')');
+    ig.addColorStop(0.75,'rgba(80,20,140,'+(a*0.5)+')');
+    ig.addColorStop(1,'rgba(40,5,90,0)');
     ctx.fillStyle=ig; ctx.beginPath();ctx.arc(ic.x,ic.y,ic.r,0,Math.PI*2);ctx.fill();
   }
 }
@@ -1569,11 +1587,16 @@ function drawRobos() {
   for(var ri=0;ri<roboFish.length;ri++){
     var rf=roboFish[ri]; if(!rf.alive) continue;
     ctx.save(); if(rf.stunned>0) ctx.globalAlpha=0.4;
-    ctx.translate(rf.x,rf.y); ctx.rotate(Math.atan2(rf.vy,rf.vx));
-    var dw = rf.size * 2.4, dh = rf.size * 1.6;
-    var ok = drawSpriteCentered(OCEAN_ATLAS, 'robo_fish', 0, 0, dw, dh);
-    if (!ok) {
-      // Procedural fallback (original body — byte-for-byte from the pre-edit code)
+    var rang = Math.atan2(rf.vy, rf.vx);
+    var rdw = rf.size * 2.4, rdh = rf.size * 1.6;
+    var drew = false;
+    withOrientation(rf.x, rf.y, rang, function() {
+      drew = drawSpriteCentered(OCEAN_ATLAS, 'robo_fish', 0, 0, rdw, rdh);
+    });
+    if (!drew) {
+      // Procedural fallback (original body — byte-for-byte from pre-edit code,
+      // but wrapped in our own translate+rotate since we're outside withOrientation)
+      ctx.save(); ctx.translate(rf.x, rf.y); ctx.rotate(rang);
       ctx.fillStyle='#78909c';
       ctx.beginPath();ctx.moveTo(-rf.size*.7,0);ctx.lineTo(-rf.size*1.12,-rf.size*.47);ctx.lineTo(-rf.size*1.12,rf.size*.47);ctx.closePath();ctx.fill();cOutline(rf.size*.1);
       ctx.fillStyle='#78909c';
@@ -1586,6 +1609,7 @@ function drawRobos() {
       ctx.fillStyle='#ffeb3b';ctx.beginPath();ctx.arc(rf.size*.74,-rf.size*.96,5,0,Math.PI*2);ctx.fill();cOutline(2);
       ctx.fillStyle='#ff1744';ctx.beginPath();ctx.arc(rf.size*.44,0,rf.size*.24,0,Math.PI*2);ctx.fill();cOutline(rf.size*.08);
       ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(rf.size*.36,-rf.size*.07,rf.size*.1,0,Math.PI*2);ctx.fill();
+      ctx.restore();
     }
     ctx.restore();
   }
