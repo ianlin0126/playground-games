@@ -1110,6 +1110,7 @@ function updateBoss(dt) {
         boss.phase = 2;
         boss.hp = boss.hpMaxP2;
         boss.invuln = 1.0;
+        triggerShake(6, 1.0);
         showBanner('⚡ Phase 2!', 1500);
         spawnPickup('heart', boss.x - 60, GROUND_Y - 20);
       } else if (boss.hp <= 0 && boss.phase === 2) {
@@ -1201,6 +1202,14 @@ function drawBossProjectiles() {
   }
 }
 
+// ── Camera shake (boss phase transition + boss death effects) ──────────────
+var shakeT = 0, shakeMag = 0;
+function triggerShake(mag, time) { shakeMag = mag; shakeT = time; }
+function getShakeOffset() {
+  if (shakeT <= 0) return { x: 0, y: 0 };
+  return { x: (Math.random() - 0.5) * shakeMag, y: (Math.random() - 0.5) * shakeMag };
+}
+
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
 function loop(now) {
@@ -1223,6 +1232,7 @@ function update(dt) {
   updatePickups(dt);
   updateCheckpoints(dt);
   updateBolts(dt);
+  if (shakeT > 0) shakeT -= dt;
 
   // Sync shield HP HUD row
   if (vehicle.mounted) {
@@ -1241,6 +1251,10 @@ function draw() {
   resolveLevelGeometry();
   updateCamera();
 
+  var sk = getShakeOffset();
+  ctx.save();
+  ctx.translate(sk.x, sk.y);
+
   ctx.save();
   ctx.translate(-camera.x, 0);
   drawFloor();
@@ -1255,6 +1269,14 @@ function draw() {
   drawProjectiles();
   drawPlayer();
   ctx.restore();
+
+  ctx.restore();
+
+  // Yellow flash overlay during boss phase transition
+  if (boss.active && boss.invuln > 0) {
+    ctx.fillStyle = 'rgba(255,235,59,' + (boss.invuln * 0.7) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
 
   var prog = Math.min(1, player.x / levelLength);
   progressEl.style.width = (prog * 100) + '%';
