@@ -77,10 +77,10 @@
     background: rgba(255,235,59,0.5);
     transform: scale(0.95);
   }
-  #ctrl-move { left: 16px;  bottom: 16px; }
-  #ctrl-jump { right: 16px; bottom: 16px; }
-  #ctrl-aim  { right: 16px; bottom: 100px; font-size: 26px; }
-  #ctrl-move.hidden { display: none; }
+  #ctrl-left  { left: 16px;  bottom: 16px; }
+  #ctrl-right { left: 100px; bottom: 16px; }
+  #ctrl-jump  { right: 16px; bottom: 16px; }
+  #ctrl-aim   { right: 16px; bottom: 100px; font-size: 26px; }
 </style>
 </head>
 <body>
@@ -97,9 +97,10 @@
   </div>
 </div>
 
-<div id="ctrl-move" class="ctrl-btn">▶</div>
-<div id="ctrl-jump" class="ctrl-btn">▲</div>
-<div id="ctrl-aim"  class="ctrl-btn">↑</div>
+<div id="ctrl-left"  class="ctrl-btn">◄</div>
+<div id="ctrl-right" class="ctrl-btn">▶</div>
+<div id="ctrl-jump"  class="ctrl-btn">▲</div>
+<div id="ctrl-aim"   class="ctrl-btn">↑</div>
 
 <div id="banner"></div>
 
@@ -151,17 +152,12 @@ refreshHud();
 
 // ── Input ──────────────────────────────────────────────────────────────────
 var input = {
-  moveHeld: false,
+  leftHeld: false,
+  rightHeld: false,
   jumpHeld: false,
   aimUp: false,
   jumpJustPressed: false,
 };
-var autoWalk = true;       // toggled on the menu screen (Task 15)
-function syncMoveBtnVisibility() {
-  var mv = document.getElementById('ctrl-move');
-  if (autoWalk) mv.classList.add('hidden'); else mv.classList.remove('hidden');
-}
-syncMoveBtnVisibility();
 
 function bindBtn(id, key) {
   var btn = document.getElementById(id);
@@ -181,12 +177,14 @@ function bindBtn(id, key) {
   btn.addEventListener('pointercancel', release, { passive: false });
   btn.addEventListener('lostpointercapture', release);
 }
-bindBtn('ctrl-move', 'moveHeld');
-bindBtn('ctrl-jump', 'jumpHeld');
-bindBtn('ctrl-aim',  'aimUp');
+bindBtn('ctrl-left',  'leftHeld');
+bindBtn('ctrl-right', 'rightHeld');
+bindBtn('ctrl-jump',  'jumpHeld');
+bindBtn('ctrl-aim',   'aimUp');
 
 window.addEventListener('keydown', function(e) {
-  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.moveHeld = true;
+  if (e.code === 'ArrowLeft'  || e.code === 'KeyA') input.leftHeld = true;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.rightHeld = true;
   if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
     if (!input.jumpHeld) input.jumpJustPressed = true;
     input.jumpHeld = true;
@@ -194,13 +192,15 @@ window.addEventListener('keydown', function(e) {
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.aimUp = true;
 });
 window.addEventListener('keyup', function(e) {
-  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.moveHeld = false;
+  if (e.code === 'ArrowLeft'  || e.code === 'KeyA') input.leftHeld = false;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.rightHeld = false;
   if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') input.jumpHeld = false;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.aimUp = false;
 });
 
 function clearInput() {
-  input.moveHeld = false;
+  input.leftHeld = false;
+  input.rightHeld = false;
   input.jumpHeld = false;
   input.aimUp = false;
   input.jumpJustPressed = false;
@@ -235,9 +235,13 @@ var player = {
 };
 
 function updatePlayer(dt) {
-  var moving = autoWalk ? true : input.moveHeld;
-  if (scene !== 'playing') moving = false;
-  player.vx = moving ? WALK_SPEED : 0;
+  var dir = 0;
+  if (scene === 'playing') {
+    if (input.rightHeld) dir += 1;
+    if (input.leftHeld)  dir -= 1;
+  }
+  player.vx = dir * WALK_SPEED;
+  if (dir !== 0) player.facing = dir;   // remembered for projectile aim direction
 
   player.vy += GRAVITY * dt;
 
@@ -340,7 +344,7 @@ function roundRect(x, y, w, h, r) {
 // ── Camera + level ─────────────────────────────────────────────────────────
 var camera = { x: 0 };
 function updateCamera() {
-  var targetCamX = player.x - W * 0.35;
+  var targetCamX = player.x - W * 0.5;   // center the player
   if (targetCamX < 0) targetCamX = 0;
   if (targetCamX > levelLength - W) targetCamX = Math.max(0, levelLength - W);
   camera.x = targetCamX;
