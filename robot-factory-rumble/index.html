@@ -81,6 +81,37 @@
   #ctrl-right { left: 100px; bottom: 16px; }
   #ctrl-jump  { right: 16px; bottom: 16px; }
   #ctrl-aim   { right: 16px; bottom: 100px; font-size: 26px; }
+  .overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(15,15,30,0.94);
+    z-index: 40;
+    align-items: center; justify-content: center; flex-direction: column;
+    text-align: center; padding: 24px;
+  }
+  .overlay.show { display: flex; }
+  .overlay h1 {
+    font-size: 38px; margin-bottom: 10px;
+    color: #FFEB3B;
+    text-shadow: 0 0 18px #FFEB3B, 0 4px 8px rgba(0,0,0,0.5);
+  }
+  .overlay-sub { font-size: 22px; margin-bottom: 22px; color: #B2DFDB; max-width: 460px; }
+  .big-btn {
+    width: 280px; max-width: 80vw;
+    padding: 18px 22px; margin: 8px 0;
+    font-size: 22px; font-weight: bold;
+    background: linear-gradient(90deg, #FFEB3B, #FFA726);
+    color: #1A1A1A;
+    border: none; border-radius: 28px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(255,235,59,0.45);
+    font-family: inherit;
+    min-height: 60px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .big-btn.cool { background: linear-gradient(90deg, #00BCD4, #2196F3); color: #fff; }
+  .big-btn:active { transform: scale(0.97); }
+  .credits { margin-top: 18px; font-size: 14px; opacity: 0.7; color: #B2DFDB; }
 </style>
 </head>
 <body>
@@ -104,6 +135,19 @@
 
 <div id="banner"></div>
 
+<div id="menu-overlay" class="overlay show">
+  <h1>🤖 Robot Factory Rumble</h1>
+  <p class="overlay-sub">Run, shoot, dodge — defeat the Foreman-Bot 9000!</p>
+  <button id="start-btn" class="big-btn cool" type="button">▶ Start!</button>
+  <p class="credits">◄ ▶ to move · ▲ to jump · ↑ to aim up</p>
+</div>
+
+<div id="win-overlay" class="overlay">
+  <h1>🎉 Sector Cleared!</h1>
+  <p class="overlay-sub">You powered down the Foreman-Bot 9000!</p>
+  <button id="winagain-btn" class="big-btn cool" type="button">▶ Play Again</button>
+</div>
+
 <script>
 // ── Setup ──────────────────────────────────────────────────────────────────
 var canvas = document.getElementById('c');
@@ -120,7 +164,6 @@ window.addEventListener('resize', resize);
 
 // ── Game state ─────────────────────────────────────────────────────────────
 var scene = 'menu';     // 'menu' | 'playing' | 'respawn' | 'win'
-scene = 'playing';      // FORCED for Task 4 dev; Task 15 replaces with menu transition
 var hp = 5;             // player hearts (0..5)
 var maxHp = 5;
 var levelLength = 4900; // total horizontal level length in px (per spec)
@@ -208,6 +251,66 @@ function clearInput() {
 }
 document.addEventListener('visibilitychange', function() { if (document.hidden) clearInput(); });
 window.addEventListener('blur', clearInput);
+
+// ── Menu / Win overlay wiring ──────────────────────────────────────────────
+var menuOverlay = document.getElementById('menu-overlay');
+var winOverlay  = document.getElementById('win-overlay');
+var startBtn    = document.getElementById('start-btn');
+var winagainBtn = document.getElementById('winagain-btn');
+var aimUpHintShown = false;
+
+function startGame() {
+  scene = 'playing';
+  hp = maxHp;
+  refreshHud();
+  player.x = 80;
+  player.y = GROUND_Y;
+  player.vy = 0;
+  player.vx = 0;
+  player.invuln = 0;
+  player.facing = 1;
+  shieldBubble = 0;
+  weapon = 'foam';
+  weaponEl.textContent = '⚡ Foam Blaster';
+  weaponDuration = 0;
+  weaponShotsLeft = 0;
+  enemies = [];
+  bolts = [];
+  projectiles = [];
+  pickups = [];
+  checkpoints = [];
+  lastCheckpoint = { x: 80, y: GROUND_Y };
+  vehicle = { x: 3500, y: 0, w: 64, h: 56, mounted: false, shield: 4, pistonT: 0, pistonCool: 0, alive: true, promptVisible: false };
+  boss = { active: false, x: 4750, y: 0, w: 120, h: 140, phase: 1, hp: 10, hpMaxP1: 10, hpMaxP2: 8, attackT: 3.0, currentAttack: null, hitFlash: 0, invuln: 0 };
+  bossRow.style.display = 'none';
+  shieldEl.style.display = 'none';
+  shakeT = 0;
+  aimUpHintShown = false;
+  setupLevelEnemies();
+  setupLevelPickups();
+  setupLevelCheckpoints();
+  hideOverlays();
+}
+
+function hideOverlays() {
+  menuOverlay.classList.remove('show');
+  winOverlay.classList.remove('show');
+}
+
+startBtn.addEventListener('click', startGame);
+winagainBtn.addEventListener('click', startGame);
+
+function maybeShowAimUpHint() {
+  if (aimUpHintShown) return;
+  for (var i = 0; i < enemies.length; i++) {
+    var e = enemies[i];
+    if (e.kind === 'copter' && e.alive && Math.abs(e.x - player.x) < W * 0.6) {
+      aimUpHintShown = true;
+      showBanner('↑ Press Aim Up to shoot up!', 2000);
+      return;
+    }
+  }
+}
 
 // ── Constants ──────────────────────────────────────────────────────────────
 var WALK_SPEED       = 180;     // px/s
@@ -1121,10 +1224,11 @@ function updateBoss(dt) {
 }
 
 function onBossDefeated() {
-  // Stub for T15. Just deactivates the boss for now.
   boss.active = false;
   bossRow.style.display = 'none';
   scene = 'win';
+  showBanner('🎉 Sector Cleared!', 2000);
+  setTimeout(function() { winOverlay.classList.add('show'); }, 1500);
 }
 
 function updateBossHazards(dt) {
@@ -1244,6 +1348,8 @@ function update(dt) {
   } else {
     shieldEl.style.display = 'none';
   }
+
+  maybeShowAimUpHint();
 }
 function draw() {
   ctx.fillStyle = '#2a2a2a';
@@ -1330,9 +1436,7 @@ function drawPlatforms() {
   }
 }
 resolveLevelGeometry();
-setupLevelEnemies();
-setupLevelPickups();
-setupLevelCheckpoints();
+// Level setup runs inside startGame() when the menu's Start button is pressed.
 requestAnimationFrame(function(ts) { lastTime = ts; requestAnimationFrame(loop); });
 </script>
 </body>
