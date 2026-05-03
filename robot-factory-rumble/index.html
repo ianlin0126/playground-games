@@ -262,12 +262,29 @@ function updatePlayer(dt) {
   player.x += player.vx * dt;
   player.y += player.vy * dt;
 
-  if (player.y >= FLOOR_Y) {
-    player.y = FLOOR_Y;
-    player.vy = 0;
-    if (!player.onGround) {
-      player.onGround = true;
-      player.coyote = COYOTE_TIME;
+  var standY = resolveStandY(player.x + player.w * 0.5);
+  // Belt horizontal modifier when standing on a conveyor
+  var beltMod = 0;
+  for (var pli = 0; pli < level.platforms.length; pli++) {
+    var pl = level.platforms[pli];
+    if (player.x + player.w * 0.5 >= pl.x && player.x + player.w * 0.5 <= pl.x + pl.w
+        && Math.abs(player.y - (GROUND_Y + pl.top)) < 1) {
+      beltMod = pl.beltDir * 80;
+    }
+  }
+  player.x += beltMod * dt;
+
+  if (player.y >= standY) {
+    if (standY === Infinity) {
+      if (player.y > H + 60) onPitFall();
+      player.onGround = false;
+    } else {
+      player.y = standY;
+      player.vy = 0;
+      if (!player.onGround) {
+        player.onGround = true;
+        player.coyote = COYOTE_TIME;
+      }
     }
   } else {
     player.onGround = false;
@@ -320,6 +337,65 @@ function roundRect(x, y, w, h, r) {
   ctx.quadraticCurveTo(x, y, x + r, y);
 }
 
+// ── Camera + level ─────────────────────────────────────────────────────────
+var camera = { x: 0 };
+function updateCamera() {
+  var targetCamX = player.x - W * 0.35;
+  if (targetCamX < 0) targetCamX = 0;
+  if (targetCamX > levelLength - W) targetCamX = Math.max(0, levelLength - W);
+  camera.x = targetCamX;
+}
+
+var FLOOR_HEIGHT = 80;
+var GROUND_Y = 0;       // canvas-y of the ground top; resolved on first draw
+var PLATFORM_HEIGHT = 14;
+var level = {
+  segments: [
+    { name: 'A',  x0: 0,    x1: 1800 },
+    { name: 'B',  x0: 1800, x1: 4200 },
+    { name: 'C',  x0: 4200, x1: 4900 },
+  ],
+  pits: [
+    { x: 600,  w: 70 },
+    { x: 1100, w: 80 },
+    { x: 1500, w: 70 },
+  ],
+  platforms: [
+    { x: 2100, w: 200, top: -120, beltDir:  1 },
+    { x: 2500, w: 220, top: -180, beltDir: -1 },
+    { x: 3000, w: 250, top: -120, beltDir:  1 },
+  ],
+};
+function resolveLevelGeometry() {
+  GROUND_Y = H - FLOOR_HEIGHT;
+  FLOOR_Y  = GROUND_Y;
+}
+
+function resolveStandY(px) {
+  var candidates = [];
+  var overPit = false;
+  for (var i = 0; i < level.pits.length; i++) {
+    var p = level.pits[i];
+    if (px >= p.x && px <= p.x + p.w) { overPit = true; break; }
+  }
+  if (!overPit) candidates.push(GROUND_Y);
+  for (var k = 0; k < level.platforms.length; k++) {
+    var pl = level.platforms[k];
+    if (px >= pl.x && px <= pl.x + pl.w) candidates.push(GROUND_Y + pl.top);
+  }
+  if (candidates.length === 0) return Infinity;
+  var ystand = Infinity;
+  for (var c = 0; c < candidates.length; c++) if (candidates[c] < ystand) ystand = candidates[c];
+  return ystand;
+}
+
+function onPitFall() {
+  // Stub for Task 5; real respawn logic lands in Task 11.
+  player.x = 80;
+  player.y = GROUND_Y;
+  player.vy = 0;
+}
+
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
 function loop(now) {
@@ -331,15 +407,72 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 function update(dt) {
+  resolveLevelGeometry();
   updatePlayer(dt);
 }
 function draw() {
   ctx.fillStyle = '#2a2a2a';
   ctx.fillRect(0, 0, W, H);
-  // Floor line (temporary — replaced by terrain in Task 5)
-  ctx.fillStyle = '#5D3A1A';
-  ctx.fillRect(0, H * 0.7, W, H * 0.3);
+  resolveLevelGeometry();
+  updateCamera();
+
+  ctx.save();
+  ctx.translate(-camera.x, 0);
+  drawFloor();
+  drawPlatforms();
   drawPlayer();
+  ctx.restore();
+
+  var prog = Math.min(1, player.x / levelLength);
+  progressEl.style.width = (prog * 100) + '%';
+}
+
+function drawFloor() {
+  var segs = [{ x0: -50, x1: levelLength + 50 }];
+  for (var i = 0; i < level.pits.length; i++) {
+    var p = level.pits[i];
+    var newSegs = [];
+    for (var j = 0; j < segs.length; j++) {
+      var s = segs[j];
+      if (p.x + p.w < s.x0 || p.x > s.x1) { newSegs.push(s); continue; }
+      if (p.x > s.x0)        newSegs.push({ x0: s.x0, x1: p.x });
+      if (p.x + p.w < s.x1)  newSegs.push({ x0: p.x + p.w, x1: s.x1 });
+    }
+    segs = newSegs;
+  }
+  ctx.fillStyle = '#5D3A1A';
+  for (var k = 0; k < segs.length; k++) {
+    ctx.fillRect(segs[k].x0, GROUND_Y, segs[k].x1 - segs[k].x0, FLOOR_HEIGHT);
+  }
+  ctx.fillStyle = '#FFEB3B';
+  for (var m = 0; m < segs.length; m++) {
+    ctx.fillRect(segs[m].x0, GROUND_Y, segs[m].x1 - segs[m].x0, 3);
+  }
+  ctx.fillStyle = '#FF1744';
+  for (var p2 = 0; p2 < level.pits.length; p2++) {
+    var pp = level.pits[p2];
+    ctx.fillRect(pp.x - 2, GROUND_Y, 2, FLOOR_HEIGHT);
+    ctx.fillRect(pp.x + pp.w, GROUND_Y, 2, FLOOR_HEIGHT);
+  }
+}
+
+function drawPlatforms() {
+  for (var i = 0; i < level.platforms.length; i++) {
+    var pl = level.platforms[i];
+    var py = GROUND_Y + pl.top;
+    ctx.fillStyle = '#37474F';
+    ctx.fillRect(pl.x, py, pl.w, PLATFORM_HEIGHT);
+    ctx.fillStyle = '#FFEB3B';
+    var phase = (Date.now() / (pl.beltDir > 0 ? -120 : 120)) % 12;
+    if (phase < 0) phase += 12;
+    for (var d = -12 + phase; d < pl.w; d += 12) {
+      var x0 = pl.x + d, x1 = pl.x + d + 8;
+      var clipL = Math.max(pl.x, x0), clipR = Math.min(pl.x + pl.w, x1);
+      if (clipR > clipL) ctx.fillRect(clipL, py + 4, clipR - clipL, 6);
+    }
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+    ctx.strokeRect(pl.x, py, pl.w, PLATFORM_HEIGHT);
+  }
 }
 requestAnimationFrame(function(ts) { lastTime = ts; requestAnimationFrame(loop); });
 </script>
