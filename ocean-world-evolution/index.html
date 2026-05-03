@@ -1163,28 +1163,44 @@ function drawAnglerfish() {
   if(!anglerfish) return;
   var af=anglerfish, flash=af.hitFlash>0;
   ctx.save(); ctx.translate(af.x,af.y);
+
+  // Outer green-glow halo (procedural)
   var glow=ctx.createRadialGradient(0,0,af.size*.4,0,0,af.size*1.6);
   glow.addColorStop(0,'rgba(0,60,20,.3)'); glow.addColorStop(1,'rgba(0,60,20,0)');
   ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0,af.size*1.6,0,Math.PI*2); ctx.fill();
-  // Tail
-  ctx.fillStyle=flash?'#ccc':'#0d3018';
-  ctx.beginPath(); ctx.moveTo(-af.size*.75,0); ctx.lineTo(-af.size*1.22,-af.size*.58); ctx.lineTo(-af.size*1.22,af.size*.58); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle='#000';ctx.lineWidth=af.size*.08;ctx.lineJoin='round';ctx.stroke();
-  // Body
-  ctx.fillStyle=flash?'#fff':'#0a2010';
-  ctx.beginPath(); ctx.ellipse(0,0,af.size,af.size*.55,0,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle='#000';ctx.lineWidth=af.size*.09;ctx.lineJoin='round';ctx.stroke();
-  // Dorsal spines
-  ctx.fillStyle=flash?'#eee':'#1a4020';
-  ctx.beginPath();
-  for(var fi2=0;fi2<5;fi2++){var fx=af.size*.2+fi2*af.size*.14;ctx.moveTo(fx,-af.size*.55);ctx.lineTo(fx+af.size*.05,-af.size*.8);ctx.lineTo(fx+af.size*.1,-af.size*.55);}
-  ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=af.size*.06;ctx.lineJoin='round';ctx.stroke();
-  // Lure rod
+
+  // Body: sprite-first, procedural fallback
+  var hpFrac = af.hp / BOSS3_MAX;
+  var spriteName = hpFrac < 0.5 ? 'boss_anglerfish_dmg' : 'boss_anglerfish';
+  var dw = af.size * 2.6, dh = af.size * 1.7;
+
+  var ok;
+  if (flash) {
+    ok = drawSpriteTinted(OCEAN_ATLAS, spriteName, 0, 0, dw, dh, 'rgba(255,255,255,0.85)');
+  } else {
+    ok = drawSpriteCentered(OCEAN_ATLAS, spriteName, 0, 0, dw, dh);
+  }
+
+  if (!ok) {
+    // Procedural fallback: tail + body + dorsal spines + eye (no lure — drawn next regardless)
+    ctx.fillStyle=flash?'#ccc':'#0d3018';
+    ctx.beginPath(); ctx.moveTo(-af.size*.75,0); ctx.lineTo(-af.size*1.22,-af.size*.58); ctx.lineTo(-af.size*1.22,af.size*.58); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#000';ctx.lineWidth=af.size*.08;ctx.lineJoin='round';ctx.stroke();
+    ctx.fillStyle=flash?'#fff':'#0a2010';
+    ctx.beginPath(); ctx.ellipse(0,0,af.size,af.size*.55,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#000';ctx.lineWidth=af.size*.09;ctx.lineJoin='round';ctx.stroke();
+    ctx.fillStyle=flash?'#eee':'#1a4020';
+    ctx.beginPath();
+    for(var fi2=0;fi2<5;fi2++){var fx=af.size*.2+fi2*af.size*.14;ctx.moveTo(fx,-af.size*.55);ctx.lineTo(fx+af.size*.05,-af.size*.8);ctx.lineTo(fx+af.size*.1,-af.size*.55);}
+    ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=af.size*.06;ctx.lineJoin='round';ctx.stroke();
+    cEye(af.size*.42,-af.size*.1,af.size*.18,'#001500');
+  }
+
+  // Lure: rod + glow + bulb (procedural — must stay so it sweeps and pulses)
   var lx=af.size*.5+Math.cos(af.lureAngle)*af.size*.35;
   var ly=-af.size*.7+Math.sin(af.lureAngle)*af.size*.2;
   ctx.strokeStyle=flash?'#aaa':'#2a6030'; ctx.lineWidth=5; ctx.lineCap='round';
   ctx.beginPath(); ctx.moveTo(af.size*.3,-af.size*.4); ctx.lineTo(lx,ly); ctx.stroke();
-  // Lure glow
   var lp=0.6+Math.sin(af.lurePulse)*0.4;
   var lg=ctx.createRadialGradient(lx,ly,0,lx,ly,24);
   lg.addColorStop(0,'rgba(255,255,150,'+lp+')'); lg.addColorStop(1,'rgba(255,220,0,0)');
@@ -1192,8 +1208,7 @@ function drawAnglerfish() {
   ctx.fillStyle='#ffe000'; ctx.beginPath(); ctx.arc(lx,ly,9,0,Math.PI*2); ctx.fill();
   ctx.strokeStyle='#000';ctx.lineWidth=2.5;ctx.stroke();
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(lx-3,ly-3,3.5,0,Math.PI*2);ctx.fill();
-  // Eye (scary big)
-  cEye(af.size*.42,-af.size*.1,af.size*.18,'#001500');
+
   ctx.restore();
 }
 
@@ -1404,30 +1419,50 @@ function drawRedFish(x,y,sz,ang,big) {
 
 function drawBoss1() {
   if(!boss) return;
-  var bs=boss.size,flash=boss.hitFlash>0;
-  ctx.save();ctx.translate(boss.x,boss.y);ctx.rotate(boss.angle);
+  var bs=boss.size, flash=boss.hitFlash>0;
+  ctx.save(); ctx.translate(boss.x,boss.y); ctx.rotate(boss.angle);
+
+  // Outer warm-glow halo (procedural — keeps the boss feeling powered)
   var glow=ctx.createRadialGradient(0,0,bs*.5,0,0,bs*1.5);
-  glow.addColorStop(0,'rgba(255,100,0,.22)');glow.addColorStop(1,'rgba(255,100,0,0)');
-  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,bs*1.5,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle=flash?'#fff':'#37474f';
-  ctx.beginPath();ctx.ellipse(0,0,bs,bs*.48,0,0,Math.PI*2);ctx.fill();
-  ctx.strokeStyle=flash?'#ccc':'#546e7a';ctx.lineWidth=3;
-  for(var p=-2;p<=2;p++){ctx.beginPath();ctx.moveTo(p*bs*.25,-bs*.48);ctx.lineTo(p*bs*.25,bs*.48);ctx.stroke();}
-  ctx.fillStyle=flash?'#eee':'#455a64';
-  ctx.beginPath();ctx.moveTo(bs*.12,-bs*.48);ctx.lineTo(bs*.38,-bs*.95);ctx.lineTo(bs*.62,-bs*.48);ctx.closePath();ctx.fill();
-  ctx.beginPath();ctx.moveTo(bs*.12,bs*.48);ctx.lineTo(bs*.3,bs*.88);ctx.lineTo(bs*.52,bs*.48);ctx.closePath();ctx.fill();
-  ctx.fillStyle=flash?'#eee':'#2e3b40';
-  ctx.fillRect(bs*.28,-bs*.2,bs*.46,bs*.12);ctx.fillRect(bs*.28,bs*.08,bs*.46,bs*.12);
-  var pulse=0.65+Math.sin(Date.now()/180)*.35;
-  ctx.fillStyle=flash?'#fff':'rgba(255,60,60,'+pulse+')';
-  ctx.beginPath();ctx.arc(bs*.5,0,bs*.22,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bs*.5,0,bs*.1,0,Math.PI*2);ctx.fill();
+  glow.addColorStop(0,'rgba(255,100,0,.22)'); glow.addColorStop(1,'rgba(255,100,0,0)');
+  ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0,bs*1.5,0,Math.PI*2); ctx.fill();
+
+  // Body: pick base or damaged sprite by HP threshold
+  var hpFrac = bossHp / BOSS1_MAX;
+  var spriteName = hpFrac < 0.5 ? 'boss_robot_dmg' : 'boss_robot';
+  var dw = bs * 2.4, dh = bs * 1.6;
+
+  var ok;
+  if (flash) {
+    ok = drawSpriteTinted(OCEAN_ATLAS, spriteName, 0, 0, dw, dh, 'rgba(255,255,255,0.85)');
+  } else {
+    ok = drawSpriteCentered(OCEAN_ATLAS, spriteName, 0, 0, dw, dh);
+  }
+
+  if (!ok) {
+    // Procedural fallback — original boss1 body shapes (halo already drawn above)
+    ctx.fillStyle=flash?'#fff':'#37474f';
+    ctx.beginPath();ctx.ellipse(0,0,bs,bs*.48,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=flash?'#ccc':'#546e7a';ctx.lineWidth=3;
+    for(var p=-2;p<=2;p++){ctx.beginPath();ctx.moveTo(p*bs*.25,-bs*.48);ctx.lineTo(p*bs*.25,bs*.48);ctx.stroke();}
+    ctx.fillStyle=flash?'#eee':'#455a64';
+    ctx.beginPath();ctx.moveTo(bs*.12,-bs*.48);ctx.lineTo(bs*.38,-bs*.95);ctx.lineTo(bs*.62,-bs*.48);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(bs*.12,bs*.48);ctx.lineTo(bs*.3,bs*.88);ctx.lineTo(bs*.52,bs*.48);ctx.closePath();ctx.fill();
+    ctx.fillStyle=flash?'#eee':'#2e3b40';
+    ctx.fillRect(bs*.28,-bs*.2,bs*.46,bs*.12); ctx.fillRect(bs*.28,bs*.08,bs*.46,bs*.12);
+    var pulse=0.65+Math.sin(Date.now()/180)*.35;
+    ctx.fillStyle=flash?'#fff':'rgba(255,60,60,'+pulse+')';
+    ctx.beginPath();ctx.arc(bs*.5,0,bs*.22,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bs*.5,0,bs*.1,0,Math.PI*2);ctx.fill();
+  }
   ctx.restore();
 }
 
 function drawKraken() {
   if(!kraken) return;
   var ks=kraken.size,flash=kraken.hitFlash>0;
+
+  // Tentacles (procedural — UNCHANGED from existing code)
   for(var ai=0;ai<kraken.arms.length;ai++){
     var arm=kraken.arms[ai]; if(arm.ext<0.02) continue;
     var tipX=kraken.x+Math.cos(arm.angle)*arm.length*arm.ext;
@@ -1446,26 +1481,46 @@ function drawKraken() {
       ctx.beginPath();ctx.arc(kraken.x+(tipX-kraken.x)*st,kraken.y+(tipY-kraken.y)*st,3.5,0,Math.PI*2);ctx.fill();
     }
   }
-  ctx.save();ctx.translate(kraken.x,kraken.y);
+
+  // Head: sprite-first, procedural fallback
+  ctx.save(); ctx.translate(kraken.x, kraken.y);
+
+  // Outer purple halo (procedural — runs regardless of sprite path)
   var kg=ctx.createRadialGradient(0,0,ks*.3,0,0,ks*1.4);
-  kg.addColorStop(0,'rgba(120,0,180,.35)');kg.addColorStop(1,'rgba(60,0,100,0)');
-  ctx.fillStyle=kg;ctx.beginPath();ctx.arc(0,0,ks*1.4,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle=flash?'#fff':(krakenPhase2?'#880e4f':'#4a148c');
-  ctx.beginPath();ctx.arc(0,0,ks,0,Math.PI*2);ctx.fill();
-  ctx.strokeStyle=flash?'#fff':'#7b1fa2'; ctx.lineWidth=2.5;
-  ctx.beginPath();ctx.arc(0,0,ks*.7,0,Math.PI*2);ctx.stroke();
-  ctx.beginPath();ctx.arc(0,0,ks*.42,0,Math.PI*2);ctx.stroke();
-  ctx.fillStyle=flash?'#ffca28':'#ff6d00';
-  ctx.beginPath();ctx.arc(-ks*.27,-ks*.16,ks*.2,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(ks*.27,-ks*.16,ks*.2,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#000';
-  ctx.beginPath();ctx.arc(-ks*.27,-ks*.16,ks*.1,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(ks*.27,-ks*.16,ks*.1,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#fff';
-  ctx.beginPath();ctx.arc(-ks*.2,-ks*.2,ks*.042,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(ks*.32,-ks*.2,ks*.042,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#12002a';
-  ctx.beginPath();ctx.moveTo(-ks*.09,ks*.1);ctx.lineTo(0,ks*.28);ctx.lineTo(ks*.09,ks*.1);ctx.closePath();ctx.fill();
+  kg.addColorStop(0,'rgba(120,0,180,.35)'); kg.addColorStop(1,'rgba(60,0,100,0)');
+  ctx.fillStyle=kg; ctx.beginPath(); ctx.arc(0,0,ks*1.4,0,Math.PI*2); ctx.fill();
+
+  var hpFrac = kraken.hp / BOSS2_MAX;
+  var spriteName = hpFrac < 0.5 ? 'boss_kraken_dmg' : 'boss_kraken';
+  var dw = ks * 2.2, dh = ks * 2.2;
+
+  var ok;
+  if (flash) {
+    ok = drawSpriteTinted(OCEAN_ATLAS, spriteName, 0, 0, dw, dh, 'rgba(255,255,255,0.85)');
+  } else {
+    ok = drawSpriteCentered(OCEAN_ATLAS, spriteName, 0, 0, dw, dh);
+  }
+
+  if (!ok) {
+    // Procedural head fallback (kraken head body + features — halo above runs anyway)
+    ctx.fillStyle=flash?'#fff':(krakenPhase2?'#880e4f':'#4a148c');
+    ctx.beginPath();ctx.arc(0,0,ks,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=flash?'#fff':'#7b1fa2'; ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(0,0,ks*.7,0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.arc(0,0,ks*.42,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle=flash?'#ffca28':'#ff6d00';
+    ctx.beginPath();ctx.arc(-ks*.27,-ks*.16,ks*.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ks*.27,-ks*.16,ks*.2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#000';
+    ctx.beginPath();ctx.arc(-ks*.27,-ks*.16,ks*.1,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ks*.27,-ks*.16,ks*.1,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(-ks*.2,-ks*.2,ks*.042,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ks*.32,-ks*.2,ks*.042,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#12002a';
+    ctx.beginPath();ctx.moveTo(-ks*.09,ks*.1);ctx.lineTo(0,ks*.28);ctx.lineTo(ks*.09,ks*.1);ctx.closePath();ctx.fill();
+  }
+
   ctx.restore();
 }
 
