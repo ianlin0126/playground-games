@@ -182,6 +182,155 @@ var BOSS1_MAX = 7, BOSS2_MAX = 10, BOSS3_MAX = 12, MAX_LIVES = 20, INK_CD_MAX = 
 var CLOAK_DURATION = 10, CLOAK_CD_MAX = 14;
 var PREY_COLORS = ['#ffee58','#ffa726','#ab47bc','#26c6da','#66bb6a','#ff7eb3'];
 
+// ── Sprite atlas ─────────────────────────────────────────────────────────
+var OCEAN_ATLAS = new Image();
+OCEAN_ATLAS.src = './assets/ocean-atlas.png';
+
+// Sprite bboxes embedded from ocean-sprite-map.json (atlas was generated
+// by GPT Image 1; gpt-image-2 wasn't available to this org). The atlas
+// produced 4 columns × 5 rows = 20 sprites instead of 5×5 = 25, so the
+// following names get {x:0,y:0,w:0,h:0} and fall back to procedural draws
+// or code-side compensation: mega_shark (rendered as code-tinted shark),
+// coin (procedural fallback), boss_robot (procedural fallback in drawBoss1),
+// boss_robot_dmg (procedural), explosion_3 (drawExplosions fades frame 2).
+var SPRITES_OCEAN = {
+  tiny_fish:           { x: 41,  y: 64,  w: 173, h: 142 },
+  shark:               { x: 255, y: 51,  w: 249, h: 160 },
+  mega_shark:          { x: 0,   y: 0,   w: 0,   h: 0   },
+  orca:                { x: 516, y: 55,  w: 226, h: 156 },
+  blue_whale:          { x: 761, y: 51,  w: 232, h: 158 },
+  squid:               { x: 39,  y: 251, w: 197, h: 202 },
+  octopus:             { x: 271, y: 251, w: 220, h: 202 },
+  plankton:            { x: 533, y: 254, w: 193, h: 186 },
+  small_fish_base:     { x: 770, y: 254, w: 215, h: 165 },
+  coin:                { x: 0,   y: 0,   w: 0,   h: 0   },
+  red_predator:        { x: 37,  y: 480, w: 198, h: 178 },
+  boss_robot:          { x: 0,   y: 0,   w: 0,   h: 0   },
+  boss_kraken:         { x: 525, y: 465, w: 208, h: 195 },
+  boss_anglerfish:     { x: 273, y: 480, w: 220, h: 174 },
+  robo_fish:           { x: 40,  y: 685, w: 196, h: 159 },
+  boss_robot_dmg:      { x: 0,   y: 0,   w: 0,   h: 0   },
+  boss_kraken_dmg:     { x: 291, y: 677, w: 173, h: 168 },
+  boss_anglerfish_dmg: { x: 769, y: 465, w: 219, h: 183 },
+  explosion_1:         { x: 52,  y: 861, w: 187, h: 144 },
+  explosion_2:         { x: 277, y: 860, w: 204, h: 145 },
+  explosion_3:         { x: 0,   y: 0,   w: 0,   h: 0   }
+};
+
+// Empirical render-size overrides per sprite, dialed in during QA from
+// side-by-side render comparison. Default (entry absent) = use bbox-ratio.
+// Add entries like: shark: { wMul: 1.0, hMul: 1.0, xOffset: 0, yOffset: 0 }
+var SPRITE_RENDER_OVERRIDES = {};
+
+// One-time setup for the offscreen-canvas tint recipe (kid-tablet safe;
+// avoids ctx.filter which iOS Safari < 17 silently ignores).
+var TINT_CANVAS = document.createElement('canvas');
+TINT_CANVAS.width = 512;
+TINT_CANVAS.height = 512;
+var TINT_CTX = TINT_CANVAS.getContext('2d');
+
+function drawSprite(atlas, name, dx, dy, dw, dh) {
+  var s = SPRITES_OCEAN[name];
+  if (!atlas.complete || atlas.naturalWidth === 0 || !s || !s.w) return false;
+  ctx.drawImage(atlas, s.x, s.y, s.w, s.h, dx, dy, dw, dh);
+  return true;
+}
+
+function drawSpriteCentered(atlas, name, cx, cy, dw, dh) {
+  return drawSprite(atlas, name, cx - dw / 2, cy - dh / 2, dw, dh);
+}
+
+function drawSpriteRel(atlas, refName, name, cx, cy, baseDW, baseDH) {
+  var ov = SPRITE_RENDER_OVERRIDES[name];
+  if (ov) {
+    var ox = ov.xOffset || 0, oy = ov.yOffset || 0;
+    return drawSpriteCentered(atlas, name, cx + ox, cy + oy,
+      baseDW * (ov.wMul || 1), baseDH * (ov.hMul || 1));
+  }
+  var ref = SPRITES_OCEAN[refName], s = SPRITES_OCEAN[name];
+  if (!ref || !s || !ref.w || !s.w) return drawSpriteCentered(atlas, name, cx, cy, baseDW, baseDH);
+  return drawSpriteCentered(atlas, name, cx, cy, baseDW * (s.w / ref.w), baseDH * (s.h / ref.h));
+}
+
+// Tint a sprite-shaped region with an arbitrary fill, masked by sprite alpha.
+// Used for: prey color tiers, mega_shark warm tint over shark sprite,
+// hit-flash white overlay on bosses, damage tinting.
+function drawSpriteTinted(atlas, name, cx, cy, dw, dh, tintFill) {
+  var s = SPRITES_OCEAN[name];
+  if (!atlas.complete || atlas.naturalWidth === 0 || !s || !s.w) return false;
+  TINT_CTX.clearRect(0, 0, TINT_CANVAS.width, TINT_CANVAS.height);
+  TINT_CTX.drawImage(atlas, s.x, s.y, s.w, s.h, 0, 0, dw, dh);
+  TINT_CTX.globalCompositeOperation = 'source-atop';
+  TINT_CTX.fillStyle = tintFill;
+  TINT_CTX.fillRect(0, 0, dw, dh);
+  TINT_CTX.globalCompositeOperation = 'source-over';
+  ctx.drawImage(TINT_CANVAS, 0, 0, dw, dh, cx - dw / 2, cy - dh / 2, dw, dh);
+  return true;
+}
+
+// Boss-death + xlf-prey-eat explosion system. Spawn triggers added in Task 9.
+var explosions = [];
+function spawnExplosion(ex, ey, esize) {
+  explosions.push({ x: ex, y: ey, size: esize, t: 0 });
+}
+function drawExplosions(dt) {
+  for (var i = explosions.length - 1; i >= 0; i--) {
+    var e = explosions[i];
+    e.t += dt;
+    var idx = Math.min(2, Math.floor(e.t / 0.08));
+    // explosion_3 is missing from the atlas — fade explosion_2 instead.
+    var name = idx === 2 ? 'explosion_2' : 'explosion_' + (idx + 1);
+    var alpha = idx === 2 ? Math.max(0, 1 - (e.t - 0.16) / 0.08) : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    drawSpriteCentered(OCEAN_ATLAS, name, e.x, e.y, e.size, e.size);
+    ctx.restore();
+    if (e.t > 0.24) explosions.splice(i, 1);
+  }
+}
+
+// QA mode hotkeys (active only when URL has ?qa=1)
+var QA_MODE = (typeof window !== 'undefined' && window.location && window.location.search.indexOf('qa=1') >= 0);
+if (QA_MODE) {
+  window.addEventListener('keydown', function(ev) {
+    var k = (ev.key || '').toLowerCase();
+    if (k >= '1' && k <= '5') {
+      isSquid = false; isOctopus = false; isLand = false;
+      si = parseInt(k, 10) - 1;
+      phase = 'play'; foods = []; enemies = []; respawnQ = [];
+      spawnFoods(14); spawnEnemies(3); updateHUD();
+    } else if (k === 'q') {
+      isSquid = true; isOctopus = false; si = FISH_STAGES.length - 1;
+      phase = 'squid'; squidEvo = 0; foods = []; enemies = [];
+      spawnFoods(14); spawnEnemies(3); updateHUD();
+    } else if (k === 'w') {
+      isSquid = true; isOctopus = true; si = FISH_STAGES.length - 1;
+      if (typeof startBoss3 === 'function') startBoss3();
+    } else if (k === 'e') {
+      isSquid = false; si = FISH_STAGES.length - 1;
+      phase = 'boss1'; bossHp = BOSS1_MAX;
+      if (typeof initBoss1 === 'function') initBoss1();
+      else if (typeof startBoss1 === 'function') startBoss1();
+    } else if (k === 'r') {
+      isSquid = true; phase = 'boss2';
+      if (typeof startKraken === 'function') startKraken();
+    } else if (k === 't') {
+      isSquid = true; isOctopus = true; phase = 'boss3';
+      if (typeof startBoss3 === 'function') startBoss3();
+    } else if (k === 'h') {
+      if (phase === 'boss1' && boss) bossHp = Math.max(0, bossHp / 2);
+      else if (phase === 'boss2' && kraken) kraken.hp = Math.max(0, kraken.hp / 2);
+      else if (phase === 'boss3' && anglerfish) anglerfish.hp = Math.max(0, anglerfish.hp / 2);
+    } else if (k === 'k') {
+      if (phase === 'boss1' && boss) bossHp = 0;
+      else if (phase === 'boss2' && kraken) kraken.hp = 0;
+      else if (phase === 'boss3' && anglerfish) anglerfish.hp = 0;
+    } else if (k === 'x') {
+      spawnExplosion(pTargetX, pTargetY, 120);
+    }
+  });
+}
+
 // ── State ─────────────────────────────────────────────────────────────────
 var phase, score, lives, si, evoPoints, isSquid, isOctopus, isLand;
 var cloakActive, cloakTimer, cloakCooldown;
@@ -873,6 +1022,7 @@ function draw() {
     else if(phase==='boss2'){ drawKraken(); drawKFishPiles(); drawRobos(); drawInkClouds(); }
     else if(phase==='boss3'){ drawAnglerfish(); drawLightbulbs(); drawInkClouds(); }
     if(fakeRobotDecoy&&fakeRobotDecoy.alive) drawFakeRobotDecoy();
+    drawExplosions(_lastDt);
     drawPlayer();
   }
 }
@@ -1788,8 +1938,10 @@ function buyFakeRobot() {
 }
 
 // ── Loop ──────────────────────────────────────────────────────────────────
+var _lastDt = 0.016;
 function loop(ts) {
   var dt=Math.min((ts-lastTs)/1000,0.05); lastTs=ts;
+  _lastDt = dt;
   if(phase!=='win'&&phase!=='choice'&&!shopOpen) update(dt);
   draw();
   requestAnimationFrame(loop);
