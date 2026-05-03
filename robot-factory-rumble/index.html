@@ -59,6 +59,28 @@
     transition: opacity 0.25s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   #banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .ctrl-btn {
+    position: fixed; z-index: 4;
+    width: 72px; height: 72px;
+    background: rgba(20,20,40,0.55);
+    border: 3px solid #FFEB3B;
+    color: #FFEB3B;
+    border-radius: 16px;
+    font-size: 30px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    cursor: pointer;
+    user-select: none; -webkit-user-select: none;
+  }
+  .ctrl-btn.pressed, .ctrl-btn:active {
+    background: rgba(255,235,59,0.5);
+    transform: scale(0.95);
+  }
+  #ctrl-move { left: 16px;  bottom: 16px; }
+  #ctrl-jump { right: 16px; bottom: 16px; }
+  #ctrl-aim  { right: 16px; bottom: 100px; font-size: 26px; }
+  #ctrl-move.hidden { display: none; }
 </style>
 </head>
 <body>
@@ -74,6 +96,10 @@
     <div id="boss-hp-bg"><div id="boss-hp-fill"></div></div>
   </div>
 </div>
+
+<div id="ctrl-move" class="ctrl-btn">▶</div>
+<div id="ctrl-jump" class="ctrl-btn">▲</div>
+<div id="ctrl-aim"  class="ctrl-btn">↑</div>
 
 <div id="banner"></div>
 
@@ -119,6 +145,66 @@ function showBanner(text, ms) {
 }
 
 refreshHud();
+
+// ── Input ──────────────────────────────────────────────────────────────────
+var input = {
+  moveHeld: false,
+  jumpHeld: false,
+  aimUp: false,
+  jumpJustPressed: false,
+};
+var autoWalk = true;       // toggled on the menu screen (Task 15)
+function syncMoveBtnVisibility() {
+  var mv = document.getElementById('ctrl-move');
+  if (autoWalk) mv.classList.add('hidden'); else mv.classList.remove('hidden');
+}
+syncMoveBtnVisibility();
+
+function bindBtn(id, key) {
+  var btn = document.getElementById(id);
+  function press(e) {
+    if (e) e.preventDefault();
+    btn.classList.add('pressed');
+    if (key === 'jumpHeld' && !input.jumpHeld) input.jumpJustPressed = true;
+    input[key] = true;
+  }
+  function release(e) {
+    if (e) e.preventDefault();
+    btn.classList.remove('pressed');
+    input[key] = false;
+  }
+  btn.addEventListener('pointerdown',   press,   { passive: false });
+  btn.addEventListener('pointerup',     release, { passive: false });
+  btn.addEventListener('pointercancel', release, { passive: false });
+  btn.addEventListener('lostpointercapture', release);
+}
+bindBtn('ctrl-move', 'moveHeld');
+bindBtn('ctrl-jump', 'jumpHeld');
+bindBtn('ctrl-aim',  'aimUp');
+
+window.addEventListener('keydown', function(e) {
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.moveHeld = true;
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+    if (!input.jumpHeld) input.jumpJustPressed = true;
+    input.jumpHeld = true;
+  }
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.aimUp = true;
+});
+window.addEventListener('keyup', function(e) {
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.moveHeld = false;
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') input.jumpHeld = false;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.aimUp = false;
+});
+
+function clearInput() {
+  input.moveHeld = false;
+  input.jumpHeld = false;
+  input.aimUp = false;
+  input.jumpJustPressed = false;
+  document.querySelectorAll('.ctrl-btn').forEach(function(b) { b.classList.remove('pressed'); });
+}
+document.addEventListener('visibilitychange', function() { if (document.hidden) clearInput(); });
+window.addEventListener('blur', clearInput);
 
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
