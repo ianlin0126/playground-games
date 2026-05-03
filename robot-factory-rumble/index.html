@@ -465,6 +465,143 @@ function drawProjectiles() {
   }
 }
 
+// ── Enemies ────────────────────────────────────────────────────────────────
+var enemies = [];     // { kind, x, y, vx, hp, w, h, alive, ... per-kind fields }
+var bolts   = [];     // K.O. bolt-burst particles: { x, y, vx, vy, life }
+
+function spawnEnemy(kind, x) {
+  if (kind === 'walker') {
+    enemies.push({
+      kind: 'walker', x: x, y: GROUND_Y, w: 32, h: 40,
+      vx: -60, hp: 2, alive: true,
+      patrolMin: x - 80, patrolMax: x + 80,
+      wobbleT: 0,
+      contactCool: 0,
+    });
+  }
+  // Other kinds (copter, bolt) wired in Tasks 8, 9
+}
+
+function setupLevelEnemies() {
+  // Segment A walkers (per spec)
+  spawnEnemy('walker', 400);
+  spawnEnemy('walker', 850);
+  spawnEnemy('walker', 1300);
+  spawnEnemy('walker', 1650);
+}
+
+function updateEnemies(dt) {
+  for (var i = enemies.length - 1; i >= 0; i--) {
+    var e = enemies[i];
+    if (!e.alive) { enemies.splice(i, 1); continue; }
+    if (e.contactCool > 0) e.contactCool -= dt;
+
+    if (e.kind === 'walker') {
+      if (e.wobbleT > 0) {
+        e.wobbleT -= dt;
+        // Wobble telegraph: no movement
+      } else {
+        e.x += e.vx * dt;
+        if (e.x <= e.patrolMin && e.vx < 0) { e.wobbleT = 0.3; e.vx = 60; }
+        if (e.x >= e.patrolMax && e.vx > 0) { e.wobbleT = 0.3; e.vx = -60; }
+      }
+    }
+
+    // Player-contact damage
+    if (rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
+                     e.x - e.w / 2, e.y - e.h, e.w, e.h)
+        && player.invuln <= 0) {
+      hurtPlayer(1, e.x);
+    }
+
+    // Projectile-vs-enemy
+    for (var j = projectiles.length - 1; j >= 0; j--) {
+      var p = projectiles[j];
+      if (p.kind !== 'foam' && p.kind !== 'spark') continue;
+      if (p.x > e.x - e.w / 2 && p.x < e.x + e.w / 2
+          && p.y > e.y - e.h && p.y < e.y) {
+        e.hp -= 1;
+        projectiles.splice(j, 1);
+        if (e.hp <= 0) { e.alive = false; spawnBoltBurst(e.x, e.y - e.h * 0.5); break; }
+      }
+    }
+  }
+}
+
+function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+function spawnBoltBurst(x, y) {
+  for (var i = 0; i < 5; i++) {
+    var a = (i / 5) * Math.PI * 2 + Math.random() * 0.4;
+    bolts.push({ x: x, y: y, vx: Math.cos(a) * 200, vy: Math.sin(a) * 200, life: 0.4 });
+  }
+}
+
+function updateBolts(dt) {
+  for (var i = bolts.length - 1; i >= 0; i--) {
+    var b = bolts[i];
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.vy += GRAVITY * 0.3 * dt;
+    b.life -= dt;
+    if (b.life <= 0) bolts.splice(i, 1);
+  }
+}
+
+function drawEnemies() {
+  for (var i = 0; i < enemies.length; i++) {
+    var e = enemies[i];
+    if (e.kind === 'walker') {
+      ctx.save();
+      ctx.translate(e.x, e.y - e.h * 0.5);
+      // Wobble tilt: peak ±10° at half-telegraph
+      if (e.wobbleT > 0) {
+        var w = Math.sin((1 - e.wobbleT / 0.3) * Math.PI) * 10 * Math.PI / 180;
+        ctx.rotate(e.vx > 0 ? -w : w);
+      }
+      ctx.fillStyle = '#9E9E9E';
+      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 6);
+      ctx.fill();
+      ctx.strokeStyle = '#37474F'; ctx.lineWidth = 2;
+      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 6);
+      ctx.stroke();
+      ctx.fillStyle = '#FF1744';
+      ctx.beginPath(); ctx.arc(-6, -8, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc( 6, -8, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+function drawBolts() {
+  for (var i = 0; i < bolts.length; i++) {
+    var b = bolts[i];
+    ctx.fillStyle = '#9E9E9E';
+    ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+  }
+}
+
+function hurtPlayer(amount, fromX) {
+  hp -= amount;
+  refreshHud();
+  player.invuln = INVULN_TIME;
+  player.vx = (player.x < fromX ? -1 : 1) * 200;
+  player.vy = -350;
+  if (hp <= 0) onPlayerOut();
+}
+
+function onPlayerOut() {
+  // Stub for now; Task 11 wires real respawn at last checkpoint.
+  hp = maxHp;
+  refreshHud();
+  player.x = 80;
+  player.y = GROUND_Y;
+  player.vy = 0;
+  player.invuln = 1.5;
+}
+
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
 function loop(now) {
@@ -479,6 +616,8 @@ function update(dt) {
   resolveLevelGeometry();
   updatePlayer(dt);
   updateProjectiles(dt);
+  updateEnemies(dt);
+  updateBolts(dt);
 }
 function draw() {
   ctx.fillStyle = '#2a2a2a';
@@ -490,6 +629,8 @@ function draw() {
   ctx.translate(-camera.x, 0);
   drawFloor();
   drawPlatforms();
+  drawEnemies();
+  drawBolts();
   drawProjectiles();
   drawPlayer();
   ctx.restore();
@@ -545,6 +686,8 @@ function drawPlatforms() {
     ctx.strokeRect(pl.x, py, pl.w, PLATFORM_HEIGHT);
   }
 }
+resolveLevelGeometry();
+setupLevelEnemies();
 requestAnimationFrame(function(ts) { lastTime = ts; requestAnimationFrame(loop); });
 </script>
 </body>
