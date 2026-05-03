@@ -1053,10 +1053,23 @@ function drawBg() {
 function drawFoods() {
   for(var fi=0;fi<foods.length;fi++){
     var f=foods[fi]; if(!f.alive) continue;
-    if(f.type==='plankton') drawPlankton(f.x,f.y,f.size,f.wobble);
-    else{
-      var fc={sf:'#ffee58',mf:'#ffa726',lf:'#ef5350',xlf:'#ab47bc'}[f.type]||'#ffee58';
-      drawSmallFish(f.x,f.y,f.size,fc,Math.atan2(f.vy||0,f.vx||0.1));
+    if(f.type==='plankton'){
+      var pdw = f.size * 2.6, pdh = f.size * 2.6;
+      var ok = drawSpriteCentered(OCEAN_ATLAS, 'plankton', f.x, f.y, pdw, pdh);
+      if (!ok) drawPlankton(f.x,f.y,f.size,f.wobble);
+    } else {
+      var ang = Math.atan2(f.vy||0, f.vx||0.1);
+      var tint = {sf:null, mf:'rgba(255,167,38,0.55)', lf:'rgba(239,83,80,0.65)', xlf:'rgba(171,71,188,0.65)'}[f.type];
+      var fdw = f.size * 2.4, fdh = f.size * 1.6;
+      ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(ang);
+      var ok2;
+      if (tint) ok2 = drawSpriteTinted(OCEAN_ATLAS, 'small_fish_base', 0, 0, fdw, fdh, tint);
+      else ok2 = drawSpriteCentered(OCEAN_ATLAS, 'small_fish_base', 0, 0, fdw, fdh);
+      ctx.restore();
+      if (!ok2) {
+        var fc={sf:'#ffee58',mf:'#ffa726',lf:'#ef5350',xlf:'#ab47bc'}[f.type]||'#ffee58';
+        drawSmallFish(f.x,f.y,f.size,fc,ang);
+      }
     }
   }
 }
@@ -1067,9 +1080,29 @@ function drawEnemies() {
     var e=enemies[ei]; if(!e.alive) continue;
     ctx.save(); if(e.stunned>0) ctx.globalAlpha=0.45;
     if(e.isPred){
-      drawRedFish(e.x,e.y,e.size,Math.atan2(py-e.y,px-e.x),e.size>ps*1.5);
+      var pang = Math.atan2(py-e.y, px-e.x);
+      var pdw = e.size * 2.4, pdh = e.size * 1.6;
+      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(pang);
+      var ok = drawSpriteCentered(OCEAN_ATLAS, 'red_predator', 0, 0, pdw, pdh);
+      ctx.restore();
+      if (!ok) drawRedFish(e.x,e.y,e.size,pang,e.size>ps*1.5);
     } else {
-      drawSmallFish(e.x,e.y,e.size,e.color,Math.atan2(e.vy||0,e.vx||0.1));
+      var ang = Math.atan2(e.vy||0, e.vx||0.1);
+      var c = e.color;
+      var tint =
+        c === '#ffee58' ? null :
+        c === '#ffa726' ? 'rgba(255,167,38,0.55)' :
+        c === '#ab47bc' ? 'rgba(171,71,188,0.65)' :
+        c === '#26c6da' ? 'rgba(38,198,218,0.55)' :
+        c === '#66bb6a' ? 'rgba(102,187,106,0.55)' :
+        c === '#ff7eb3' ? 'rgba(255,126,179,0.55)' : null;
+      var edw = e.size * 2.4, edh = e.size * 1.6;
+      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(ang);
+      var ok2;
+      if (tint) ok2 = drawSpriteTinted(OCEAN_ATLAS, 'small_fish_base', 0, 0, edw, edh, tint);
+      else ok2 = drawSpriteCentered(OCEAN_ATLAS, 'small_fish_base', 0, 0, edw, edh);
+      ctx.restore();
+      if (!ok2) drawSmallFish(e.x,e.y,e.size,c,ang);
     }
     ctx.restore();
   }
