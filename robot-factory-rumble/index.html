@@ -404,10 +404,13 @@ function resolveStandY(px) {
 }
 
 function onPitFall() {
-  // Stub for Task 5; real respawn logic lands in Task 11.
-  player.x = 80;
+  hp -= 1;
+  refreshHud();
+  if (hp <= 0) { onPlayerOut(); return; }
+  player.x = lastCheckpoint.x;
   player.y = GROUND_Y;
   player.vy = 0;
+  player.invuln = 1.5;
 }
 
 // ── Projectiles ────────────────────────────────────────────────────────────
@@ -755,13 +758,13 @@ function hurtPlayer(amount, fromX) {
 }
 
 function onPlayerOut() {
-  // Stub for now; Task 11 wires real respawn at last checkpoint.
   hp = maxHp;
   refreshHud();
-  player.x = 80;
+  player.x = lastCheckpoint.x;
   player.y = GROUND_Y;
   player.vy = 0;
   player.invuln = 1.5;
+  showBanner('Try again, you\'ve got this!', 1500);
 }
 
 // ── Power-ups ──────────────────────────────────────────────────────────────
@@ -839,6 +842,44 @@ function drawPickups() {
   }
 }
 
+// ── Checkpoints ────────────────────────────────────────────────────────────
+var checkpoints = [];        // { x, y, name, touched }
+var lastCheckpoint = { x: 80, y: 0 };   // y resolved on first frame
+
+function setupLevelCheckpoints() {
+  checkpoints.push({ x: 1780, y: 0, name: '1', touched: false });
+  checkpoints.push({ x: 4180, y: 0, name: '2', touched: false });
+}
+
+function updateCheckpoints(dt) {
+  for (var i = 0; i < checkpoints.length; i++) {
+    var c = checkpoints[i];
+    if (c.touched) continue;
+    if (rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
+                     c.x - 24, GROUND_Y - 24, 48, 24)) {
+      c.touched = true;
+      lastCheckpoint = { x: c.x, y: GROUND_Y };
+      showBanner('🛟 Saved!', 1200);
+    }
+  }
+}
+
+function drawCheckpoints() {
+  for (var i = 0; i < checkpoints.length; i++) {
+    var c = checkpoints[i];
+    var pulse = 0.4 + 0.5 * (0.5 + 0.5 * Math.sin(Date.now() / 500));
+    ctx.fillStyle = c.touched ? 'rgba(76,175,80,' + pulse + ')' : 'rgba(0,229,255,' + pulse + ')';
+    ctx.beginPath();
+    ctx.arc(c.x, GROUND_Y - 12, 24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = c.touched ? '#4CAF50' : '#00E5FF';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(c.x, GROUND_Y - 12, 24, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
 function loop(now) {
@@ -856,6 +897,7 @@ function update(dt) {
   updateEnemyProjectiles(dt);
   updateEnemies(dt);
   updatePickups(dt);
+  updateCheckpoints(dt);
   updateBolts(dt);
 }
 function draw() {
@@ -868,6 +910,7 @@ function draw() {
   ctx.translate(-camera.x, 0);
   drawFloor();
   drawPlatforms();
+  drawCheckpoints();
   drawPickups();
   drawEnemies();
   drawBolts();
@@ -929,6 +972,7 @@ function drawPlatforms() {
 resolveLevelGeometry();
 setupLevelEnemies();
 setupLevelPickups();
+setupLevelCheckpoints();
 requestAnimationFrame(function(ts) { lastTime = ts; requestAnimationFrame(loop); });
 </script>
 </body>
