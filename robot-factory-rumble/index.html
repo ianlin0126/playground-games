@@ -111,12 +111,15 @@ var W, H;
 function resize() {
   W = canvas.width = window.innerWidth;
   H = canvas.height = window.innerHeight;
+  FLOOR_Y = H * 0.7;
 }
+var FLOOR_Y = 0;        // resolved by resize()
 resize();
 window.addEventListener('resize', resize);
 
 // ── Game state ─────────────────────────────────────────────────────────────
 var scene = 'menu';     // 'menu' | 'playing' | 'respawn' | 'win'
+scene = 'playing';      // FORCED for Task 4 dev; Task 15 replaces with menu transition
 var hp = 5;             // player hearts (0..5)
 var maxHp = 5;
 var levelLength = 4900; // total horizontal level length in px (per spec)
@@ -206,6 +209,117 @@ function clearInput() {
 document.addEventListener('visibilitychange', function() { if (document.hidden) clearInput(); });
 window.addEventListener('blur', clearInput);
 
+// ── Constants ──────────────────────────────────────────────────────────────
+var WALK_SPEED       = 180;     // px/s
+var GRAVITY          = 1800;    // px/s²
+var JUMP_IMPULSE     = -700;    // px/s
+var JUMP_HOLD_MAX    = 0.20;    // s
+var JUMP_HOLD_CUTOFF = 0.45;
+var COYOTE_TIME      = 0.08;    // s
+// FLOOR_Y is declared up at resize() so the first updatePlayer() sees it correctly.
+var INVULN_TIME      = 1.2;     // s after hit
+
+// ── Player ─────────────────────────────────────────────────────────────────
+var player = {
+  x: 80, y: FLOOR_Y,
+  vx: 0, vy: 0,
+  w: 36, h: 44,
+  hbW: 28, hbH: 36,
+  onGround: true,
+  coyote: 0,
+  jumpHoldT: 0,
+  jumping: false,
+  facing: 1,
+  invuln: 0,
+  walkAnim: 0,
+};
+
+function updatePlayer(dt) {
+  var moving = autoWalk ? true : input.moveHeld;
+  if (scene !== 'playing') moving = false;
+  player.vx = moving ? WALK_SPEED : 0;
+
+  player.vy += GRAVITY * dt;
+
+  if (input.jumpJustPressed && (player.onGround || player.coyote > 0) && scene === 'playing') {
+    player.vy = JUMP_IMPULSE;
+    player.onGround = false;
+    player.coyote = 0;
+    player.jumping = true;
+    player.jumpHoldT = 0;
+  }
+  input.jumpJustPressed = false;
+
+  if (player.jumping) {
+    player.jumpHoldT += dt;
+    if (!input.jumpHeld && player.vy < 0 && player.jumpHoldT < JUMP_HOLD_MAX) {
+      player.vy *= JUMP_HOLD_CUTOFF;
+      player.jumping = false;
+    }
+    if (player.jumpHoldT >= JUMP_HOLD_MAX) player.jumping = false;
+  }
+
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+
+  if (player.y >= FLOOR_Y) {
+    player.y = FLOOR_Y;
+    player.vy = 0;
+    if (!player.onGround) {
+      player.onGround = true;
+      player.coyote = COYOTE_TIME;
+    }
+  } else {
+    player.onGround = false;
+    if (player.coyote > 0) player.coyote -= dt;
+  }
+
+  if (player.onGround && Math.abs(player.vx) > 0) {
+    player.walkAnim += dt * 2.5;
+    if (player.walkAnim >= 1) player.walkAnim -= 1;
+  } else {
+    player.walkAnim = 0;
+  }
+
+  if (player.invuln > 0) player.invuln -= dt;
+}
+
+function drawPlayer() {
+  if (player.invuln > 0 && Math.floor(player.invuln * 30) % 2 === 0) return;
+
+  var px = player.x, py = player.y - player.h;
+  ctx.fillStyle = '#42A5F5';
+  roundRect(px, py, player.w, player.h, 8);
+  ctx.fill();
+  ctx.fillStyle = '#FFEB3B';
+  ctx.fillRect(px + 4, py + 8, player.w - 8, 7);
+  ctx.strokeStyle = '#0d3a6b'; ctx.lineWidth = 2;
+  roundRect(px, py, player.w, player.h, 8);
+  ctx.stroke();
+  ctx.fillStyle = '#37474F';
+  var legSwap = player.walkAnim < 0.5;
+  if (legSwap) {
+    ctx.fillRect(px + 5,  py + player.h - 4, 10, 6);
+    ctx.fillRect(px + 21, py + player.h,     10, 4);
+  } else {
+    ctx.fillRect(px + 5,  py + player.h,     10, 4);
+    ctx.fillRect(px + 21, py + player.h - 4, 10, 6);
+  }
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+}
+
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
 function loop(now) {
@@ -217,18 +331,15 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 function update(dt) {
-  // entity updates land here in subsequent tasks
+  updatePlayer(dt);
 }
 function draw() {
-  // Placeholder factory-floor backdrop
   ctx.fillStyle = '#2a2a2a';
   ctx.fillRect(0, 0, W, H);
-  // Title (proves the loop is running)
-  ctx.fillStyle = '#FFEB3B';
-  ctx.font = 'bold 36px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('🤖 Robot Factory Rumble', W / 2, H / 2);
+  // Floor line (temporary — replaced by terrain in Task 5)
+  ctx.fillStyle = '#5D3A1A';
+  ctx.fillRect(0, H * 0.7, W, H * 0.3);
+  drawPlayer();
 }
 requestAnimationFrame(function(ts) { lastTime = ts; requestAnimationFrame(loop); });
 </script>
