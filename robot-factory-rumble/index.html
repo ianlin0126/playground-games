@@ -461,6 +461,11 @@ function drawProjectiles() {
       ctx.beginPath();
       ctx.arc(p.x, p.y, FOAM_RADIUS, 0, Math.PI * 2);
       ctx.fill();
+    } else if (p.kind === 'enemy-blob') {
+      ctx.fillStyle = '#F06292';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 }
@@ -478,16 +483,28 @@ function spawnEnemy(kind, x) {
       wobbleT: 0,
       contactCool: 0,
     });
+  } else if (kind === 'copter') {
+    enemies.push({
+      kind: 'copter', x: x, y: GROUND_Y - 160, w: 28, h: 24,
+      hp: 1, alive: true,
+      bobT: Math.random() * 6.28,
+      dropT: 1.0,
+      contactCool: 0,
+    });
   }
-  // Other kinds (copter, bolt) wired in Tasks 8, 9
+  // Other kinds (bolt) wired in Task 9
 }
 
 function setupLevelEnemies() {
-  // Segment A walkers (per spec)
+  // Segment A walkers
   spawnEnemy('walker', 400);
   spawnEnemy('walker', 850);
   spawnEnemy('walker', 1300);
   spawnEnemy('walker', 1650);
+  // Segment A copter — triggers Aim Up hint
+  spawnEnemy('copter', 1000);
+  // Segment B copter
+  spawnEnemy('copter', 2700);
 }
 
 function updateEnemies(dt) {
@@ -499,11 +516,21 @@ function updateEnemies(dt) {
     if (e.kind === 'walker') {
       if (e.wobbleT > 0) {
         e.wobbleT -= dt;
-        // Wobble telegraph: no movement
       } else {
         e.x += e.vx * dt;
         if (e.x <= e.patrolMin && e.vx < 0) { e.wobbleT = 0.3; e.vx = 60; }
         if (e.x >= e.patrolMax && e.vx > 0) { e.wobbleT = 0.3; e.vx = -60; }
+      }
+    } else if (e.kind === 'copter') {
+      e.bobT += dt * 4;
+      e.y = (GROUND_Y - 160) + Math.sin(e.bobT) * 6;
+      e.dropT -= dt;
+      if (e.dropT <= 0) {
+        projectiles.push({
+          x: e.x, y: e.y, vx: 0, vy: 200, life: 5,
+          kind: 'enemy-blob',
+        });
+        e.dropT = 2.0;
       }
     }
 
@@ -518,6 +545,7 @@ function updateEnemies(dt) {
     for (var j = projectiles.length - 1; j >= 0; j--) {
       var p = projectiles[j];
       if (p.kind !== 'foam' && p.kind !== 'spark') continue;
+      // (enemy-blob projectiles are filtered by the kind check above)
       if (p.x > e.x - e.w / 2 && p.x < e.x + e.w / 2
           && p.y > e.y - e.h && p.y < e.y) {
         e.hp -= 1;
@@ -550,6 +578,22 @@ function updateBolts(dt) {
   }
 }
 
+function updateEnemyProjectiles(dt) {
+  for (var i = projectiles.length - 1; i >= 0; i--) {
+    var p = projectiles[i];
+    if (p.kind !== 'enemy-blob') continue;
+    if (p.x > player.x && p.x < player.x + player.w
+        && p.y > player.y - player.h && p.y < player.y
+        && player.invuln <= 0) {
+      hurtPlayer(1, p.x);
+      projectiles.splice(i, 1);
+    } else if (p.y > GROUND_Y) {
+      // Hit floor — splat
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
 function drawEnemies() {
   for (var i = 0; i < enemies.length; i++) {
     var e = enemies[i];
@@ -570,6 +614,29 @@ function drawEnemies() {
       ctx.fillStyle = '#FF1744';
       ctx.beginPath(); ctx.arc(-6, -8, 3, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc( 6, -8, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else if (e.kind === 'copter') {
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      // Cup base (trapezoid)
+      ctx.fillStyle = '#6D4C41';
+      ctx.beginPath();
+      ctx.moveTo(-e.w / 2, 0);
+      ctx.lineTo( e.w / 2, 0);
+      ctx.lineTo( e.w / 2 - 4, e.h / 2);
+      ctx.lineTo(-e.w / 2 + 4, e.h / 2);
+      ctx.closePath();
+      ctx.fill();
+      // Frosting top
+      ctx.fillStyle = '#F8BBD0';
+      ctx.beginPath();
+      ctx.arc(0, -e.h / 4, e.w / 2, Math.PI, 0);
+      ctx.fill();
+      // Wings flapping
+      var flap = Math.sin(Date.now() / 50) * 4;
+      ctx.fillStyle = '#9E9E9E';
+      ctx.fillRect(-e.w / 2 - 6, -2 + flap, 6, 3);
+      ctx.fillRect( e.w / 2,     -2 + flap, 6, 3);
       ctx.restore();
     }
   }
@@ -616,6 +683,7 @@ function update(dt) {
   resolveLevelGeometry();
   updatePlayer(dt);
   updateProjectiles(dt);
+  updateEnemyProjectiles(dt);
   updateEnemies(dt);
   updateBolts(dt);
 }
