@@ -280,8 +280,7 @@ function startGame() {
   pickups = [];
   checkpoints = [];
   lastCheckpoint = { x: 80, y: GROUND_Y };
-  vehicle = { x: 3500, y: 0, w: 64, h: 56, mounted: false, shield: 4, pistonT: 0, pistonCool: 0, alive: true, promptVisible: false };
-  boss = { active: false, x: 4500, y: 0, w: 120, h: 140, phase: 1, hp: 18, hpMaxP1: 18, hpMaxP2: 14, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false };
+  boss = { active: false, x: 4500, y: 0, w: 120, h: 140, phase: 1, hp: 18, hpMaxP1: 18, hpMaxP2: 14, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5 };
   bossRow.style.display = 'none';
   shieldEl.style.display = 'none';
   shakeT = 0;
@@ -577,7 +576,7 @@ function fireSpark() {
 }
 
 function updateProjectiles(dt) {
-  if (scene === 'playing' && !vehicle.mounted) {
+  if (scene === 'playing') {
     fireCooldown -= dt;
     if (fireCooldown <= 0) fireWeapon();
   }
@@ -669,6 +668,12 @@ function spawnEnemy(kind, x) {
       hopCount: 0,
       homeY: GROUND_Y,
       squashY: 0,
+      contactCool: 0,
+    });
+  } else if (kind === 'minion') {
+    enemies.push({
+      kind: 'minion', x: x, y: GROUND_Y, w: 22, h: 28,
+      vx: -120, hp: 1, alive: true,
       contactCool: 0,
     });
   }
@@ -771,38 +776,30 @@ function updateEnemies(dt) {
         if (e.hopCount >= 4) { e.hopCount = 0; e.hopDir *= -1; }
         e.squashY = 0;
       }
+    } else if (e.kind === 'minion') {
+      // Walks straight at the player at a steady pace.
+      var towardPlayer = (player.x < e.x ? -1 : 1);
+      e.vx = towardPlayer * 140;
+      e.x += e.vx * dt;
+      e.y = GROUND_Y;
     }
 
     // Player-contact damage
     if (rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
-                     e.x - e.w / 2, e.y - e.h, e.w, e.h)) {
-      if (vehicle.mounted) {
-        if (vehicle.shield > 0 && e.contactCool <= 0) {
-          vehicle.shield -= 1;
-          e.contactCool = 0.5;
-        }
-      } else if (player.invuln <= 0 && shieldBubble <= 0) {
-        hurtPlayer(1, e.x);
-      }
+                     e.x - e.w / 2, e.y - e.h, e.w, e.h)
+        && player.invuln <= 0 && shieldBubble <= 0) {
+      hurtPlayer(1, e.x);
     }
 
     // Projectile-vs-enemy
     for (var j = projectiles.length - 1; j >= 0; j--) {
       var p = projectiles[j];
-      if (p.kind === 'enemy-blob') continue;
-      if (p.kind === 'mech-piston') {
-        if (rectsOverlap(p.x, p.y - 8, 40, 16, e.x - e.w / 2, e.y - e.h, e.w, e.h)) {
-          e.hp -= (p.damage || 1.5);
-          if (e.hp <= 0) { e.alive = false; spawnBoltBurst(e.x, e.y - e.h * 0.5); break; }
-          // Don't despawn the piston — it lasts 0.2s and can hit multiple enemies
-        }
-      } else if (p.kind === 'foam' || p.kind === 'spark') {
-        if (p.x > e.x - e.w / 2 && p.x < e.x + e.w / 2
-            && p.y > e.y - e.h && p.y < e.y) {
-          e.hp -= 1;
-          projectiles.splice(j, 1);
-          if (e.hp <= 0) { e.alive = false; spawnBoltBurst(e.x, e.y - e.h * 0.5); break; }
-        }
+      if (p.kind !== 'foam' && p.kind !== 'spark') continue;
+      if (p.x > e.x - e.w / 2 && p.x < e.x + e.w / 2
+          && p.y > e.y - e.h && p.y < e.y) {
+        e.hp -= 1;
+        projectiles.splice(j, 1);
+        if (e.hp <= 0) { e.alive = false; spawnBoltBurst(e.x, e.y - e.h * 0.5); break; }
       }
     }
   }
@@ -835,16 +832,10 @@ function updateEnemyProjectiles(dt) {
     var p = projectiles[i];
     if (p.kind !== 'enemy-blob' && p.kind !== 'enemy-laser') continue;
     if (p.x > player.x && p.x < player.x + player.w
-        && p.y > player.y - player.h && p.y < player.y) {
-      if (vehicle.mounted) {
-        if (vehicle.shield > 0) {
-          vehicle.shield -= 1;
-          projectiles.splice(i, 1);
-        }
-      } else if (player.invuln <= 0 && shieldBubble <= 0) {
-        hurtPlayer(1, p.x);
-        projectiles.splice(i, 1);
-      }
+        && p.y > player.y - player.h && p.y < player.y
+        && player.invuln <= 0 && shieldBubble <= 0) {
+      hurtPlayer(1, p.x);
+      projectiles.splice(i, 1);
     } else if (p.y > GROUND_Y) {
       // Hit floor — splat
       projectiles.splice(i, 1);
@@ -912,6 +903,19 @@ function drawEnemies() {
       ctx.beginPath(); ctx.arc(-5, -8, 2.5, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc( 5, -8, 2.5, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
+    } else if (e.kind === 'minion') {
+      ctx.save();
+      ctx.translate(e.x, e.y - e.h * 0.5);
+      ctx.fillStyle = '#FFC107';
+      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
+      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 4);
+      ctx.stroke();
+      // Single red eye (smaller minion has one eye)
+      ctx.fillStyle = '#FF1744';
+      ctx.beginPath(); ctx.arc(0, -6, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
     }
   }
 }
@@ -967,7 +971,7 @@ function updatePickups(dt) {
     var pk = pickups[i];
     if (!pk.alive) { pickups.splice(i, 1); continue; }
     if (rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
-                     pk.x - 12, pk.y - 24, 24, 24)) {
+                     pk.x - 20, pk.y - 40, 40, 40)) {
       pk.alive = false;
       onPickup(pk.kind);
     }
@@ -995,17 +999,30 @@ function drawPickups() {
   for (var i = 0; i < pickups.length; i++) {
     var pk = pickups[i];
     if (!pk.alive) continue;
-    var bob = Math.sin(Date.now() / 300 + pk.x * 0.01) * 4;
+    var bob = Math.sin(Date.now() / 300 + pk.x * 0.01) * 6;
+    var pulse = 0.45 + 0.35 * Math.sin(Date.now() / 200);
     var color = pk.kind === 'spark' ? '#FFEB3B' : pk.kind === 'shield' ? '#00E5FF' : '#FF1744';
-    var label = pk.kind === 'spark' ? 'SS' : pk.kind === 'shield' ? 'S' : '♥';
+    var label = pk.kind === 'spark' ? '⚡' : pk.kind === 'shield' ? '🛡' : '♥';
+    var size = 40;       // was 24 — bigger so the kid sees them
+    var cx = pk.x, cy = pk.y - size / 2 + bob;
+    // Pulsing glow halo
+    ctx.save();
+    ctx.globalAlpha = pulse;
     ctx.fillStyle = color;
-    ctx.fillRect(pk.x - 12, pk.y - 24 + bob, 24, 24);
-    ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
-    ctx.strokeRect(pk.x - 12, pk.y - 24 + bob, 24, 24);
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Solid crate
+    ctx.fillStyle = color;
+    ctx.fillRect(cx - size / 2, cy - size / 2, size, size);
+    ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 3;
+    ctx.strokeRect(cx - size / 2, cy - size / 2, size, size);
+    // Big icon glyph
     ctx.fillStyle = '#1A1A1A';
-    ctx.font = 'bold 14px Arial';
+    ctx.font = 'bold 22px Arial';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(label, pk.x, pk.y - 12 + bob);
+    ctx.fillText(label, cx, cy + 1);
   }
 }
 
@@ -1047,94 +1064,6 @@ function drawCheckpoints() {
   }
 }
 
-// ── Vehicle ────────────────────────────────────────────────────────────────
-var vehicle = {
-  x: 3500, y: 0,
-  w: 64, h: 56,
-  mounted: false,
-  shield: 4,
-  pistonT: 0,
-  pistonCool: 0,
-  alive: true,
-  promptVisible: false,
-};
-
-function updateVehicle(dt) {
-  if (!vehicle.alive) return;
-  if (!vehicle.mounted) {
-    var near = Math.abs(player.x - vehicle.x) < 36 && player.onGround;
-    vehicle.promptVisible = near;
-    if (near && input.jumpJustPressed) {
-      vehicle.mounted = true;
-      vehicle.promptVisible = false;
-    }
-    return;
-  }
-  // Mounted: vehicle pins to player x
-  vehicle.x = player.x;
-  vehicle.pistonCool -= dt;
-  if (vehicle.pistonCool <= 0) {
-    vehicle.pistonT = 0.4;
-    vehicle.pistonCool = 0.5;
-    var f = player.facing || 1;
-    var pistonX = (f > 0) ? (vehicle.x + vehicle.w + 20) : (vehicle.x - 20 - 40);
-    projectiles.push({
-      x: pistonX, y: GROUND_Y - vehicle.h * 0.5,
-      vx: 0, vy: 0, life: 0.2, kind: 'mech-piston', damage: 1.5, facing: f,
-    });
-  }
-  if (vehicle.pistonT > 0) vehicle.pistonT -= dt;
-  // Dismount only on shield-zero (mech destroyed). Mech persists into boss fight.
-  if (vehicle.shield <= 0) {
-    vehicle.mounted = false;
-    vehicle.alive = false;
-    spawnBoltBurst(vehicle.x + vehicle.w / 2, GROUND_Y - vehicle.h / 2);
-    spawnBoltBurst(vehicle.x + vehicle.w / 4, GROUND_Y - vehicle.h / 3);
-    player.vy = -350;
-    player.invuln = 1.5;
-    showBanner('Mech down — keep going!', 1200);
-  }
-}
-
-function drawVehicle() {
-  if (!vehicle.alive && !vehicle.mounted) return;
-  var vx = vehicle.x, vy = GROUND_Y - vehicle.h;
-  ctx.fillStyle = '#FFC107';
-  ctx.fillRect(vx, vy, vehicle.w, vehicle.h);
-  ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
-  ctx.strokeRect(vx, vy, vehicle.w, vehicle.h);
-  ctx.fillStyle = '#37474F';
-  ctx.beginPath(); ctx.arc(vx + 12, GROUND_Y - 8, 10, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(vx + vehicle.w - 12, GROUND_Y - 8, 10, 0, Math.PI * 2); ctx.fill();
-  // Forks (face the direction of travel; default right when not mounted)
-  var f = vehicle.mounted ? (player.facing || 1) : 1;
-  ctx.fillStyle = '#9E9E9E';
-  if (f > 0) {
-    ctx.fillRect(vx + vehicle.w, vy + vehicle.h * 0.3, 30, 6);
-    ctx.fillRect(vx + vehicle.w, vy + vehicle.h * 0.6, 30, 6);
-  } else {
-    ctx.fillRect(vx - 30, vy + vehicle.h * 0.3, 30, 6);
-    ctx.fillRect(vx - 30, vy + vehicle.h * 0.6, 30, 6);
-  }
-  // Piston (when extended)
-  if (vehicle.pistonT > 0.2) {
-    ctx.fillStyle = '#6D4C41';
-    if (f > 0) ctx.fillRect(vx + vehicle.w + 30, vy + vehicle.h * 0.42, 40, 16);
-    else       ctx.fillRect(vx - 30 - 40,        vy + vehicle.h * 0.42, 40, 16);
-  }
-  // Antenna LED
-  ctx.fillStyle = (Math.floor(Date.now() / 300) % 2) ? '#FFEB3B' : '#9E9E9E';
-  ctx.fillRect(vx + vehicle.w / 2 - 1, vy - 12, 2, 12);
-  ctx.beginPath(); ctx.arc(vx + vehicle.w / 2, vy - 14, 4, 0, Math.PI * 2); ctx.fill();
-  // Mount prompt
-  if (vehicle.promptVisible) {
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 16px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('↑ Press Jump to ride!', vx + vehicle.w / 2, vy - 28);
-  }
-}
-
 // ── Boss ───────────────────────────────────────────────────────────────────
 var boss = {
   active: false,
@@ -1149,6 +1078,8 @@ var boss = {
   hitFlash: 0,
   invuln: 0,
   defeated: false,
+  bobT: 0,
+  minionT: 5,
 };
 var BOSS_TRIGGER_X = 4250;
 
@@ -1170,10 +1101,20 @@ function updateBoss(dt) {
   }
   if (boss.hitFlash > 0) boss.hitFlash -= dt;
   if (boss.invuln > 0) boss.invuln -= dt;
+  boss.bobT = (boss.bobT || 0) + dt;
 
   // Update HP bar fill
   var maxHpForPhase = boss.phase === 1 ? boss.hpMaxP1 : boss.hpMaxP2;
   bossFill.style.width = Math.max(0, (boss.hp / maxHpForPhase) * 100) + '%';
+
+  // Phase 2: summon minion bots periodically
+  if (boss.phase === 2 && boss.invuln <= 0) {
+    boss.minionT -= dt;
+    if (boss.minionT <= 0) {
+      spawnEnemy('minion', boss.x - 60);
+      boss.minionT = 5.0;
+    }
+  }
 
   // Attack rotation
   if (boss.invuln <= 0 && boss.currentAttack === null) {
@@ -1204,19 +1145,39 @@ function updateBoss(dt) {
     if (a.kind === 'claw') {
       if (a.t > 0.5 && !a.fired) {
         a.fired = true;
+        var bobNow = Math.sin(boss.bobT * 1.6) * 60;
+        var spawnY = GROUND_Y - boss.h * 0.5 - 80 + bobNow;
+        var spawnX = boss.x - 30;
+        var dx = (player.x + player.w * 0.5) - spawnX;
+        var dy = (player.y - player.hbH * 0.5) - spawnY;
+        var dist = Math.max(40, Math.sqrt(dx * dx + dy * dy));
+        var clawSpeed = 540;
         projectiles.push({
-          x: boss.x - 30, y: GROUND_Y - 30,
-          vx: -540, vy: 0, life: 0.65, kind: 'boss-claw',
+          x: spawnX, y: spawnY,
+          vx: (dx / dist) * clawSpeed,
+          vy: (dy / dist) * clawSpeed,
+          life: 0.9, kind: 'boss-claw',
         });
       }
     } else if (a.kind === 'volley') {
       if (a.t > 0.5 && !a.fired) {
         a.fired = true;
+        var bobNow2 = Math.sin(boss.bobT * 1.6) * 60;
+        var sX = boss.x - 20;
+        var sY = GROUND_Y - boss.h * 0.5 - 80 + bobNow2;
+        var pdx = (player.x + player.w * 0.5) - sX;
+        var pdy = (player.y - player.hbH * 0.5) - sY;
+        var pd = Math.max(40, Math.sqrt(pdx * pdx + pdy * pdy));
+        var baseAng = Math.atan2(pdy, pdx);
+        var boltSpeed = 360;
         for (var k = -2; k <= 2; k++) {
+          var ang = baseAng + k * 0.12;   // ±~14° fan
           projectiles.push({
-            x: boss.x - 20, y: GROUND_Y - boss.h * 0.6,
-            vx: -360 + k * 35, vy: -260, life: 2.0, kind: 'boss-bolt',
-            grav: true,
+            x: sX, y: sY,
+            vx: Math.cos(ang) * boltSpeed,
+            vy: Math.sin(ang) * boltSpeed,
+            life: 2.0, kind: 'boss-bolt',
+            // No `grav: true` — bolts now travel straight along their fan ray.
           });
         }
       }
@@ -1224,9 +1185,10 @@ function updateBoss(dt) {
       // T14 wires this; placeholder so the attack-table doesn't crash
       if (a.t > 0.5 && !a.fired) {
         a.fired = true;
+        var dirToPlayer = (player.x < boss.x) ? -1 : 1;
         projectiles.push({
-          x: boss.x - 30, y: GROUND_Y - 16,
-          vx: -350, vy: 0, life: 1.5, kind: 'boss-stomp',
+          x: boss.x - 30 * dirToPlayer, y: GROUND_Y - 16,
+          vx: 350 * dirToPlayer, vy: 0, life: 1.5, kind: 'boss-stomp',
         });
       }
     }
@@ -1238,13 +1200,14 @@ function updateBoss(dt) {
   // Player projectiles vs boss
   for (var j = projectiles.length - 1; j >= 0; j--) {
     var p = projectiles[j];
-    if (p.kind !== 'foam' && p.kind !== 'spark' && p.kind !== 'mech-piston') continue;
+    if (p.kind !== 'foam' && p.kind !== 'spark') continue;
     if (boss.invuln > 0) continue;
-    if (rectsOverlap(p.x - 6, p.y - 6, 12, 12, boss.x - boss.w / 2, GROUND_Y - boss.h, boss.w, boss.h)) {
-      var dmg = p.kind === 'mech-piston' ? (p.damage || 1.5) : 1;
-      boss.hp -= dmg;
+    var bobYHit = Math.sin(boss.bobT * 1.6) * 60;
+    var bossTopY = GROUND_Y - boss.h - 80 + bobYHit;
+    if (rectsOverlap(p.x - 6, p.y - 6, 12, 12, boss.x - boss.w / 2, bossTopY, boss.w, boss.h)) {
+      boss.hp -= 1;
       boss.hitFlash = 0.15;
-      if (p.kind !== 'mech-piston') projectiles.splice(j, 1);
+      projectiles.splice(j, 1);
     }
   }
 
@@ -1283,7 +1246,7 @@ function updateBossHazards(dt) {
     p.life -= dt;
     if (p.life <= 0) { projectiles.splice(i, 1); continue; }
     // Hit player
-    if (player.invuln <= 0 && shieldBubble <= 0 && !vehicle.mounted &&
+    if (player.invuln <= 0 && shieldBubble <= 0 &&
         rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
                      p.x - 12, p.y - 12, 24, 24)) {
       var dmg = p.kind === 'boss-stomp' ? 2 : 1;
@@ -1294,8 +1257,9 @@ function updateBossHazards(dt) {
 
 function drawBoss() {
   if (!boss.active) return;
+  var bobY = Math.sin(boss.bobT * 1.6) * 60;     // ±60px vertical sway
   var bx = boss.x - boss.w / 2;
-  var by = GROUND_Y - boss.h;
+  var by = GROUND_Y - boss.h - 80 + bobY;        // boss is anchored 80px above ground baseline + bob
   var flash = boss.hitFlash > 0;
   ctx.fillStyle = flash ? '#FFFFFF' : '#9E9E9E';
   ctx.fillRect(bx, by, boss.w, boss.h);
@@ -1373,7 +1337,6 @@ function update(dt) {
     if (shakeT > 0) shakeT -= dt;
     return;
   }
-  updateVehicle(dt);
   updateBoss(dt);
   updateBossHazards(dt);
   updatePlayer(dt);
@@ -1385,16 +1348,8 @@ function update(dt) {
   updateBolts(dt);
   if (shakeT > 0) shakeT -= dt;
 
-  // Sync shield HP HUD row
-  if (vehicle.mounted) {
-    shieldEl.style.display = 'block';
-    var s = '';
-    for (var ii = 0; ii < vehicle.shield; ii++) s += '▣';
-    for (var jj = vehicle.shield; jj < 4; jj++) s += '▢';
-    shieldEl.textContent = s;
-  } else {
-    shieldEl.style.display = 'none';
-  }
+  // Vehicle removed — shield row stays hidden (Shield Bubble still visible via the cyan ring around player).
+  shieldEl.style.display = 'none';
 
   maybeShowAimUpHint();
 }
@@ -1413,7 +1368,6 @@ function draw() {
   drawFloor();
   drawPlatforms();
   drawCheckpoints();
-  drawVehicle();
   drawPickups();
   drawEnemies();
   drawBolts();
