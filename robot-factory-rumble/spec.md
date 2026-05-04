@@ -22,3 +22,23 @@ Procedural canvas drawing — flat colors with black outlines, similar to Baldi 
 
 ## Out of scope (Phase 2 candidates)
 Sprite atlas, multi-frame animation, parallax background, sound, persisted save, multi-level, difficulty selector.
+
+---
+
+# Phase 2 — Sprite Atlas + Animation (this branch)
+
+This phase swaps every procedural rectangle from Phase 1 for sprites from a single 1024×1024 PNG atlas, and adds multi-frame animations for player, enemies, and boss. Gameplay tuning is identical to Phase 1 — only visuals change.
+
+**Style:** Friendly industrial cartoon — chunky black outlines (3-4px), bright saturated primaries, slight chrome highlight on metal. Saturday-morning Wall-E meets Cars.
+
+**Atlas:** `assets/robot-factory-rumble-atlas.png` (1024×1024 transparent, 5×4 grid of 192px cells, 19 sprites + 1 throwaway gear).
+
+**Sprite map:** `sprite-map.json` is the source of truth for sprite coordinates. If gpt-image-2 produces a different grid than prompted, the JSON is updated to match — the code never assumes grid math.
+
+**Hard-replace:** No procedural fallback. Loading splash blocks the game until atlas + sprite-map load.
+
+**Boss Phase 2 sensor:** orange overlay drawn via canvas `globalCompositeOperation = 'lighter'` on top of the existing 4 boss sprites — not a separate sprite.
+
+**Out of scope:** parallax, sound, save state, difficulty selector, second level (deferred to Phase C).
+
+Full design at `docs/superpowers/specs/2026-05-04-robot-factory-rumble-phase2-design.md` (in platform repo, gitignored).
