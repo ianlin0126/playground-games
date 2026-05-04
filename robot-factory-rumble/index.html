@@ -360,6 +360,8 @@ var player = {
   invuln: 0,
   walkAnim: 0,
   aimAngle: 0,
+  anim: { current: 'player_walk', frame: 0, timer: 0 },
+  shootPoseT: 0,
 };
 
 function updatePlayer(dt) {
@@ -448,20 +450,37 @@ function updatePlayer(dt) {
   }
 
   if (player.invuln > 0) player.invuln -= dt;
+
+  // Phase 2 animation state machine
+  player.shootPoseT -= dt;
+  if (player.shootPoseT < 0) player.shootPoseT = 0;
+  if (!player.onGround) {
+    setAnim(player, 'player_jump');
+  } else if (player.shootPoseT > 0) {
+    setAnim(player, 'player_shoot');
+  } else {
+    setAnim(player, 'player_walk');
+  }
+  // Walk animation freezes on frame 0 when not horizontally moving;
+  // other animations always advance.
+  if (player.anim.current === 'player_walk' && Math.abs(player.vx) < 1) {
+    player.anim.frame = 0;
+    player.anim.timer = 0;
+  } else {
+    updateAnim(player, dt);
+  }
 }
 
 function drawPlayer() {
   if (player.invuln > 0 && Math.floor(player.invuln * 30) % 2 === 0) return;
 
   var px = player.x, py = player.y - player.h;
-  ctx.fillStyle = '#42A5F5';
-  roundRect(px, py, player.w, player.h, 8);
-  ctx.fill();
-  ctx.fillStyle = '#FFEB3B';
-  ctx.fillRect(px + 4, py + 8, player.w - 8, 7);
-  ctx.strokeStyle = '#0d3a6b'; ctx.lineWidth = 2;
-  roundRect(px, py, player.w, player.h, 8);
-  ctx.stroke();
+  var spriteName = currentSpriteOf(player);
+  if (spriteName) {
+    drawSprite(spriteName, px, py, player.w, player.h, player.facing < 0);
+  }
+
+  // Shield bubble overlay (kept procedurally — it's a glow effect, not a character)
   if (shieldBubble > 0) {
     ctx.save();
     ctx.globalAlpha = 0.35 + 0.25 * Math.sin(Date.now() / 100);
@@ -471,15 +490,6 @@ function drawPlayer() {
     ctx.arc(px + player.w / 2, py + player.h / 2, player.w * 0.85, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-  }
-  ctx.fillStyle = '#37474F';
-  var legSwap = player.walkAnim < 0.5;
-  if (legSwap) {
-    ctx.fillRect(px + 5,  py + player.h - 4, 10, 6);
-    ctx.fillRect(px + 21, py + player.h,     10, 4);
-  } else {
-    ctx.fillRect(px + 5,  py + player.h,     10, 4);
-    ctx.fillRect(px + 21, py + player.h - 4, 10, 6);
   }
 }
 
@@ -659,6 +669,7 @@ var weaponDuration = 0;
 var weaponShotsLeft = 0;
 
 function fireFoam() {
+  player.shootPoseT = 0.10;  // 100ms recoil pose
   var f = player.facing;
   var ang = player.aimAngle;       // 0 = horizontal, π/2 = up
   var cosA = Math.cos(ang), sinA = Math.sin(ang);
@@ -689,6 +700,7 @@ function fireWeapon() {
 }
 
 function fireSpark() {
+  player.shootPoseT = 0.10;  // 100ms recoil pose
   var f = player.facing;
   var ang = player.aimAngle;
   var cosA = Math.cos(ang), sinA = Math.sin(ang);
