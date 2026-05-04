@@ -145,6 +145,36 @@
 var canvas = document.getElementById('c');
 var ctx = canvas.getContext('2d');
 var W, H;
+
+// ===== Phase 2 asset state =====
+var atlas = null;
+var spriteMap = null;
+var assetsReady = false;
+var assetsErrored = false;
+
+function loadAssets() {
+  var atlasImg = new Image();
+  var atlasPromise = new Promise(function (resolve, reject) {
+    atlasImg.onload = function () { resolve(atlasImg); };
+    atlasImg.onerror = function () { reject(new Error('atlas load failed')); };
+  });
+  atlasImg.src = './assets/robot-factory-rumble-atlas.png';
+
+  var mapPromise = fetch('./sprite-map.json').then(function (r) {
+    if (!r.ok) throw new Error('sprite-map fetch failed: ' + r.status);
+    return r.json();
+  });
+
+  return Promise.all([atlasPromise, mapPromise]).then(function (results) {
+    atlas = results[0];
+    spriteMap = results[1].sprites;
+    assetsReady = true;
+  }).catch(function (err) {
+    assetsErrored = true;
+    console.error('[RFR Phase 2] asset load error:', err);
+  });
+}
+
 function resize() {
   W = canvas.width = window.innerWidth;
   H = canvas.height = window.innerHeight;
@@ -1386,6 +1416,11 @@ function getShakeOffset() {
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
 function loop(now) {
+  if (!assetsReady) {
+    if (W > 0 && H > 0) drawLoadingSplash();
+    requestAnimationFrame(loop);
+    return;
+  }
   var dt = lastTime ? (now - lastTime) / 1000 : 1 / 60;
   if (dt > 0.05) dt = 0.05;
   lastTime = now;
@@ -1522,8 +1557,28 @@ function drawPlatforms() {
     ctx.strokeRect(pl.x, py, pl.w, PLATFORM_HEIGHT);
   }
 }
+
+function drawLoadingSplash() {
+  ctx.fillStyle = '#101820';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#FFEB3B';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (assetsErrored) {
+    ctx.fillText('⚠ Could not load game assets', W / 2, H / 2 - 20);
+    ctx.font = '20px sans-serif';
+    ctx.fillText('Refresh the page to try again', W / 2, H / 2 + 20);
+  } else {
+    ctx.fillText('Loading…', W / 2, H / 2);
+  }
+  ctx.textAlign = 'start';
+  ctx.textBaseline = 'alphabetic';
+}
+
 resolveLevelGeometry();
 // Level setup runs inside startGame() when the menu's Start button is pressed.
+loadAssets();
 requestAnimationFrame(function(ts) { lastTime = ts; requestAnimationFrame(loop); });
 </script>
 </body>
