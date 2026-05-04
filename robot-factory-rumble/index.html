@@ -47,18 +47,18 @@
   #boss-hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #FF5252, #FF1744);
                   transition: width 0.25s; }
   #banner {
-    position: fixed; top: 30%; left: 50%;
-    transform: translate(-50%, -50%) scale(0.7);
+    position: fixed; bottom: 100px; left: 50%;
+    transform: translate(-50%, 0) scale(0.9);
     z-index: 30; pointer-events: none;
-    background: linear-gradient(135deg, #FFEB3B, #FFA726);
-    color: #1a1a1a; padding: 14px 28px; border-radius: 22px;
-    font-size: 28px; font-weight: bold;
-    border: 3px solid #fff;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.55);
+    color: #FFEB3B; padding: 6px 14px; border-radius: 14px;
+    font-size: 16px; font-weight: bold;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
     opacity: 0;
-    transition: opacity 0.25s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap;
+    transition: opacity 0.2s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
-  #banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  #banner.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
   .ctrl-btn {
     position: fixed; z-index: 4;
     width: 72px; height: 72px;
@@ -281,7 +281,7 @@ function startGame() {
   pickups = [];
   checkpoints = [];
   lastCheckpoint = { x: 80, y: GROUND_Y };
-  boss = { active: false, x: 0, y: 0, w: 80, h: 80, phase: 1, hp: 180, hpMaxP1: 180, hpMaxP2: 140, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5, minionSpawnT: 4, entryT: 0 };
+  boss = { active: false, x: 0, y: 0, w: 80, h: 80, phase: 1, hp: 54, hpMaxP1: 54, hpMaxP2: 70, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5, minionSpawnT: 4, entryT: 0 };
   bossRow.style.display = 'none';
   shieldEl.style.display = 'none';
   shakeT = 0;
@@ -339,9 +339,6 @@ var player = {
 };
 
 function updatePlayer(dt) {
-  // Aim Up: gradually tilt up to 90° while held; gradually return to 0° on release.
-  var aimTarget = input.aimUp ? Math.PI / 2 : 0;
-  player.aimAngle += (aimTarget - player.aimAngle) * Math.min(1, dt * 4);
   var dir = 0;
   if (scene === 'playing') {
     if (input.rightHeld) dir += 1;
@@ -585,6 +582,14 @@ function fireFoam() {
 }
 
 function fireWeapon() {
+  // Aim Up steps 15° per shot. Held → tilt up; released → tilt back down.
+  var step = Math.PI / 12;     // 15°
+  var maxAim = Math.PI / 2;    // 90°
+  if (input.aimUp) {
+    player.aimAngle = Math.min(maxAim, player.aimAngle + step);
+  } else {
+    player.aimAngle = Math.max(0, player.aimAngle - step);
+  }
   if (weapon === 'foam') {
     fireFoam();
     fireCooldown = FOAM_INTERVAL;
@@ -1140,9 +1145,9 @@ var boss = {
   x: 0, y: 0,                    // resolved in activateBoss / startGame to BOSS_ARENA_LEFT + 200
   w: 80, h: 80,
   phase: 1,
-  hp: 180,
-  hpMaxP1: 180,
-  hpMaxP2: 140,
+  hp: 54,
+  hpMaxP1: 54,
+  hpMaxP2: 70,
   attackT: 1.6,
   currentAttack: null,
   hitFlash: 0,
@@ -1181,7 +1186,9 @@ function activateBoss() {
 
 function updateBoss(dt) {
   if (!boss.active) {
-    if (!boss.defeated && player.x >= BOSS_TRIGGER_X) activateBoss();
+    // Spawn boss the moment the camera reaches its right limit (frame stops moving).
+    var camLockX = levelLength - W * 0.5;
+    if (!boss.defeated && player.x >= camLockX) activateBoss();
     return;
   }
   // Fly-in intro: lerp boss.y from -200 (above screen) down to 0 over 1s.
