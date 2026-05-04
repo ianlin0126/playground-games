@@ -496,6 +496,67 @@ function roundRect(x, y, w, h, r) {
   ctx.quadraticCurveTo(x, y, x + r, y);
 }
 
+function drawSprite(name, dx, dy, dw, dh, flipped) {
+  if (!atlas || !spriteMap) return;
+  var s = spriteMap[name];
+  if (!s) return;
+  if (flipped) {
+    ctx.save();
+    ctx.translate(dx + dw, dy);
+    ctx.scale(-1, 1);
+    ctx.drawImage(atlas, s.x, s.y, s.w, s.h, 0, 0, dw, dh);
+    ctx.restore();
+  } else {
+    ctx.drawImage(atlas, s.x, s.y, s.w, s.h, dx, dy, dw, dh);
+  }
+}
+
+var ANIMS = {
+  player_walk:    { frames: ['player_walk_0','player_walk_1','player_walk_2','player_walk_3'], fps: 8, loop: true },
+  player_jump:    { frames: ['player_jump'],     fps: 1, loop: false },
+  player_shoot:   { frames: ['player_shoot'],    fps: 1, loop: false },
+  walker_walk:    { frames: ['walker_walk_0','walker_walk_1'], fps: 4, loop: true },
+  walker_ko:      { frames: ['walker_ko'],       fps: 1, loop: false },
+  copter_hover:   { frames: ['copter_hover_0','copter_hover_1'], fps: 5, loop: true },
+  copter_ko:      { frames: ['copter_ko'],       fps: 1, loop: false },
+  bolt_hop:       { frames: ['bolt_squash','bolt_stretch'], fps: 0, loop: false },
+  bolt_ko:        { frames: ['bolt_ko'],         fps: 1, loop: false },
+  boss_idle:      { frames: ['boss_idle'],       fps: 1, loop: false },
+  boss_claw:      { frames: ['boss_claw'],       fps: 1, loop: false },
+  boss_volley:    { frames: ['boss_volley'],     fps: 1, loop: false },
+  boss_stomp:     { frames: ['boss_stomp'],      fps: 1, loop: false }
+};
+
+function setAnim(entity, animName) {
+  if (!entity.anim) entity.anim = { current: animName, frame: 0, timer: 0 };
+  if (entity.anim.current === animName) return;
+  entity.anim.current = animName;
+  entity.anim.frame = 0;
+  entity.anim.timer = 0;
+}
+
+function updateAnim(entity, dt) {
+  if (!entity.anim) return;
+  var anim = ANIMS[entity.anim.current];
+  if (!anim || anim.fps === 0) return;
+  entity.anim.timer += dt * 1000;
+  var frameMs = 1000 / anim.fps;
+  while (entity.anim.timer >= frameMs) {
+    entity.anim.timer -= frameMs;
+    entity.anim.frame++;
+    if (entity.anim.frame >= anim.frames.length) {
+      entity.anim.frame = anim.loop ? 0 : anim.frames.length - 1;
+    }
+  }
+}
+
+function currentSpriteOf(entity) {
+  if (!entity.anim) return null;
+  var anim = ANIMS[entity.anim.current];
+  if (!anim) return null;
+  return anim.frames[entity.anim.frame];
+}
+
 // ── Camera + level ─────────────────────────────────────────────────────────
 var camera = { x: 0 };
 function updateCamera() {
