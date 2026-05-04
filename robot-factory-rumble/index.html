@@ -542,7 +542,8 @@ var ANIMS = {
   boss_idle:      { frames: ['boss_idle'],       fps: 1, loop: false },
   boss_claw:      { frames: ['boss_claw'],       fps: 1, loop: false },
   boss_volley:    { frames: ['boss_volley'],     fps: 1, loop: false },
-  boss_stomp:     { frames: ['boss_stomp'],      fps: 1, loop: false }
+  boss_stomp:     { frames: ['boss_stomp'],      fps: 1, loop: false },
+  gear_minion:    { frames: ['gear_filler'],     fps: 1, loop: false }
 };
 
 function setAnim(entity, animName) {
@@ -833,7 +834,7 @@ function spawnEnemy(kind, x) {
     e.anim = { current: 'bolt_hop', frame: 0, timer: 0 };
     enemies.push(e);
   } else if (kind === 'minion') {
-    enemies.push({
+    var minion = {
       kind: 'minion', x: x, y: GROUND_Y, w: 22, h: 28,
       vx: 0, hp: 3, alive: true,
       hopT: 0,
@@ -843,7 +844,10 @@ function spawnEnemy(kind, x) {
       squashY: 0,
       shotT: 1.5 + Math.random() * 1.0,
       contactCool: 0,
-    });
+      rotateAngle: 0,
+      anim: { current: 'gear_minion', frame: 0, timer: 0 },
+    };
+    enemies.push(minion);
   }
 }
 
@@ -946,6 +950,7 @@ function updateEnemies(dt) {
         e.squashY = 0;
       }
     } else if (e.kind === 'minion') {
+      e.rotateAngle = (e.rotateAngle || 0) + dt * 2;
       e.hopT += dt;
       if (e.hopT < 1.0) {
         var t = e.hopT;
@@ -1050,21 +1055,15 @@ function drawEnemies() {
     if (!e) continue;
     // Skip fully despawned (alive=false and koTimer expired)
     if (e.alive === false && (e.koTimer || 0) <= 0) continue;
-    // Minion still uses procedural drawing (no atlas sprite yet)
+    // Minion renders as a spinning gear sprite
     if (e.kind === 'minion') {
+      var GEAR_VW = 52, GEAR_VH = 52;
+      var centerX = e.x;
+      var centerY = e.y - e.h * 0.5;
       ctx.save();
-      ctx.translate(e.x, e.y - e.h * 0.5);
-      var msy = 1 + (e.squashY || 0) * 0.3;
-      var msx = 1 - (e.squashY || 0) * 0.15;
-      ctx.scale(msx, msy);
-      ctx.fillStyle = '#FFC107';
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 4);
-      ctx.fill();
-      ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 4);
-      ctx.stroke();
-      ctx.fillStyle = '#FF1744';
-      ctx.beginPath(); ctx.arc(0, -6, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.translate(centerX, centerY);
+      ctx.rotate(e.rotateAngle || 0);
+      drawSprite('gear_filler', -GEAR_VW / 2, -GEAR_VH / 2, GEAR_VW, GEAR_VH, false);
       ctx.restore();
       continue;
     }
@@ -1446,7 +1445,7 @@ function drawBoss() {
   var visualBy = by + boss.h - BOSS_VISUAL_H;
 
   var spriteName = currentSpriteOf(boss) || 'boss_idle';
-  drawSprite(spriteName, visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H, false);
+  drawSprite(spriteName, visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H, true);
 
   // Phase 2 sensor color — code-side composite tint, no separate sprite
   if (boss.phase === 2) {
