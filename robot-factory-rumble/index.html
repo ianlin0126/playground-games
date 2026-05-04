@@ -166,7 +166,7 @@ window.addEventListener('resize', resize);
 var scene = 'menu';     // 'menu' | 'playing' | 'respawn' | 'win'
 var hp = 5;             // player hearts (0..5)
 var maxHp = 5;
-var levelLength = 24500; // 5x the original — more pits, more platforms, more enemies
+var levelLength = 17150; // 30% shorter than the previous 24500
 
 var heartsEl   = document.getElementById('hearts-row');
 var shieldEl   = document.getElementById('shield-row');
@@ -475,10 +475,16 @@ var camera = { x: 0 };
 function updateCamera() {
   var targetCamX = player.x - W * 0.5;
   if (boss.active && !boss.defeated) {
-    targetCamX = (BOSS_ARENA_LEFT + BOSS_ARENA_RIGHT) / 2 - W * 0.5;
+    // Follow the player but clamp to arena bounds so we never show outside it.
+    var minCamArena = BOSS_ARENA_LEFT;
+    var maxCamArena = BOSS_ARENA_RIGHT - W;
+    if (maxCamArena < minCamArena) maxCamArena = minCamArena;   // arena narrower than viewport
+    if (targetCamX < minCamArena) targetCamX = minCamArena;
+    if (targetCamX > maxCamArena) targetCamX = maxCamArena;
+  } else {
+    if (targetCamX < 0) targetCamX = 0;
+    if (targetCamX > levelLength - W) targetCamX = Math.max(0, levelLength - W);
   }
-  if (targetCamX < 0) targetCamX = 0;
-  if (targetCamX > levelLength - W) targetCamX = Math.max(0, levelLength - W);
   camera.x = targetCamX;
 }
 
@@ -487,53 +493,52 @@ var GROUND_Y = 0;       // canvas-y of the ground top; resolved on first draw
 var PLATFORM_HEIGHT = 14;
 var level = {
   segments: [
-    { name: 'A', x0: 0,     x1:  6000 },
-    { name: 'B', x0: 6000,  x1: 18000 },
-    { name: 'C', x0: 18000, x1: 23000 },
-    { name: 'D', x0: 23000, x1: 24500 },   // boss arena
+    { name: 'A', x0: 0,     x1:  4200 },
+    { name: 'B', x0: 4200,  x1: 12600 },
+    { name: 'C', x0: 12600, x1: 16100 },
+    { name: 'D', x0: 16100, x1: 17150 },   // boss arena
   ],
   pits: [
     // Segment A — gentle intro
-    { x: 700,   w: 70 },  { x: 1300,  w: 80 },  { x: 1900,  w: 70 },
-    { x: 2700,  w: 80 },  { x: 3500,  w: 70 },  { x: 4200,  w: 90 },
-    { x: 4900,  w: 80 },  { x: 5600,  w: 80 },
+    { x: 490,   w: 50 },  { x: 910,   w: 60 },  { x: 1330,  w: 50 },
+    { x: 1890,  w: 60 },  { x: 2450,  w: 50 },  { x: 2940,  w: 60 },
+    { x: 3430,  w: 60 },  { x: 3920,  w: 60 },
     // Segment B
-    { x: 6800,  w: 90 },  { x: 7600,  w: 80 },  { x: 8500,  w: 100 },
-    { x: 9400,  w: 90 },  { x: 10300, w: 100 }, { x: 11400, w: 110 },
-    { x: 12500, w: 100 }, { x: 13800, w: 110 }, { x: 15000, w: 100 },
-    { x: 16500, w: 120 }, { x: 17500, w: 100 },
+    { x: 4760,  w: 60 },  { x: 5320,  w: 60 },  { x: 5950,  w: 70 },
+    { x: 6580,  w: 60 },  { x: 7210,  w: 70 },  { x: 7980,  w: 80 },
+    { x: 8750,  w: 70 },  { x: 9660,  w: 80 },  { x: 10500, w: 70 },
+    { x: 11550, w: 80 },  { x: 12250, w: 70 },
     // Segment C
-    { x: 18600, w: 100 }, { x: 19500, w: 110 }, { x: 20500, w: 120 },
-    { x: 21500, w: 110 }, { x: 22500, w: 100 },
+    { x: 13020, w: 70 },  { x: 13650, w: 80 },  { x: 14350, w: 80 },
+    { x: 15050, w: 80 },  { x: 15750, w: 70 },
   ],
   platforms: [
-    // Segment A platforms (introduce mechanic)
-    { x: 2200,  w: 200, top: -120, beltDir:  0 },
-    { x: 3200,  w: 220, top: -150, beltDir:  1 },
-    { x: 4400,  w: 200, top: -120, beltDir: -1 },
-    // Segment B — denser, varied heights
-    { x: 6900,  w: 220, top: -120, beltDir:  1 },
-    { x: 7800,  w: 200, top: -180, beltDir: -1 },
-    { x: 8700,  w: 240, top: -120, beltDir:  0 },
-    { x: 9600,  w: 220, top: -200, beltDir:  1 },
-    { x: 10600, w: 220, top: -120, beltDir: -1 },
-    { x: 11700, w: 250, top: -180, beltDir:  1 },
-    { x: 12800, w: 220, top: -120, beltDir:  0 },
-    { x: 14000, w: 240, top: -200, beltDir: -1 },
-    { x: 15300, w: 220, top: -120, beltDir:  1 },
-    { x: 16700, w: 240, top: -180, beltDir: -1 },
-    // Segment C — sparser, leading to boss
-    { x: 18800, w: 220, top: -120, beltDir:  1 },
-    { x: 20100, w: 240, top: -180, beltDir: -1 },
-    { x: 21800, w: 220, top: -120, beltDir:  0 },
+    // Segment A
+    { x: 1540,  w: 140, top: -120, beltDir:  0 },
+    { x: 2240,  w: 160, top: -150, beltDir:  1 },
+    { x: 3080,  w: 140, top: -120, beltDir: -1 },
+    // Segment B
+    { x: 4830,  w: 160, top: -120, beltDir:  1 },
+    { x: 5460,  w: 140, top: -180, beltDir: -1 },
+    { x: 6090,  w: 170, top: -120, beltDir:  0 },
+    { x: 6720,  w: 160, top: -200, beltDir:  1 },
+    { x: 7420,  w: 160, top: -120, beltDir: -1 },
+    { x: 8190,  w: 180, top: -180, beltDir:  1 },
+    { x: 8960,  w: 160, top: -120, beltDir:  0 },
+    { x: 9800,  w: 170, top: -200, beltDir: -1 },
+    { x: 10710, w: 160, top: -120, beltDir:  1 },
+    { x: 11690, w: 170, top: -180, beltDir: -1 },
+    // Segment C
+    { x: 13160, w: 160, top: -120, beltDir:  1 },
+    { x: 14070, w: 170, top: -180, beltDir: -1 },
+    { x: 15260, w: 160, top: -120, beltDir:  0 },
   ],
-  // NEW: floor-conveyor sections (push player along the ground)
   floorBelts: [
-    { x: 6300, w: 320, dir:  1 },
-    { x: 9000, w: 360, dir: -1 },
-    { x: 12000, w: 360, dir:  1 },
-    { x: 15800, w: 320, dir: -1 },
-    { x: 19500, w: 320, dir:  1 },
+    { x: 4410,  w: 230, dir:  1 },
+    { x: 6300,  w: 250, dir: -1 },
+    { x: 8400,  w: 250, dir:  1 },
+    { x: 11060, w: 230, dir: -1 },
+    { x: 13650, w: 230, dir:  1 },
   ],
 };
 function resolveLevelGeometry() {
@@ -698,7 +703,7 @@ function spawnEnemy(kind, x) {
   if (kind === 'walker') {
     enemies.push({
       kind: 'walker', x: x, y: GROUND_Y, w: 32, h: 40,
-      vx: -60, hp: 2, alive: true,
+      vx: -60, hp: 3, alive: true,
       patrolMin: x - 80, patrolMax: x + 80,
       wobbleT: 0,
       contactCool: 0,
@@ -707,7 +712,7 @@ function spawnEnemy(kind, x) {
   } else if (kind === 'copter') {
     enemies.push({
       kind: 'copter', x: x, y: GROUND_Y - 160, w: 28, h: 24,
-      hp: 1, alive: true,
+      hp: 3, alive: true,
       bobT: Math.random() * 6.28,
       dropT: 1.0,
       contactCool: 0,
@@ -715,7 +720,7 @@ function spawnEnemy(kind, x) {
   } else if (kind === 'bolt') {
     enemies.push({
       kind: 'bolt', x: x, y: GROUND_Y, w: 24, h: 30,
-      hp: 1, alive: true,
+      hp: 3, alive: true,
       hopT: 0,
       hopDir: -1,
       hopCount: 0,
@@ -739,54 +744,54 @@ function spawnEnemy(kind, x) {
 }
 
 function setupLevelEnemies() {
-  // Segment A — gentle intro (0–6000)
-  spawnEnemy('walker', 400);
-  spawnEnemy('walker', 950);
-  spawnEnemy('copter', 1100);   // triggers Aim Up hint
-  spawnEnemy('walker', 1700);
-  spawnEnemy('bolt',   2300);
-  spawnEnemy('walker', 2900);
-  spawnEnemy('copter', 3200);
-  spawnEnemy('walker', 3700);
-  spawnEnemy('bolt',   4100);
-  spawnEnemy('walker', 4600);
-  spawnEnemy('copter', 5000);
-  spawnEnemy('walker', 5400);
-  spawnEnemy('bolt',   5800);
-  // Segment B — denser, mixed (6000–18000)
-  spawnEnemy('walker', 6300);
-  spawnEnemy('copter', 6700);
-  spawnEnemy('bolt',   7100);
-  spawnEnemy('walker', 7500);
-  spawnEnemy('walker', 7900);
-  spawnEnemy('copter', 8300);
-  spawnEnemy('bolt',   8800);
-  spawnEnemy('walker', 9200);
-  spawnEnemy('copter', 9700);
-  spawnEnemy('walker', 10100);
-  spawnEnemy('bolt',   10600);
-  spawnEnemy('walker', 11000);
-  spawnEnemy('copter', 11500);
-  spawnEnemy('walker', 12000);
-  spawnEnemy('bolt',   12600);
-  spawnEnemy('walker', 13100);
-  spawnEnemy('copter', 13600);
-  spawnEnemy('walker', 14100);
-  spawnEnemy('bolt',   14700);
-  spawnEnemy('walker', 15200);
-  spawnEnemy('copter', 15700);
-  spawnEnemy('walker', 16300);
-  spawnEnemy('bolt',   16900);
-  spawnEnemy('walker', 17400);
-  // Segment C — sparser, leading toward boss (18000–23000)
-  spawnEnemy('walker', 18300);
-  spawnEnemy('copter', 18900);
-  spawnEnemy('bolt',   19500);
-  spawnEnemy('walker', 20200);
-  spawnEnemy('copter', 20800);
-  spawnEnemy('bolt',   21500);
-  spawnEnemy('walker', 22100);
-  spawnEnemy('walker', 22600);
+  // Segment A (0–4200)
+  spawnEnemy('walker', 280);
+  spawnEnemy('walker', 670);
+  spawnEnemy('copter', 770);
+  spawnEnemy('walker', 1190);
+  spawnEnemy('bolt',   1610);
+  spawnEnemy('walker', 2030);
+  spawnEnemy('copter', 2240);
+  spawnEnemy('walker', 2590);
+  spawnEnemy('bolt',   2870);
+  spawnEnemy('walker', 3220);
+  spawnEnemy('copter', 3500);
+  spawnEnemy('walker', 3780);
+  spawnEnemy('bolt',   4060);
+  // Segment B (4200–12600)
+  spawnEnemy('walker', 4410);
+  spawnEnemy('copter', 4690);
+  spawnEnemy('bolt',   4970);
+  spawnEnemy('walker', 5250);
+  spawnEnemy('walker', 5530);
+  spawnEnemy('copter', 5810);
+  spawnEnemy('bolt',   6160);
+  spawnEnemy('walker', 6440);
+  spawnEnemy('copter', 6790);
+  spawnEnemy('walker', 7070);
+  spawnEnemy('bolt',   7420);
+  spawnEnemy('walker', 7700);
+  spawnEnemy('copter', 8050);
+  spawnEnemy('walker', 8400);
+  spawnEnemy('bolt',   8820);
+  spawnEnemy('walker', 9170);
+  spawnEnemy('copter', 9520);
+  spawnEnemy('walker', 9870);
+  spawnEnemy('bolt',   10290);
+  spawnEnemy('walker', 10640);
+  spawnEnemy('copter', 10990);
+  spawnEnemy('walker', 11410);
+  spawnEnemy('bolt',   11830);
+  spawnEnemy('walker', 12180);
+  // Segment C (12600–16100)
+  spawnEnemy('walker', 12810);
+  spawnEnemy('copter', 13230);
+  spawnEnemy('bolt',   13650);
+  spawnEnemy('walker', 14140);
+  spawnEnemy('copter', 14560);
+  spawnEnemy('bolt',   15050);
+  spawnEnemy('walker', 15470);
+  spawnEnemy('walker', 15820);
 }
 
 function updateEnemies(dt) {
@@ -1078,11 +1083,11 @@ function spawnPickup(kind, x, y) {
 }
 
 function setupLevelPickups() {
-  spawnPickup('spark',  2400);    // Segment A
-  spawnPickup('shield', 9500);    // Mid-Segment B
-  spawnPickup('heart', 16500);    // Late-Segment B
-  spawnPickup('shield', 19500);   // Segment C — extra shield before the boss
-  spawnPickup('heart', 22500);    // Pre-boss heart
+  spawnPickup('spark',  1680);    // Segment A
+  spawnPickup('shield', 6650);    // Mid-Segment B
+  spawnPickup('heart', 11550);    // Late-Segment B
+  spawnPickup('shield', 13650);   // Segment C
+  spawnPickup('heart', 15750);    // Pre-boss heart
 }
 
 function updatePickups(dt) {
@@ -1150,10 +1155,10 @@ var checkpoints = [];        // { x, y, name, touched }
 var lastCheckpoint = { x: 80, y: 0 };   // y resolved on first frame
 
 function setupLevelCheckpoints() {
-  checkpoints.push({ x: 5900,  y: 0, name: '1', touched: false });   // End of Segment A
-  checkpoints.push({ x: 12000, y: 0, name: '2', touched: false });   // Mid Segment B
-  checkpoints.push({ x: 17900, y: 0, name: '3', touched: false });   // End of Segment B
-  checkpoints.push({ x: 22900, y: 0, name: '4', touched: false });   // Just before boss
+  checkpoints.push({ x: 4130,  y: 0, name: '1', touched: false });
+  checkpoints.push({ x: 8400,  y: 0, name: '2', touched: false });
+  checkpoints.push({ x: 12530, y: 0, name: '3', touched: false });
+  checkpoints.push({ x: 16030, y: 0, name: '4', touched: false });
 }
 
 function updateCheckpoints(dt) {
@@ -1203,9 +1208,9 @@ var boss = {
   minionT: 5,
   minionSpawnT: 4,                // phase 2 minion-from-right cadence
 };
-var BOSS_TRIGGER_X = 23000;
-var BOSS_ARENA_LEFT  = 23000;
-var BOSS_ARENA_RIGHT = 24500;
+var BOSS_TRIGGER_X = 16100;
+var BOSS_ARENA_LEFT  = 16100;
+var BOSS_ARENA_RIGHT = 17150;
 
 function activateBoss() {
   if (boss.active) return;
@@ -1254,11 +1259,11 @@ function updateBoss(dt) {
       if (boss.phase === 1) {
         boss.currentAttack = roll < 0.5
           ? { kind: 'volley', t: 0, life: 0.5 + 0.5 }
-          : { kind: 'ram',    t: 0, life: 1.4 };
+          : { kind: 'ram',    t: 0, life: 2.2 };
       } else {
         boss.currentAttack = roll < 0.5
           ? { kind: 'volley', t: 0, life: 0.5 + 0.4 }
-          : { kind: 'ram',    t: 0, life: 1.2 };
+          : { kind: 'ram',    t: 0, life: 2.2 };
       }
       // Phase 2 attacks fire faster to keep the kid honest.
       boss.attackT = boss.phase === 1 ? 1.6 : 1.2;
@@ -1291,21 +1296,16 @@ function updateBoss(dt) {
         }
       }
     } else if (a.kind === 'ram') {
-      // Boss flies horizontally across the arena, low to the floor
-      // (jumpable by the kid). Telegraph 0.4s, charge 0.8s, recover 0.2s.
-      if (a.t < 0.4) {
-        // Telegraph: hover at low y on the SAME side as the player
+      // 0.5s telegraph + 1.5s charge + brief recover. Charge speed ~700 px/s
+      // across a ~1050px arena → 1.5s sweep, much easier for kids to time a jump.
+      if (a.t < 0.5) {
         a.ramFromX = (player.x < boss.x) ? BOSS_ARENA_RIGHT - boss.w : BOSS_ARENA_LEFT + boss.w;
         a.ramToX   = (player.x < boss.x) ? BOSS_ARENA_LEFT  + boss.w : BOSS_ARENA_RIGHT - boss.w;
         boss.x = a.ramFromX;
-      } else if (a.t < 1.2) {
-        // Charge: lerp x across the arena. Boss y goes LOW (just above floor)
-        // so the kid can jump over.
-        var k2 = Math.min(1, (a.t - 0.4) / 0.8);
+      } else if (a.t < 2.0) {
+        var k2 = Math.min(1, (a.t - 0.5) / 1.5);
         boss.x = a.ramFromX + (a.ramToX - a.ramFromX) * k2;
       }
-      // Override default bob during ram by setting boss.x directly above (it'll
-      // be re-overridden each frame). The render-y override is in drawBoss.
     }
     if (a.t >= a.life) {
       boss.currentAttack = null;
