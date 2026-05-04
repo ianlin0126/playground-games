@@ -471,13 +471,17 @@ function updatePlayer(dt) {
   }
 }
 
+var PLAYER_VISUAL_W = 60;
+var PLAYER_VISUAL_H = 72;
+
 function drawPlayer() {
   if (player.invuln > 0 && Math.floor(player.invuln * 30) % 2 === 0) return;
 
-  var px = player.x, py = player.y - player.h;
   var spriteName = currentSpriteOf(player);
   if (spriteName) {
-    drawSprite(spriteName, px, py, player.w, player.h, player.facing < 0);
+    var visualPx = player.x + (player.w - PLAYER_VISUAL_W) / 2;
+    var visualPy = player.y - PLAYER_VISUAL_H;
+    drawSprite(spriteName, visualPx, visualPy, PLAYER_VISUAL_W, PLAYER_VISUAL_H, player.facing < 0);
   }
 
   // Shield bubble overlay (kept procedurally — it's a glow effect, not a character)
@@ -487,7 +491,7 @@ function drawPlayer() {
     ctx.strokeStyle = '#00E5FF';
     ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.arc(px + player.w / 2, py + player.h / 2, player.w * 0.85, 0, Math.PI * 2);
+    ctx.arc(player.x + player.w / 2, player.y - player.h / 2, PLAYER_VISUAL_W * 0.85, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
@@ -506,18 +510,23 @@ function roundRect(x, y, w, h, r) {
   ctx.quadraticCurveTo(x, y, x + r, y);
 }
 
-function drawSprite(name, dx, dy, dw, dh, flipped) {
+function drawSprite(name, dx, dy, dw, dh, flipped, stretch) {
   if (!atlas || !spriteMap) return;
   var s = spriteMap[name];
   if (!s) return;
-  // Aspect-preserving letterbox: fit sprite inside (dw, dh), anchored to bottom
-  var sa = s.w / s.h;
-  var da = dw / dh;
-  var rw, rh;
-  if (sa > da) { rw = dw; rh = dw / sa; }
-  else         { rh = dh; rw = dh * sa; }
-  var rdx = dx + (dw - rw) / 2;
-  var rdy = dy + (dh - rh);   // anchor to bottom of hitbox (feet on ground)
+  var rw, rh, rdx, rdy;
+  if (stretch) {
+    // Bypass letterbox — fill destination exactly (used for boss so all frames render same size)
+    rw = dw; rh = dh; rdx = dx; rdy = dy;
+  } else {
+    // Aspect-preserving letterbox: fit sprite inside (dw, dh), anchored to bottom
+    var sa = s.w / s.h;
+    var da = dw / dh;
+    if (sa > da) { rw = dw; rh = dw / sa; }
+    else         { rh = dh; rw = dh * sa; }
+    rdx = dx + (dw - rw) / 2;
+    rdy = dy + (dh - rh);   // anchor to bottom of hitbox (feet on ground)
+  }
   if (flipped) {
     ctx.save();
     ctx.translate(rdx + rw, rdy);
@@ -870,6 +879,20 @@ function setupLevelEnemies() {
 function updateEnemies(dt) {
   for (var i = enemies.length - 1; i >= 0; i--) {
     var e = enemies[i];
+    // Falling copter: apply gravity until floor impact, then switch to KO anim
+    if (e.dying) {
+      e.vy = (e.vy || 0) + GRAVITY * dt;
+      e.y += e.vy * dt;
+      if (e.y >= GROUND_Y) {
+        e.y = GROUND_Y;
+        e.dying = false;
+        e.alive = false;
+        setAnim(e, 'copter_ko');
+        e.koTimer = 0.4;
+        spawnBoltBurst(e.x, e.y - e.h * 0.5);
+      }
+      continue;
+    }
     if (!e.alive) {
       e.koTimer = (e.koTimer || 0) - dt;
       if (e.koTimer <= 0) { enemies.splice(i, 1); }
@@ -987,12 +1010,18 @@ function updateEnemies(dt) {
         e.hp -= 1;
         projectiles.splice(j, 1);
         if (e.hp <= 0) {
-          e.alive = false;
-          spawnBoltBurst(e.x, e.y - e.h * 0.5);
-          if (e.kind === 'walker') setAnim(e, 'walker_ko');
-          else if (e.kind === 'copter') setAnim(e, 'copter_ko');
-          else if (e.kind === 'bolt') setAnim(e, 'bolt_ko');
-          e.koTimer = 0.4;
+          if (e.kind === 'copter') {
+            // Copter falls under gravity to the floor, then plays KO anim
+            e.dying = true;
+            e.vy = 0;
+            e.vx = 0;
+          } else {
+            e.alive = false;
+            spawnBoltBurst(e.x, e.y - e.h * 0.5);
+            if (e.kind === 'walker') setAnim(e, 'walker_ko');
+            else if (e.kind === 'bolt') setAnim(e, 'bolt_ko');
+            e.koTimer = 0.4;
+          }
           break;
         }
       }
@@ -1049,6 +1078,10 @@ function updateEnemyProjectiles(dt) {
   }
 }
 
+var WALKER_VISUAL_W = 52, WALKER_VISUAL_H = 72;
+var BOLT_VISUAL_W = 48, BOLT_VISUAL_H = 72;
+var MINION_VISUAL_W = 60, MINION_VISUAL_H = 72;
+
 function drawEnemies() {
   for (var i = 0; i < enemies.length; i++) {
     var e = enemies[i];
@@ -1057,7 +1090,6 @@ function drawEnemies() {
     if (e.alive === false && (e.koTimer || 0) <= 0) continue;
     // Minion renders as a spinning gear sprite at a larger visual size
     if (e.kind === 'minion') {
-      var MINION_VISUAL_W = 56, MINION_VISUAL_H = 56;
       var visualMx = e.x + (e.w - MINION_VISUAL_W) / 2;
       var visualMy = e.y - MINION_VISUAL_H;
       ctx.save();
@@ -1077,6 +1109,14 @@ function drawEnemies() {
       var vex = e.x + e.w / 2 - COPTER_VW / 2;
       var vey = e.y - COPTER_VH;
       drawSprite(spriteName, vex, vey, COPTER_VW, COPTER_VH, flipped);
+    } else if (e.kind === 'walker') {
+      var vwx = e.x - e.w / 2 + (e.w - WALKER_VISUAL_W) / 2;
+      var vwy = e.y - WALKER_VISUAL_H;
+      drawSprite(spriteName, vwx, vwy, WALKER_VISUAL_W, WALKER_VISUAL_H, flipped);
+    } else if (e.kind === 'bolt') {
+      var vbx = e.x - e.w / 2 + (e.w - BOLT_VISUAL_W) / 2;
+      var vby = e.y - BOLT_VISUAL_H;
+      drawSprite(spriteName, vbx, vby, BOLT_VISUAL_W, BOLT_VISUAL_H, flipped);
     } else {
       var ex = e.x, ey = e.y - e.h;
       drawSprite(spriteName, ex, ey, e.w, e.h, flipped);
@@ -1445,7 +1485,33 @@ function drawBoss() {
   var visualBy = by + boss.h - BOSS_VISUAL_H;
 
   var spriteName = currentSpriteOf(boss) || 'boss_idle';
-  drawSprite(spriteName, visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H, true);
+
+  // Procedural rocket flame plume under the boss feet (drawn first so it appears behind the body)
+  var flameX = visualBx + BOSS_VISUAL_W / 2;
+  var flameTop = visualBy + BOSS_VISUAL_H - 6;  // just under the feet
+  var flicker = Math.sin(Date.now() / 60) * 4;
+  var flameH = 28 + flicker;
+  ctx.save();
+  // Outer orange flame
+  var grad1 = ctx.createLinearGradient(flameX, flameTop, flameX, flameTop + flameH);
+  grad1.addColorStop(0, '#FFB300');
+  grad1.addColorStop(0.6, '#FF6F00');
+  grad1.addColorStop(1, 'rgba(244,67,54,0)');
+  ctx.fillStyle = grad1;
+  ctx.beginPath();
+  ctx.ellipse(flameX, flameTop + flameH / 2, 22, flameH / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Inner yellow core
+  var grad2 = ctx.createLinearGradient(flameX, flameTop, flameX, flameTop + flameH * 0.7);
+  grad2.addColorStop(0, '#FFEB3B');
+  grad2.addColorStop(1, 'rgba(255,235,59,0)');
+  ctx.fillStyle = grad2;
+  ctx.beginPath();
+  ctx.ellipse(flameX, flameTop + flameH / 3, 11, flameH / 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  drawSprite(spriteName, visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H, true, true);
 
 }
 
