@@ -1481,7 +1481,7 @@ function drawBoss() {
   // Bottom-anchor: visual bottom aligns with hitbox bottom (by + boss.h)
   var visualBy = by + boss.h - BOSS_VISUAL_H;
 
-  var spriteName = 'boss_idle';
+  var spriteName = (boss.phase === 2) ? 'boss_volley' : 'boss_idle';
 
   // Two rocket flame plumes, one under each foot (drawn first so they appear behind the body)
   var leftFootX  = visualBx + BOSS_VISUAL_W * 0.30;
