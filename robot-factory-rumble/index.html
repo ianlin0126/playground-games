@@ -269,6 +269,7 @@ function startGame() {
   player.vx = 0;
   player.invuln = 0;
   player.facing = 1;
+  player.aimAngle = 0;
   shieldBubble = 0;
   weapon = 'foam';
   weaponEl.textContent = '⚡ Foam Blaster';
@@ -280,7 +281,7 @@ function startGame() {
   pickups = [];
   checkpoints = [];
   lastCheckpoint = { x: 80, y: GROUND_Y };
-  boss = { active: false, x: 0, y: 0, w: 80, h: 80, phase: 1, hp: 180, hpMaxP1: 180, hpMaxP2: 140, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5, minionSpawnT: 4 };
+  boss = { active: false, x: 0, y: 0, w: 80, h: 80, phase: 1, hp: 180, hpMaxP1: 180, hpMaxP2: 140, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5, minionSpawnT: 4, entryT: 0 };
   bossRow.style.display = 'none';
   shieldEl.style.display = 'none';
   shakeT = 0;
@@ -334,9 +335,13 @@ var player = {
   facing: 1,
   invuln: 0,
   walkAnim: 0,
+  aimAngle: 0,
 };
 
 function updatePlayer(dt) {
+  // Aim Up: gradually tilt up to 90° while held; gradually return to 0° on release.
+  var aimTarget = input.aimUp ? Math.PI / 2 : 0;
+  player.aimAngle += (aimTarget - player.aimAngle) * Math.min(1, dt * 4);
   var dir = 0;
   if (scene === 'playing') {
     if (input.rightHeld) dir += 1;
@@ -568,17 +573,14 @@ var weaponDuration = 0;
 var weaponShotsLeft = 0;
 
 function fireFoam() {
-  var f = player.facing;     // +1 = right, -1 = left
-  var muzzleX = (f > 0) ? (player.x + player.w) : player.x;
-  var muzzleY = player.y - player.h * 0.45;
-  var vx = FOAM_SPEED * f, vy = 0;
-  if (input.aimUp) {
-    var d = Math.SQRT1_2;
-    vx = FOAM_SPEED * f * d;
-    vy = -FOAM_SPEED * d;
-    muzzleX = (f > 0) ? (player.x + player.w * 0.7) : (player.x + player.w * 0.3);
-    muzzleY = player.y - player.h * 0.85;
-  }
+  var f = player.facing;
+  var ang = player.aimAngle;       // 0 = horizontal, π/2 = up
+  var cosA = Math.cos(ang), sinA = Math.sin(ang);
+  // Muzzle moves up + slightly inward as the aim rotates upward.
+  var muzzleX = (f > 0) ? (player.x + player.w * (1 - sinA * 0.3)) : (player.x + player.w * sinA * 0.3);
+  var muzzleY = player.y - player.h * (0.45 + sinA * 0.4);
+  var vx = FOAM_SPEED * f * cosA;
+  var vy = -FOAM_SPEED * sinA;
   projectiles.push({ x: muzzleX, y: muzzleY, vx: vx, vy: vy, life: 1.6, kind: 'foam' });
 }
 
@@ -593,18 +595,18 @@ function fireWeapon() {
 }
 
 function fireSpark() {
-  var f = player.facing;     // +1 = right, -1 = left
-  var muzzleX = (f > 0) ? (player.x + player.w * 0.7) : (player.x + player.w * 0.3);
-  var muzzleY = player.y - player.h * 0.5;
-  var baseVx = FOAM_SPEED * f, baseVy = 0;
-  if (input.aimUp) {
-    baseVx = FOAM_SPEED * f * Math.SQRT1_2;
-    baseVy = -FOAM_SPEED * Math.SQRT1_2;
-  }
-  var fanRad = SPARK_FAN_DEG * Math.PI / 360; // half-fan
+  var f = player.facing;
+  var ang = player.aimAngle;
+  var cosA = Math.cos(ang), sinA = Math.sin(ang);
+  var muzzleX = (f > 0) ? (player.x + player.w * (0.7 - sinA * 0.2)) : (player.x + player.w * (0.3 + sinA * 0.2));
+  var muzzleY = player.y - player.h * (0.5 + sinA * 0.35);
+  // Center direction in player.aimAngle facing direction.
+  var baseVx = FOAM_SPEED * f * cosA;
+  var baseVy = -FOAM_SPEED * sinA;
+  var fanRad = SPARK_FAN_DEG * Math.PI / 360;
   for (var k = -1; k <= 1; k++) {
-    var ang = fanRad * k;
-    var c = Math.cos(ang), s = Math.sin(ang);
+    var rot = fanRad * k;
+    var c = Math.cos(rot), s = Math.sin(rot);
     var vx = baseVx * c - baseVy * s;
     var vy = baseVx * s + baseVy * c;
     projectiles.push({ x: muzzleX, y: muzzleY, vx: vx, vy: vy, life: 1.6, kind: 'spark' });
@@ -1026,7 +1028,7 @@ function spawnPickup(kind, x, y) {
 }
 
 function setupLevelPickups() {
-  spawnPickup('spark',   600);
+  spawnPickup('spark', 1900);    // moved from x=600 to mid-level
   spawnPickup('shield', 1700);
   spawnPickup('heart',  2400);
   spawnPickup('shield', 3100);
@@ -1149,16 +1151,28 @@ var boss = {
   bobT: 0,
   minionT: 5,
   minionSpawnT: 4,                // phase 2 minion-from-right cadence
+  entryT: 0,
 };
-var BOSS_TRIGGER_X = 3770;
-var BOSS_ARENA_LEFT  = 3770;
-var BOSS_ARENA_RIGHT = 4270;
+var BOSS_TRIGGER_X = 4070;        // ~200px from level end; arena bounds set dynamically at activation
+var BOSS_ARENA_LEFT  = 4070;       // overridden in activateBoss()
+var BOSS_ARENA_RIGHT = 4270;       // overridden in activateBoss()
 
 function activateBoss() {
   if (boss.active) return;
   boss.active = true;
-  boss.x = BOSS_ARENA_LEFT + 200;
-  boss.attackT = 1.6;
+  // Lock the arena to the current screen so the camera doesn't jump.
+  // Pre-compute camera target NOW so left edge = camera.x (no scroll jump).
+  BOSS_ARENA_LEFT  = camera.x;
+  BOSS_ARENA_RIGHT = camera.x + W;
+  // Don't let the arena extend past the world's right edge.
+  if (BOSS_ARENA_RIGHT > levelLength) {
+    BOSS_ARENA_RIGHT = levelLength;
+    BOSS_ARENA_LEFT  = levelLength - W;
+  }
+  boss.x = BOSS_ARENA_RIGHT - boss.w * 0.6 - 20;
+  boss.y = -200;       // start above the screen — fly-down intro
+  boss.entryT = 1.0;   // 1 second fly-down animation
+  boss.attackT = 2.0;  // first attack delayed until intro completes
   boss.hp = boss.hpMaxP1;
   boss.phase = 1;
   bossRow.style.display = 'block';
@@ -1169,6 +1183,12 @@ function updateBoss(dt) {
   if (!boss.active) {
     if (!boss.defeated && player.x >= BOSS_TRIGGER_X) activateBoss();
     return;
+  }
+  // Fly-in intro: lerp boss.y from -200 (above screen) down to 0 over 1s.
+  if (boss.entryT > 0) {
+    boss.entryT -= dt;
+    if (boss.entryT < 0) boss.entryT = 0;
+    return;   // skip attacks/bob during intro
   }
   if (boss.hitFlash > 0) boss.hitFlash -= dt;
   if (boss.invuln > 0) boss.invuln -= dt;
@@ -1196,13 +1216,13 @@ function updateBoss(dt) {
     boss.attackT -= dt;
     if (boss.attackT <= 0) {
       var roll = Math.random();
-      // Volley-only — boss is now a stationary turret. Faster cadence in Phase 2.
+      // Single aimed shot — fires more often so the kid stays on the move.
       if (boss.phase === 1) {
-        boss.currentAttack = { kind: 'volley', t: 0, life: 0.5 + 0.5 };
+        boss.currentAttack = { kind: 'volley', t: 0, life: 0.5 };
       } else {
-        boss.currentAttack = { kind: 'volley', t: 0, life: 0.5 + 0.4 };
+        boss.currentAttack = { kind: 'volley', t: 0, life: 0.4 };
       }
-      boss.attackT = boss.phase === 1 ? 1.4 : 1.0;
+      boss.attackT = boss.phase === 1 ? 0.7 : 0.5;
     }
   }
 
@@ -1211,7 +1231,7 @@ function updateBoss(dt) {
     var a = boss.currentAttack;
     a.t += dt;
     if (a.kind === 'volley') {
-      if (a.t > 0.5 && !a.fired) {
+      if (a.t > 0.2 && !a.fired) {
         a.fired = true;
         var bobNow2 = Math.sin(boss.bobT * 1.2) * 130;
         var sX = boss.x;
@@ -1219,17 +1239,14 @@ function updateBoss(dt) {
         var pdx = (player.x + player.w * 0.5) - sX;
         var pdy = (player.y - player.hbH * 0.5) - sY;
         var pd = Math.max(40, Math.sqrt(pdx * pdx + pdy * pdy));
-        var baseAng = Math.atan2(pdy, pdx);
-        var boltSpeed = 320;        // 25% slower than the previous 360 (tighter pace + fits the new theme)
-        for (var k = -2; k <= 2; k++) {
-          var ang = baseAng + k * 0.12;
-          projectiles.push({
-            x: sX, y: sY,
-            vx: Math.cos(ang) * boltSpeed,
-            vy: Math.sin(ang) * boltSpeed,
-            life: 2.0, kind: 'boss-bolt',
-          });
-        }
+        var boltSpeed = 320;
+        // Single aimed bolt — easier to dodge, fired more often.
+        projectiles.push({
+          x: sX, y: sY,
+          vx: (pdx / pd) * boltSpeed,
+          vy: (pdy / pd) * boltSpeed,
+          life: 2.0, kind: 'boss-bolt',
+        });
       }
     }
     if (a.t >= a.life) {
@@ -1241,7 +1258,7 @@ function updateBoss(dt) {
   for (var j = projectiles.length - 1; j >= 0; j--) {
     var p = projectiles[j];
     if (p.kind !== 'foam' && p.kind !== 'spark') continue;
-    if (boss.invuln > 0) continue;
+    if (boss.invuln > 0 || boss.entryT > 0) continue;
     var bobYHit = Math.sin(boss.bobT * 1.2) * 130;
     var bossTopY = GROUND_Y - boss.h - 80 + bobYHit;
     if (rectsOverlap(p.x - 6, p.y - 6, 12, 12, boss.x - boss.w / 2, bossTopY, boss.w, boss.h)) {
@@ -1300,6 +1317,12 @@ function drawBoss() {
   var bobY = Math.sin(boss.bobT * 1.2) * 130;     // ±60px vertical sway
   var bx = boss.x - boss.w / 2;
   var by = GROUND_Y - boss.h - 80 + bobY;        // boss is anchored 80px above ground baseline + bob
+  // Intro fly-down: ease in from above
+  if (boss.entryT > 0) {
+    var introProg = 1 - boss.entryT;          // 0..1
+    var introY = -200 + introProg * 200;       // -200..0 (ease linear)
+    by = (GROUND_Y - boss.h - 80) + introY;    // anchored y minus offset
+  }
   var flash = boss.hitFlash > 0;
   ctx.fillStyle = flash ? '#FFFFFF' : '#9E9E9E';
   ctx.fillRect(bx, by, boss.w, boss.h);
