@@ -1255,6 +1255,7 @@ function activateBoss() {
   boss.attackT = 2.0;  // first attack delayed until intro completes
   boss.hp = boss.hpMaxP1;
   boss.phase = 1;
+  boss.anim = { current: 'boss_idle', frame: 0, timer: 0 };
   bossRow.style.display = 'block';
   progressBar.style.display = 'none';
   showBanner('🤖 FOREMAN-BOT 9000', 1500);
@@ -1308,6 +1309,12 @@ function updateBoss(dt) {
       boss.attackT = boss.phase === 1 ? 0.7 : 0.5;
     }
   }
+
+  // Phase 2 — sprite anim selection driven by attack state
+  if (boss.currentAttack && boss.currentAttack.kind === 'claw')        setAnim(boss, 'boss_claw');
+  else if (boss.currentAttack && boss.currentAttack.kind === 'volley') setAnim(boss, 'boss_volley');
+  else if (boss.currentAttack && boss.currentAttack.kind === 'stomp')  setAnim(boss, 'boss_stomp');
+  else                                                                  setAnim(boss, 'boss_idle');
 
   // Run current attack
   if (boss.currentAttack) {
@@ -1411,33 +1418,17 @@ function drawBoss() {
     var introY = -200 + introProg * 200;
     by = bossCenterTop + introY;
   }
-  var flash = boss.hitFlash > 0;
-  ctx.fillStyle = flash ? '#FFFFFF' : '#9E9E9E';
-  ctx.fillRect(bx, by, boss.w, boss.h);
-  ctx.fillStyle = '#FFC107';
-  for (var s = 0; s < 4; s++) ctx.fillRect(bx, by + 12 + s * 26, boss.w, 6);
-  ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 3;
-  ctx.strokeRect(bx, by, boss.w, boss.h);
-  // Optical sensor (on the side facing the player)
-  var sensorXOffset = (boss.facing === 1) ? boss.w * 0.7 : boss.w * 0.3;
-  ctx.fillStyle = boss.phase === 1 ? '#FF1744' : '#FF6F00';
-  ctx.beginPath();
-  ctx.arc(bx + sensorXOffset, by + boss.h * 0.25, 14, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#1A1A1A';
-  ctx.beginPath();
-  ctx.arc(bx + sensorXOffset, by + boss.h * 0.25, 14, 0, Math.PI * 2);
-  ctx.stroke();
-  // Claw arm
-  ctx.fillStyle = '#37474F';
-  ctx.fillRect(bx - 30, by + boss.h * 0.45, 30, 14);
-  // Telegraph: claw rears back
-  if (boss.currentAttack && boss.currentAttack.kind === 'claw' && boss.currentAttack.t < 0.5) {
+
+  var spriteName = currentSpriteOf(boss) || 'boss_idle';
+  drawSprite(spriteName, bx, by, boss.w, boss.h, false);
+
+  // Phase 2 sensor color — code-side composite tint, no separate sprite
+  if (boss.phase === 2) {
     ctx.save();
-    ctx.translate(bx, by + boss.h * 0.45);
-    ctx.rotate(-Math.PI / 6);
-    ctx.fillStyle = '#FF1744';
-    ctx.fillRect(-30, 0, 30, 14);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = '#FF8800';
+    ctx.fillRect(bx, by, boss.w, boss.h);
     ctx.restore();
   }
 }
