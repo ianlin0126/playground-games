@@ -1232,9 +1232,10 @@ function updateBoss(dt) {
     if (a.kind === 'volley') {
       if (a.t > 0.2 && !a.fired) {
         a.fired = true;
-        var bobNow2 = Math.sin(boss.bobT * 1.2) * 130;
+        var ampSpawn = Math.min(130, (GROUND_Y - boss.h - 30) / 2);
+        var bobNow2 = Math.sin(boss.bobT * 1.2) * ampSpawn;
         var sX = boss.x;
-        var sY = GROUND_Y - boss.h * 0.5 - 150 + bobNow2;
+        var sY = (GROUND_Y - boss.h - 20 - ampSpawn) + boss.h * 0.5 + bobNow2;
         var pdx = (player.x + player.w * 0.5) - sX;
         var pdy = (player.y - player.hbH * 0.5) - sY;
         var pd = Math.max(40, Math.sqrt(pdx * pdx + pdy * pdy));
@@ -1258,8 +1259,9 @@ function updateBoss(dt) {
     var p = projectiles[j];
     if (p.kind !== 'foam' && p.kind !== 'spark') continue;
     if (boss.invuln > 0 || boss.entryT > 0) continue;
-    var bobYHit = Math.sin(boss.bobT * 1.2) * 130;
-    var bossTopY = GROUND_Y - boss.h - 150 + bobYHit;
+    var ampHit = Math.min(130, (GROUND_Y - boss.h - 30) / 2);
+    var bobYHit = Math.sin(boss.bobT * 1.2) * ampHit;
+    var bossTopY = (GROUND_Y - boss.h - 20 - ampHit) + bobYHit;
     if (rectsOverlap(p.x - 6, p.y - 6, 12, 12, boss.x - boss.w / 2, bossTopY, boss.w, boss.h)) {
       boss.hp -= 1;
       boss.hitFlash = 0.15;
@@ -1313,14 +1315,16 @@ function updateBossHazards(dt) {
 
 function drawBoss() {
   if (!boss.active) return;
-  var bobY = Math.sin(boss.bobT * 1.2) * 130;     // ±60px vertical sway
+  var bossAmp = Math.min(130, (GROUND_Y - boss.h - 30) / 2);
+  var bossCenterTop = GROUND_Y - boss.h - 20 - bossAmp;
+  var bobY = Math.sin(boss.bobT * 1.2) * bossAmp;
   var bx = boss.x - boss.w / 2;
-  var by = GROUND_Y - boss.h - 150 + bobY;        // boss is anchored 150px above ground baseline + bob
+  var by = bossCenterTop + bobY;
   // Intro fly-down: ease in from above
   if (boss.entryT > 0) {
     var introProg = 1 - boss.entryT;
     var introY = -200 + introProg * 200;
-    by = (GROUND_Y - boss.h - 150) + introY;
+    by = bossCenterTop + introY;
   }
   var flash = boss.hitFlash > 0;
   ctx.fillStyle = flash ? '#FFFFFF' : '#9E9E9E';
