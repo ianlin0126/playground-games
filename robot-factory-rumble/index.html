@@ -786,25 +786,32 @@ var enemies = [];     // { kind, x, y, vx, hp, w, h, alive, ... per-kind fields 
 var bolts   = [];     // K.O. bolt-burst particles: { x, y, vx, vy, life }
 
 function spawnEnemy(kind, x) {
+  var e;
   if (kind === 'walker') {
-    enemies.push({
+    e = {
       kind: 'walker', x: x, y: GROUND_Y, w: 32, h: 40,
       vx: -60, hp: 3, alive: true,
       patrolMin: x - 80, patrolMax: x + 80,
       wobbleT: 0,
       contactCool: 0,
       shotT: 2.0 + Math.random() * 2.0,
-    });
+    };
+    // Phase 2 — initial animation state per enemy kind
+    e.anim = { current: 'walker_walk', frame: 0, timer: 0 };
+    enemies.push(e);
   } else if (kind === 'copter') {
-    enemies.push({
+    e = {
       kind: 'copter', x: x, y: GROUND_Y - 160, w: 28, h: 24,
       hp: 3, alive: true,
       bobT: Math.random() * 6.28,
       dropT: 1.0,
       contactCool: 0,
-    });
+    };
+    // Phase 2 — initial animation state per enemy kind
+    e.anim = { current: 'copter_hover', frame: 0, timer: 0 };
+    enemies.push(e);
   } else if (kind === 'bolt') {
-    enemies.push({
+    e = {
       kind: 'bolt', x: x, y: GROUND_Y, w: 24, h: 30,
       hp: 3, alive: true,
       hopT: 0,
@@ -813,7 +820,10 @@ function spawnEnemy(kind, x) {
       homeY: GROUND_Y,
       squashY: 0,
       contactCool: 0,
-    });
+    };
+    // Phase 2 — initial animation state per enemy kind
+    e.anim = { current: 'bolt_hop', frame: 0, timer: 0 };
+    enemies.push(e);
   } else if (kind === 'minion') {
     enemies.push({
       kind: 'minion', x: x, y: GROUND_Y, w: 22, h: 28,
@@ -848,7 +858,11 @@ function setupLevelEnemies() {
 function updateEnemies(dt) {
   for (var i = enemies.length - 1; i >= 0; i--) {
     var e = enemies[i];
-    if (!e.alive) { enemies.splice(i, 1); continue; }
+    if (!e.alive) {
+      e.koTimer = (e.koTimer || 0) - dt;
+      if (e.koTimer <= 0) { enemies.splice(i, 1); }
+      continue;
+    }
     if (e.contactCool > 0) e.contactCool -= dt;
 
     if (e.kind === 'walker') {
@@ -959,7 +973,26 @@ function updateEnemies(dt) {
           && p.y > e.y - e.h && p.y < e.y) {
         e.hp -= 1;
         projectiles.splice(j, 1);
-        if (e.hp <= 0) { e.alive = false; spawnBoltBurst(e.x, e.y - e.h * 0.5); break; }
+        if (e.hp <= 0) {
+          e.alive = false;
+          spawnBoltBurst(e.x, e.y - e.h * 0.5);
+          if (e.kind === 'walker') setAnim(e, 'walker_ko');
+          else if (e.kind === 'copter') setAnim(e, 'copter_ko');
+          else if (e.kind === 'bolt') setAnim(e, 'bolt_ko');
+          e.koTimer = 0.4;
+          break;
+        }
+      }
+    }
+
+    // Advance animation for alive enemies
+    if (e.alive) {
+      if (e.kind === 'bolt') {
+        e.anim.current = 'bolt_hop';
+        // Stretch frame (1) on the way up (hopT < 0.5); squash frame (0) falling or resting
+        e.anim.frame = (e.hopT < 0.5) ? 1 : 0;
+      } else if (e.anim) {
+        updateAnim(e, dt);
       }
     }
   }
@@ -1006,64 +1039,11 @@ function updateEnemyProjectiles(dt) {
 function drawEnemies() {
   for (var i = 0; i < enemies.length; i++) {
     var e = enemies[i];
-    if (e.kind === 'walker') {
-      ctx.save();
-      ctx.translate(e.x, e.y - e.h * 0.5);
-      // Wobble tilt: peak ±10° at half-telegraph
-      if (e.wobbleT > 0) {
-        var w = Math.sin((1 - e.wobbleT / 0.3) * Math.PI) * 10 * Math.PI / 180;
-        ctx.rotate(e.vx > 0 ? -w : w);
-      }
-      ctx.fillStyle = '#9E9E9E';
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 6);
-      ctx.fill();
-      ctx.strokeStyle = '#37474F'; ctx.lineWidth = 2;
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 6);
-      ctx.stroke();
-      ctx.fillStyle = '#FF1744';
-      ctx.beginPath(); ctx.arc(-6, -8, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc( 6, -8, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    } else if (e.kind === 'copter') {
-      ctx.save();
-      ctx.translate(e.x, e.y);
-      // Cup base (trapezoid)
-      ctx.fillStyle = '#6D4C41';
-      ctx.beginPath();
-      ctx.moveTo(-e.w / 2, 0);
-      ctx.lineTo( e.w / 2, 0);
-      ctx.lineTo( e.w / 2 - 4, e.h / 2);
-      ctx.lineTo(-e.w / 2 + 4, e.h / 2);
-      ctx.closePath();
-      ctx.fill();
-      // Frosting top
-      ctx.fillStyle = '#F8BBD0';
-      ctx.beginPath();
-      ctx.arc(0, -e.h / 4, e.w / 2, Math.PI, 0);
-      ctx.fill();
-      // Wings flapping
-      var flap = Math.sin(Date.now() / 50) * 4;
-      ctx.fillStyle = '#9E9E9E';
-      ctx.fillRect(-e.w / 2 - 6, -2 + flap, 6, 3);
-      ctx.fillRect( e.w / 2,     -2 + flap, 6, 3);
-      ctx.restore();
-    } else if (e.kind === 'bolt') {
-      ctx.save();
-      ctx.translate(e.x, e.y - e.h / 2);
-      var sy = 1 + e.squashY * 0.3;
-      var sx = 1 - e.squashY * 0.15;
-      ctx.scale(sx, sy);
-      ctx.fillStyle = '#66BB6A';
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 5);
-      ctx.fill();
-      ctx.strokeStyle = '#1B5E20'; ctx.lineWidth = 2;
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 5);
-      ctx.stroke();
-      ctx.fillStyle = '#1A1A1A';
-      ctx.beginPath(); ctx.arc(-5, -8, 2.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc( 5, -8, 2.5, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    } else if (e.kind === 'minion') {
+    if (!e) continue;
+    // Skip fully despawned (alive=false and koTimer expired)
+    if (e.alive === false && (e.koTimer || 0) <= 0) continue;
+    // Minion still uses procedural drawing (no atlas sprite yet)
+    if (e.kind === 'minion') {
       ctx.save();
       ctx.translate(e.x, e.y - e.h * 0.5);
       var msy = 1 + (e.squashY || 0) * 0.3;
@@ -1078,7 +1058,13 @@ function drawEnemies() {
       ctx.fillStyle = '#FF1744';
       ctx.beginPath(); ctx.arc(0, -6, 3, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
+      continue;
     }
+    var spriteName = currentSpriteOf(e);
+    if (!spriteName) continue;
+    var ex = e.x, ey = e.y - e.h;
+    var flipped = (e.vx || 0) < 0;
+    drawSprite(spriteName, ex, ey, e.w, e.h, flipped);
   }
 }
 
