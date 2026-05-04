@@ -1201,12 +1201,19 @@ function updateBoss(dt) {
   if (boss.hitFlash > 0) boss.hitFlash -= dt;
   if (boss.invuln > 0) boss.invuln -= dt;
   boss.bobT = (boss.bobT || 0) + dt;
-  // Idle horizontal sweep within the arena (overridden by ram attack)
+  // Boss tracks the player horizontally (offset oscillates ±200px) so both stay on-screen.
+  // Slowed cadence (0.7 → 0.45) and reduced amplitude (full arena → ±200) per playtest.
   if (!boss.currentAttack || boss.currentAttack.kind !== 'ram') {
-    var arenaCenter = (BOSS_ARENA_LEFT + BOSS_ARENA_RIGHT) / 2;
-    var arenaHalf   = (BOSS_ARENA_RIGHT - BOSS_ARENA_LEFT) / 2 - boss.w * 0.6;
-    boss.x = arenaCenter + Math.sin(boss.bobT * 0.7) * arenaHalf;
+    var sideOffset = Math.sin(boss.bobT * 0.45) * 200;
+    var targetX = player.x + player.w * 0.5 + sideOffset;
+    // Smooth follow so the boss doesn't snap each frame
+    boss.x += (targetX - boss.x) * Math.min(1, dt * 2.5);
+    // Clamp inside arena bounds
+    if (boss.x < BOSS_ARENA_LEFT  + boss.w / 2) boss.x = BOSS_ARENA_LEFT  + boss.w / 2;
+    if (boss.x > BOSS_ARENA_RIGHT - boss.w / 2) boss.x = BOSS_ARENA_RIGHT - boss.w / 2;
   }
+  // Always orient the boss toward the player so the "front" sensor faces them.
+  boss.facing = (player.x + player.w * 0.5 < boss.x) ? -1 : 1;
 
   // Update HP bar fill
   var maxHpForPhase = boss.phase === 1 ? boss.hpMaxP1 : boss.hpMaxP2;
@@ -1266,16 +1273,22 @@ function updateBoss(dt) {
         }
       }
     } else if (a.kind === 'ram') {
-      // 0.5s telegraph + 1.5s charge + brief recover. Charge speed ~700 px/s
-      // across a ~1050px arena → 1.5s sweep, much easier for kids to time a jump.
+      // Ram is now player-relative: starts on the OPPOSITE side of the player
+      // (~240px away) and sweeps across to ~240px past the player on the same
+      // side. Total sweep ~480px, takes 1.5s → ~320 px/s. Slow enough to
+      // jump over comfortably; both player and boss stay on-screen the whole time.
+      var pcx = player.x + player.w * 0.5;
       if (a.t < 0.5) {
-        a.ramFromX = (player.x < boss.x) ? BOSS_ARENA_RIGHT - boss.w : BOSS_ARENA_LEFT + boss.w;
-        a.ramToX   = (player.x < boss.x) ? BOSS_ARENA_LEFT  + boss.w : BOSS_ARENA_RIGHT - boss.w;
+        a.ramFromX = (player.x < boss.x) ? pcx + 240 : pcx - 240;
+        a.ramToX   = (player.x < boss.x) ? pcx - 240 : pcx + 240;
         boss.x = a.ramFromX;
       } else if (a.t < 2.0) {
         var k2 = Math.min(1, (a.t - 0.5) / 1.5);
         boss.x = a.ramFromX + (a.ramToX - a.ramFromX) * k2;
       }
+      // Clamp inside arena (in case player is near an edge)
+      if (boss.x < BOSS_ARENA_LEFT  + boss.w / 2) boss.x = BOSS_ARENA_LEFT  + boss.w / 2;
+      if (boss.x > BOSS_ARENA_RIGHT - boss.w / 2) boss.x = BOSS_ARENA_RIGHT - boss.w / 2;
     }
     if (a.t >= a.life) {
       boss.currentAttack = null;
@@ -1369,14 +1382,15 @@ function drawBoss() {
   for (var s = 0; s < 4; s++) ctx.fillRect(bx, by + 12 + s * 26, boss.w, 6);
   ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 3;
   ctx.strokeRect(bx, by, boss.w, boss.h);
-  // Optical sensor
+  // Optical sensor (on the side facing the player)
+  var sensorXOffset = (boss.facing === 1) ? boss.w * 0.7 : boss.w * 0.3;
   ctx.fillStyle = boss.phase === 1 ? '#FF1744' : '#FF6F00';
   ctx.beginPath();
-  ctx.arc(bx + boss.w * 0.3, by + boss.h * 0.25, 14, 0, Math.PI * 2);
+  ctx.arc(bx + sensorXOffset, by + boss.h * 0.25, 14, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#1A1A1A';
   ctx.beginPath();
-  ctx.arc(bx + boss.w * 0.3, by + boss.h * 0.25, 14, 0, Math.PI * 2);
+  ctx.arc(bx + sensorXOffset, by + boss.h * 0.25, 14, 0, Math.PI * 2);
   ctx.stroke();
   // Claw arm
   ctx.fillStyle = '#37474F';
