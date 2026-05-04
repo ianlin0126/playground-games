@@ -145,6 +145,36 @@
 var canvas = document.getElementById('c');
 var ctx = canvas.getContext('2d');
 var W, H;
+
+// ===== Phase 2 asset state =====
+var atlas = null;
+var spriteMap = null;
+var assetsReady = false;
+var assetsErrored = false;
+
+function loadAssets() {
+  var atlasImg = new Image();
+  var atlasPromise = new Promise(function (resolve, reject) {
+    atlasImg.onload = function () { resolve(atlasImg); };
+    atlasImg.onerror = function () { reject(new Error('atlas load failed')); };
+  });
+  atlasImg.src = './assets/robot-factory-rumble-atlas.png';
+
+  var mapPromise = fetch('./sprite-map.json').then(function (r) {
+    if (!r.ok) throw new Error('sprite-map fetch failed: ' + r.status);
+    return r.json();
+  });
+
+  return Promise.all([atlasPromise, mapPromise]).then(function (results) {
+    atlas = results[0];
+    spriteMap = results[1].sprites;
+    assetsReady = true;
+  }).catch(function (err) {
+    assetsErrored = true;
+    console.error('[RFR Phase 2] asset load error:', err);
+  });
+}
+
 function resize() {
   W = canvas.width = window.innerWidth;
   H = canvas.height = window.innerHeight;
@@ -330,6 +360,8 @@ var player = {
   invuln: 0,
   walkAnim: 0,
   aimAngle: 0,
+  anim: { current: 'player_walk', frame: 0, timer: 0 },
+  shootPoseT: 0,
 };
 
 function updatePlayer(dt) {
@@ -418,38 +450,50 @@ function updatePlayer(dt) {
   }
 
   if (player.invuln > 0) player.invuln -= dt;
+
+  // Phase 2 animation state machine
+  player.shootPoseT -= dt;
+  if (player.shootPoseT < 0) player.shootPoseT = 0;
+  if (!player.onGround) {
+    setAnim(player, 'player_jump');
+  } else if (player.shootPoseT > 0) {
+    setAnim(player, 'player_shoot');
+  } else {
+    setAnim(player, 'player_walk');
+  }
+  // Walk animation freezes on frame 0 when not horizontally moving;
+  // other animations always advance.
+  if (player.anim.current === 'player_walk' && Math.abs(player.vx) < 1) {
+    player.anim.frame = 0;
+    player.anim.timer = 0;
+  } else {
+    updateAnim(player, dt);
+  }
 }
+
+var PLAYER_VISUAL_W = 60;
+var PLAYER_VISUAL_H = 72;
 
 function drawPlayer() {
   if (player.invuln > 0 && Math.floor(player.invuln * 30) % 2 === 0) return;
 
-  var px = player.x, py = player.y - player.h;
-  ctx.fillStyle = '#42A5F5';
-  roundRect(px, py, player.w, player.h, 8);
-  ctx.fill();
-  ctx.fillStyle = '#FFEB3B';
-  ctx.fillRect(px + 4, py + 8, player.w - 8, 7);
-  ctx.strokeStyle = '#0d3a6b'; ctx.lineWidth = 2;
-  roundRect(px, py, player.w, player.h, 8);
-  ctx.stroke();
+  var spriteName = currentSpriteOf(player);
+  if (spriteName) {
+    var visualPx = player.x + (player.w - PLAYER_VISUAL_W) / 2;
+    var visualPy = player.y - PLAYER_VISUAL_H;
+    drawSprite(spriteName, visualPx, visualPy, PLAYER_VISUAL_W, PLAYER_VISUAL_H, player.facing < 0);
+  }
+
+  // Shield bubble overlay (kept procedurally — it's a glow effect, not a character)
   if (shieldBubble > 0) {
     ctx.save();
     ctx.globalAlpha = 0.35 + 0.25 * Math.sin(Date.now() / 100);
     ctx.strokeStyle = '#00E5FF';
     ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.arc(px + player.w / 2, py + player.h / 2, player.w * 0.85, 0, Math.PI * 2);
+    ctx.arc(player.x + player.w / 2, player.y - player.h / 2, PLAYER_VISUAL_W * 0.85, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-  }
-  ctx.fillStyle = '#37474F';
-  var legSwap = player.walkAnim < 0.5;
-  if (legSwap) {
-    ctx.fillRect(px + 5,  py + player.h - 4, 10, 6);
-    ctx.fillRect(px + 21, py + player.h,     10, 4);
-  } else {
-    ctx.fillRect(px + 5,  py + player.h,     10, 4);
-    ctx.fillRect(px + 21, py + player.h - 4, 10, 6);
   }
 }
 
@@ -464,6 +508,81 @@ function roundRect(x, y, w, h, r) {
   ctx.quadraticCurveTo(x, y + h, x, y + h - r);
   ctx.lineTo(x, y + r);
   ctx.quadraticCurveTo(x, y, x + r, y);
+}
+
+function drawSprite(name, dx, dy, dw, dh, flipped, stretch) {
+  if (!atlas || !spriteMap) return;
+  var s = spriteMap[name];
+  if (!s) return;
+  var rw, rh, rdx, rdy;
+  if (stretch) {
+    // Bypass letterbox — fill destination exactly (used for boss so all frames render same size)
+    rw = dw; rh = dh; rdx = dx; rdy = dy;
+  } else {
+    // Aspect-preserving letterbox: fit sprite inside (dw, dh), anchored to bottom
+    var sa = s.w / s.h;
+    var da = dw / dh;
+    if (sa > da) { rw = dw; rh = dw / sa; }
+    else         { rh = dh; rw = dh * sa; }
+    rdx = dx + (dw - rw) / 2;
+    rdy = dy + (dh - rh);   // anchor to bottom of hitbox (feet on ground)
+  }
+  if (flipped) {
+    ctx.save();
+    ctx.translate(rdx + rw, rdy);
+    ctx.scale(-1, 1);
+    ctx.drawImage(atlas, s.x, s.y, s.w, s.h, 0, 0, rw, rh);
+    ctx.restore();
+  } else {
+    ctx.drawImage(atlas, s.x, s.y, s.w, s.h, rdx, rdy, rw, rh);
+  }
+}
+
+var ANIMS = {
+  player_walk:    { frames: ['player_walk_0','player_walk_1','player_walk_2','player_walk_3'], fps: 8, loop: true },
+  player_jump:    { frames: ['player_jump'],     fps: 1, loop: false },
+  player_shoot:   { frames: ['player_shoot'],    fps: 1, loop: false },
+  walker_walk:    { frames: ['walker_walk_0','walker_walk_1'], fps: 4, loop: true },
+  walker_ko:      { frames: ['walker_ko'],       fps: 1, loop: false },
+  copter_hover:   { frames: ['copter_hover_0','copter_hover_1'], fps: 5, loop: true },
+  copter_ko:      { frames: ['copter_ko'],       fps: 1, loop: false },
+  bolt_hop:       { frames: ['bolt_squash','bolt_stretch'], fps: 0, loop: false },
+  bolt_ko:        { frames: ['bolt_ko'],         fps: 1, loop: false },
+  boss_idle:      { frames: ['boss_idle'],       fps: 1, loop: false },
+  boss_claw:      { frames: ['boss_claw'],       fps: 1, loop: false },
+  boss_volley:    { frames: ['boss_volley'],     fps: 1, loop: false },
+  boss_stomp:     { frames: ['boss_stomp'],      fps: 1, loop: false },
+  gear_minion:    { frames: ['gear_filler'],     fps: 1, loop: false }
+};
+
+function setAnim(entity, animName) {
+  if (!entity.anim) entity.anim = { current: animName, frame: 0, timer: 0 };
+  if (entity.anim.current === animName) return;
+  entity.anim.current = animName;
+  entity.anim.frame = 0;
+  entity.anim.timer = 0;
+}
+
+function updateAnim(entity, dt) {
+  if (!entity.anim) return;
+  var anim = ANIMS[entity.anim.current];
+  if (!anim || anim.fps === 0) return;
+  entity.anim.timer += dt * 1000;
+  var frameMs = 1000 / anim.fps;
+  while (entity.anim.timer >= frameMs) {
+    entity.anim.timer -= frameMs;
+    entity.anim.frame++;
+    if (entity.anim.frame >= anim.frames.length) {
+      entity.anim.frame = anim.loop ? 0 : anim.frames.length - 1;
+    }
+  }
+}
+
+function currentSpriteOf(entity) {
+  if (!entity.anim) return null;
+  var anim = ANIMS[entity.anim.current];
+  if (!anim) return null;
+  return anim.frames[entity.anim.frame];
 }
 
 // ── Camera + level ─────────────────────────────────────────────────────────
@@ -568,6 +687,7 @@ var weaponDuration = 0;
 var weaponShotsLeft = 0;
 
 function fireFoam() {
+  player.shootPoseT = 0.10;  // 100ms recoil pose
   var f = player.facing;
   var ang = player.aimAngle;       // 0 = horizontal, π/2 = up
   var cosA = Math.cos(ang), sinA = Math.sin(ang);
@@ -598,6 +718,7 @@ function fireWeapon() {
 }
 
 function fireSpark() {
+  player.shootPoseT = 0.10;  // 100ms recoil pose
   var f = player.facing;
   var ang = player.aimAngle;
   var cosA = Math.cos(ang), sinA = Math.sin(ang);
@@ -683,25 +804,32 @@ var enemies = [];     // { kind, x, y, vx, hp, w, h, alive, ... per-kind fields 
 var bolts   = [];     // K.O. bolt-burst particles: { x, y, vx, vy, life }
 
 function spawnEnemy(kind, x) {
+  var e;
   if (kind === 'walker') {
-    enemies.push({
+    e = {
       kind: 'walker', x: x, y: GROUND_Y, w: 32, h: 40,
       vx: -60, hp: 3, alive: true,
       patrolMin: x - 80, patrolMax: x + 80,
       wobbleT: 0,
       contactCool: 0,
       shotT: 2.0 + Math.random() * 2.0,
-    });
+    };
+    // Phase 2 — initial animation state per enemy kind
+    e.anim = { current: 'walker_walk', frame: 0, timer: 0 };
+    enemies.push(e);
   } else if (kind === 'copter') {
-    enemies.push({
+    e = {
       kind: 'copter', x: x, y: GROUND_Y - 160, w: 28, h: 24,
       hp: 3, alive: true,
       bobT: Math.random() * 6.28,
       dropT: 1.0,
       contactCool: 0,
-    });
+    };
+    // Phase 2 — initial animation state per enemy kind
+    e.anim = { current: 'copter_hover', frame: 0, timer: 0 };
+    enemies.push(e);
   } else if (kind === 'bolt') {
-    enemies.push({
+    e = {
       kind: 'bolt', x: x, y: GROUND_Y, w: 24, h: 30,
       hp: 3, alive: true,
       hopT: 0,
@@ -710,9 +838,12 @@ function spawnEnemy(kind, x) {
       homeY: GROUND_Y,
       squashY: 0,
       contactCool: 0,
-    });
+    };
+    // Phase 2 — initial animation state per enemy kind
+    e.anim = { current: 'bolt_hop', frame: 0, timer: 0 };
+    enemies.push(e);
   } else if (kind === 'minion') {
-    enemies.push({
+    var minion = {
       kind: 'minion', x: x, y: GROUND_Y, w: 22, h: 28,
       vx: 0, hp: 3, alive: true,
       hopT: 0,
@@ -722,7 +853,10 @@ function spawnEnemy(kind, x) {
       squashY: 0,
       shotT: 1.5 + Math.random() * 1.0,
       contactCool: 0,
-    });
+      rotateAngle: 0,
+      anim: { current: 'gear_minion', frame: 0, timer: 0 },
+    };
+    enemies.push(minion);
   }
 }
 
@@ -745,7 +879,25 @@ function setupLevelEnemies() {
 function updateEnemies(dt) {
   for (var i = enemies.length - 1; i >= 0; i--) {
     var e = enemies[i];
-    if (!e.alive) { enemies.splice(i, 1); continue; }
+    // Falling aerial enemy: apply gravity until floor impact, then switch to KO anim
+    if (e.dying) {
+      e.vy = (e.vy || 0) + GRAVITY * dt;
+      e.y += e.vy * dt;
+      if (e.y >= GROUND_Y) {
+        e.y = GROUND_Y;
+        e.dying = false;
+        e.alive = false;
+        setAnim(e, e.kind + '_ko');
+        e.koTimer = 0.4;
+        spawnBoltBurst(e.x, e.y - e.h * 0.5);
+      }
+      continue;
+    }
+    if (!e.alive) {
+      e.koTimer = (e.koTimer || 0) - dt;
+      if (e.koTimer <= 0) { enemies.splice(i, 1); }
+      continue;
+    }
     if (e.contactCool > 0) e.contactCool -= dt;
 
     if (e.kind === 'walker') {
@@ -821,6 +973,7 @@ function updateEnemies(dt) {
         e.squashY = 0;
       }
     } else if (e.kind === 'minion') {
+      e.rotateAngle = (e.rotateAngle || 0) + dt * 2;
       e.hopT += dt;
       if (e.hopT < 1.0) {
         var t = e.hopT;
@@ -856,7 +1009,32 @@ function updateEnemies(dt) {
           && p.y > e.y - e.h && p.y < e.y) {
         e.hp -= 1;
         projectiles.splice(j, 1);
-        if (e.hp <= 0) { e.alive = false; spawnBoltBurst(e.x, e.y - e.h * 0.5); break; }
+        if (e.hp <= 0) {
+          if ((e.kind === 'copter' || e.kind === 'bolt') && e.y < GROUND_Y - 4) {
+            // Aerial enemy falls under gravity to the floor, then plays KO anim
+            e.dying = true;
+            e.vy = 0;
+            e.vx = 0;
+          } else {
+            e.alive = false;
+            spawnBoltBurst(e.x, e.y - e.h * 0.5);
+            if (e.kind === 'walker') setAnim(e, 'walker_ko');
+            else setAnim(e, e.kind + '_ko');
+            e.koTimer = 0.4;
+          }
+          break;
+        }
+      }
+    }
+
+    // Advance animation for alive enemies
+    if (e.alive) {
+      if (e.kind === 'bolt') {
+        e.anim.current = 'bolt_hop';
+        // Stretch frame (1) on the way up (hopT < 0.5); squash frame (0) falling or resting
+        e.anim.frame = (e.hopT < 0.5) ? 1 : 0;
+      } else if (e.anim) {
+        updateAnim(e, dt);
       }
     }
   }
@@ -900,81 +1078,48 @@ function updateEnemyProjectiles(dt) {
   }
 }
 
+var WALKER_VISUAL_W = 52, WALKER_VISUAL_H = 72;
+var BOLT_VISUAL_W = 48, BOLT_VISUAL_H = 72;
+var MINION_VISUAL_W = 60, MINION_VISUAL_H = 72;
+
 function drawEnemies() {
   for (var i = 0; i < enemies.length; i++) {
     var e = enemies[i];
-    if (e.kind === 'walker') {
+    if (!e) continue;
+    // Skip fully despawned (alive=false and koTimer expired)
+    if (e.alive === false && (e.koTimer || 0) <= 0) continue;
+    // Minion renders as a spinning gear sprite at a larger visual size
+    if (e.kind === 'minion') {
+      var visualMx = e.x + (e.w - MINION_VISUAL_W) / 2;
+      var visualMy = e.y - MINION_VISUAL_H;
       ctx.save();
-      ctx.translate(e.x, e.y - e.h * 0.5);
-      // Wobble tilt: peak ±10° at half-telegraph
-      if (e.wobbleT > 0) {
-        var w = Math.sin((1 - e.wobbleT / 0.3) * Math.PI) * 10 * Math.PI / 180;
-        ctx.rotate(e.vx > 0 ? -w : w);
-      }
-      ctx.fillStyle = '#9E9E9E';
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 6);
-      ctx.fill();
-      ctx.strokeStyle = '#37474F'; ctx.lineWidth = 2;
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 6);
-      ctx.stroke();
-      ctx.fillStyle = '#FF1744';
-      ctx.beginPath(); ctx.arc(-6, -8, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc( 6, -8, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.translate(visualMx + MINION_VISUAL_W / 2, visualMy + MINION_VISUAL_H / 2);
+      ctx.rotate(e.rotateAngle || 0);
+      drawSprite('gear_filler', -MINION_VISUAL_W / 2, -MINION_VISUAL_H / 2, MINION_VISUAL_W, MINION_VISUAL_H, false);
       ctx.restore();
-    } else if (e.kind === 'copter') {
-      ctx.save();
-      ctx.translate(e.x, e.y);
-      // Cup base (trapezoid)
-      ctx.fillStyle = '#6D4C41';
-      ctx.beginPath();
-      ctx.moveTo(-e.w / 2, 0);
-      ctx.lineTo( e.w / 2, 0);
-      ctx.lineTo( e.w / 2 - 4, e.h / 2);
-      ctx.lineTo(-e.w / 2 + 4, e.h / 2);
-      ctx.closePath();
-      ctx.fill();
-      // Frosting top
-      ctx.fillStyle = '#F8BBD0';
-      ctx.beginPath();
-      ctx.arc(0, -e.h / 4, e.w / 2, Math.PI, 0);
-      ctx.fill();
-      // Wings flapping
-      var flap = Math.sin(Date.now() / 50) * 4;
-      ctx.fillStyle = '#9E9E9E';
-      ctx.fillRect(-e.w / 2 - 6, -2 + flap, 6, 3);
-      ctx.fillRect( e.w / 2,     -2 + flap, 6, 3);
-      ctx.restore();
+      continue;
+    }
+    var spriteName = currentSpriteOf(e);
+    if (!spriteName) continue;
+    var flipped = (e.vx || 0) < 0;
+    if (e.kind === 'copter') {
+      // Copter sprites are portrait (160×242) but hitbox is landscape (28×24).
+      // Render at a taller visual box so the cupcake shape is legible.
+      var COPTER_VW = 48, COPTER_VH = 72;
+      var vex = e.x + e.w / 2 - COPTER_VW / 2;
+      var vey = e.y - COPTER_VH;
+      drawSprite(spriteName, vex, vey, COPTER_VW, COPTER_VH, flipped);
+    } else if (e.kind === 'walker') {
+      var vwx = e.x - e.w / 2 + (e.w - WALKER_VISUAL_W) / 2;
+      var vwy = e.y - WALKER_VISUAL_H;
+      drawSprite(spriteName, vwx, vwy, WALKER_VISUAL_W, WALKER_VISUAL_H, flipped);
     } else if (e.kind === 'bolt') {
-      ctx.save();
-      ctx.translate(e.x, e.y - e.h / 2);
-      var sy = 1 + e.squashY * 0.3;
-      var sx = 1 - e.squashY * 0.15;
-      ctx.scale(sx, sy);
-      ctx.fillStyle = '#66BB6A';
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 5);
-      ctx.fill();
-      ctx.strokeStyle = '#1B5E20'; ctx.lineWidth = 2;
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 5);
-      ctx.stroke();
-      ctx.fillStyle = '#1A1A1A';
-      ctx.beginPath(); ctx.arc(-5, -8, 2.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc( 5, -8, 2.5, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    } else if (e.kind === 'minion') {
-      ctx.save();
-      ctx.translate(e.x, e.y - e.h * 0.5);
-      var msy = 1 + (e.squashY || 0) * 0.3;
-      var msx = 1 - (e.squashY || 0) * 0.15;
-      ctx.scale(msx, msy);
-      ctx.fillStyle = '#FFC107';
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 4);
-      ctx.fill();
-      ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
-      roundRect(-e.w / 2, -e.h / 2, e.w, e.h, 4);
-      ctx.stroke();
-      ctx.fillStyle = '#FF1744';
-      ctx.beginPath(); ctx.arc(0, -6, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
+      var vbx = e.x - e.w / 2 + (e.w - BOLT_VISUAL_W) / 2;
+      var vby = e.y - BOLT_VISUAL_H;
+      drawSprite(spriteName, vbx, vby, BOLT_VISUAL_W, BOLT_VISUAL_H, flipped);
+    } else {
+      var ex = e.x, ey = e.y - e.h;
+      drawSprite(spriteName, ex, ey, e.w, e.h, flipped);
     }
   }
 }
@@ -1166,6 +1311,7 @@ function activateBoss() {
   boss.attackT = 2.0;  // first attack delayed until intro completes
   boss.hp = boss.hpMaxP1;
   boss.phase = 1;
+  boss.anim = { current: 'boss_idle', frame: 0, timer: 0 };
   bossRow.style.display = 'block';
   progressBar.style.display = 'none';
   showBanner('🤖 FOREMAN-BOT 9000', 1500);
@@ -1219,6 +1365,9 @@ function updateBoss(dt) {
       boss.attackT = boss.phase === 1 ? 0.7 : 0.5;
     }
   }
+
+  // Boss always renders as idle regardless of active attack
+  setAnim(boss, 'boss_idle');
 
   // Run current attack
   if (boss.currentAttack) {
@@ -1322,35 +1471,48 @@ function drawBoss() {
     var introY = -200 + introProg * 200;
     by = bossCenterTop + introY;
   }
-  var flash = boss.hitFlash > 0;
-  ctx.fillStyle = flash ? '#FFFFFF' : '#9E9E9E';
-  ctx.fillRect(bx, by, boss.w, boss.h);
-  ctx.fillStyle = '#FFC107';
-  for (var s = 0; s < 4; s++) ctx.fillRect(bx, by + 12 + s * 26, boss.w, 6);
-  ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 3;
-  ctx.strokeRect(bx, by, boss.w, boss.h);
-  // Optical sensor (on the side facing the player)
-  var sensorXOffset = (boss.facing === 1) ? boss.w * 0.7 : boss.w * 0.3;
-  ctx.fillStyle = boss.phase === 1 ? '#FF1744' : '#FF6F00';
-  ctx.beginPath();
-  ctx.arc(bx + sensorXOffset, by + boss.h * 0.25, 14, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#1A1A1A';
-  ctx.beginPath();
-  ctx.arc(bx + sensorXOffset, by + boss.h * 0.25, 14, 0, Math.PI * 2);
-  ctx.stroke();
-  // Claw arm
-  ctx.fillStyle = '#37474F';
-  ctx.fillRect(bx - 30, by + boss.h * 0.45, 30, 14);
-  // Telegraph: claw rears back
-  if (boss.currentAttack && boss.currentAttack.kind === 'claw' && boss.currentAttack.t < 0.5) {
+
+  // Render boss sprite at a larger visual size than the 80×80 hitbox.
+  // Boss sprites are wide (177-213px) and short (136-137px) — a landscape shape.
+  // 120×140 gives the boss an imposing screen presence while letterboxing preserves aspect.
+  var BOSS_VISUAL_W = 120;
+  var BOSS_VISUAL_H = 140;
+  var visualBx = boss.x - BOSS_VISUAL_W / 2;
+  // Bottom-anchor: visual bottom aligns with hitbox bottom (by + boss.h)
+  var visualBy = by + boss.h - BOSS_VISUAL_H;
+
+  var spriteName = (boss.phase === 2) ? 'boss_volley' : 'boss_idle';
+
+  // Two rocket flame plumes, one under each foot (drawn first so they appear behind the body)
+  var leftFootX  = visualBx + BOSS_VISUAL_W * 0.30;
+  var rightFootX = visualBx + BOSS_VISUAL_W * 0.70;
+  var flameTop = visualBy + BOSS_VISUAL_H - 6;
+  [leftFootX, rightFootX].forEach(function(fx, i) {
+    var localFlicker = Math.sin(Date.now() / 60 + i * 1.7) * 3;
+    var fh = 22 + localFlicker;
     ctx.save();
-    ctx.translate(bx, by + boss.h * 0.45);
-    ctx.rotate(-Math.PI / 6);
-    ctx.fillStyle = '#FF1744';
-    ctx.fillRect(-30, 0, 30, 14);
+    // Outer orange flame
+    var grad1 = ctx.createLinearGradient(fx, flameTop, fx, flameTop + fh);
+    grad1.addColorStop(0, '#FFB300');
+    grad1.addColorStop(0.6, '#FF6F00');
+    grad1.addColorStop(1, 'rgba(244,67,54,0)');
+    ctx.fillStyle = grad1;
+    ctx.beginPath();
+    ctx.ellipse(fx, flameTop + fh / 2, 13, fh / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Inner yellow core
+    var grad2 = ctx.createLinearGradient(fx, flameTop, fx, flameTop + fh * 0.7);
+    grad2.addColorStop(0, '#FFEB3B');
+    grad2.addColorStop(1, 'rgba(255,235,59,0)');
+    ctx.fillStyle = grad2;
+    ctx.beginPath();
+    ctx.ellipse(fx, flameTop + fh / 3, 6, fh / 3, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
-  }
+  });
+
+  drawSprite(spriteName, visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H, true, true);
+
 }
 
 function drawBossProjectiles() {
@@ -1386,6 +1548,11 @@ function getShakeOffset() {
 // ── Loop ───────────────────────────────────────────────────────────────────
 var lastTime = 0;
 function loop(now) {
+  if (!assetsReady) {
+    if (W > 0 && H > 0) drawLoadingSplash();
+    requestAnimationFrame(loop);
+    return;
+  }
   var dt = lastTime ? (now - lastTime) / 1000 : 1 / 60;
   if (dt > 0.05) dt = 0.05;
   lastTime = now;
@@ -1522,8 +1689,28 @@ function drawPlatforms() {
     ctx.strokeRect(pl.x, py, pl.w, PLATFORM_HEIGHT);
   }
 }
+
+function drawLoadingSplash() {
+  ctx.fillStyle = '#101820';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#FFEB3B';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (assetsErrored) {
+    ctx.fillText('⚠ Could not load game assets', W / 2, H / 2 - 20);
+    ctx.font = '20px sans-serif';
+    ctx.fillText('Refresh the page to try again', W / 2, H / 2 + 20);
+  } else {
+    ctx.fillText('Loading…', W / 2, H / 2);
+  }
+  ctx.textAlign = 'start';
+  ctx.textBaseline = 'alphabetic';
+}
+
 resolveLevelGeometry();
 // Level setup runs inside startGame() when the menu's Start button is pressed.
+loadAssets();
 requestAnimationFrame(function(ts) { lastTime = ts; requestAnimationFrame(loop); });
 </script>
 </body>
