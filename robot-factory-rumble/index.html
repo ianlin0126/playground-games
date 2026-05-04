@@ -517,8 +517,12 @@ var level = {
     { x: 3350, w: 140, top: -150, beltDir: -1 },
   ],
   floorBelts: [
+    { x:  600, w: 200, dir:  1 },   // Segment A
     { x: 1300, w: 200, dir:  1 },
+    { x: 1700, w: 200, dir: -1 },   // Mid Segment B
     { x: 2300, w: 200, dir: -1 },
+    { x: 2800, w: 200, dir:  1 },   // Segment C
+    { x: 3400, w: 200, dir: -1 },   // Late Segment C, just before boss arena
   ],
 };
 function resolveLevelGeometry() {
@@ -582,8 +586,8 @@ function fireFoam() {
 }
 
 function fireWeapon() {
-  // Aim Up steps 15° per shot. Held → tilt up; released → tilt back down.
-  var step = Math.PI / 12;     // 15°
+  // Aim Up steps 30° per shot. Held → tilt up; released → tilt back down.
+  var step = Math.PI / 6;      // 30°
   var maxAim = Math.PI / 2;    // 90°
   if (input.aimUp) {
     player.aimAngle = Math.min(maxAim, player.aimAngle + step);
@@ -825,26 +829,14 @@ function updateEnemies(dt) {
     } else if (e.kind === 'minion') {
       e.hopT += dt;
       if (e.hopT < 1.0) {
-        var prevT = e.hopT - dt;
         var t = e.hopT;
         // Home toward player horizontally each hop
         var towardPlayerSign = (player.x < e.x ? -1 : 1);
         e.hopDir = towardPlayerSign;
         e.x += e.hopDir * 110 * dt;
-        var peakOffset = 220 * 4 * t * (1 - t);  // 220px peak (slightly higher than bolt)
+        var peakOffset = 220 * 4 * t * (1 - t);
         e.y = e.homeY - peakOffset;
         e.squashY = -peakOffset / 220;
-        // Fire one shot at peak
-        if (prevT < 0.5 && t >= 0.5 && Math.abs(player.x - e.x) < 380) {
-          var dxm = (player.x + player.w * 0.5) - e.x;
-          var dym = (player.y - player.hbH * 0.5) - e.y;
-          var dm = Math.max(40, Math.sqrt(dxm * dxm + dym * dym));
-          projectiles.push({
-            x: e.x, y: e.y,
-            vx: (dxm / dm) * 270, vy: (dym / dm) * 270,
-            life: 2.2, kind: 'enemy-laser',
-          });
-        }
       } else if (e.hopT < 1.4) {
         e.y = e.homeY;
         e.squashY = 1;
