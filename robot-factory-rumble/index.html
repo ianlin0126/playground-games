@@ -1055,15 +1055,15 @@ function drawEnemies() {
     if (!e) continue;
     // Skip fully despawned (alive=false and koTimer expired)
     if (e.alive === false && (e.koTimer || 0) <= 0) continue;
-    // Minion renders as a spinning gear sprite
+    // Minion renders as a spinning gear sprite at a larger visual size
     if (e.kind === 'minion') {
-      var GEAR_VW = 52, GEAR_VH = 52;
-      var centerX = e.x;
-      var centerY = e.y - e.h * 0.5;
+      var MINION_VISUAL_W = 56, MINION_VISUAL_H = 56;
+      var visualMx = e.x + (e.w - MINION_VISUAL_W) / 2;
+      var visualMy = e.y - MINION_VISUAL_H;
       ctx.save();
-      ctx.translate(centerX, centerY);
+      ctx.translate(visualMx + MINION_VISUAL_W / 2, visualMy + MINION_VISUAL_H / 2);
       ctx.rotate(e.rotateAngle || 0);
-      drawSprite('gear_filler', -GEAR_VW / 2, -GEAR_VH / 2, GEAR_VW, GEAR_VH, false);
+      drawSprite('gear_filler', -MINION_VISUAL_W / 2, -MINION_VISUAL_H / 2, MINION_VISUAL_W, MINION_VISUAL_H, false);
       ctx.restore();
       continue;
     }
@@ -1447,15 +1447,6 @@ function drawBoss() {
   var spriteName = currentSpriteOf(boss) || 'boss_idle';
   drawSprite(spriteName, visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H, true);
 
-  // Phase 2 sensor color — code-side composite tint, no separate sprite
-  if (boss.phase === 2) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.35;
-    ctx.fillStyle = '#FF8800';
-    ctx.fillRect(visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H);
-    ctx.restore();
-  }
 }
 
 function drawBossProjectiles() {
