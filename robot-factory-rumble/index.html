@@ -879,7 +879,7 @@ function setupLevelEnemies() {
 function updateEnemies(dt) {
   for (var i = enemies.length - 1; i >= 0; i--) {
     var e = enemies[i];
-    // Falling copter: apply gravity until floor impact, then switch to KO anim
+    // Falling aerial enemy: apply gravity until floor impact, then switch to KO anim
     if (e.dying) {
       e.vy = (e.vy || 0) + GRAVITY * dt;
       e.y += e.vy * dt;
@@ -887,7 +887,7 @@ function updateEnemies(dt) {
         e.y = GROUND_Y;
         e.dying = false;
         e.alive = false;
-        setAnim(e, 'copter_ko');
+        setAnim(e, e.kind + '_ko');
         e.koTimer = 0.4;
         spawnBoltBurst(e.x, e.y - e.h * 0.5);
       }
@@ -1010,8 +1010,8 @@ function updateEnemies(dt) {
         e.hp -= 1;
         projectiles.splice(j, 1);
         if (e.hp <= 0) {
-          if (e.kind === 'copter') {
-            // Copter falls under gravity to the floor, then plays KO anim
+          if ((e.kind === 'copter' || e.kind === 'bolt') && e.y < GROUND_Y - 4) {
+            // Aerial enemy falls under gravity to the floor, then plays KO anim
             e.dying = true;
             e.vy = 0;
             e.vx = 0;
@@ -1019,7 +1019,7 @@ function updateEnemies(dt) {
             e.alive = false;
             spawnBoltBurst(e.x, e.y - e.h * 0.5);
             if (e.kind === 'walker') setAnim(e, 'walker_ko');
-            else if (e.kind === 'bolt') setAnim(e, 'bolt_ko');
+            else setAnim(e, e.kind + '_ko');
             e.koTimer = 0.4;
           }
           break;
@@ -1366,11 +1366,8 @@ function updateBoss(dt) {
     }
   }
 
-  // Phase 2 — sprite anim selection driven by attack state
-  if (boss.currentAttack && boss.currentAttack.kind === 'claw')        setAnim(boss, 'boss_claw');
-  else if (boss.currentAttack && boss.currentAttack.kind === 'volley') setAnim(boss, 'boss_volley');
-  else if (boss.currentAttack && boss.currentAttack.kind === 'stomp')  setAnim(boss, 'boss_stomp');
-  else                                                                  setAnim(boss, 'boss_idle');
+  // Boss always renders as idle regardless of active attack
+  setAnim(boss, 'boss_idle');
 
   // Run current attack
   if (boss.currentAttack) {
@@ -1484,32 +1481,35 @@ function drawBoss() {
   // Bottom-anchor: visual bottom aligns with hitbox bottom (by + boss.h)
   var visualBy = by + boss.h - BOSS_VISUAL_H;
 
-  var spriteName = currentSpriteOf(boss) || 'boss_idle';
+  var spriteName = 'boss_idle';
 
-  // Procedural rocket flame plume under the boss feet (drawn first so it appears behind the body)
-  var flameX = visualBx + BOSS_VISUAL_W / 2;
-  var flameTop = visualBy + BOSS_VISUAL_H - 6;  // just under the feet
-  var flicker = Math.sin(Date.now() / 60) * 4;
-  var flameH = 28 + flicker;
-  ctx.save();
-  // Outer orange flame
-  var grad1 = ctx.createLinearGradient(flameX, flameTop, flameX, flameTop + flameH);
-  grad1.addColorStop(0, '#FFB300');
-  grad1.addColorStop(0.6, '#FF6F00');
-  grad1.addColorStop(1, 'rgba(244,67,54,0)');
-  ctx.fillStyle = grad1;
-  ctx.beginPath();
-  ctx.ellipse(flameX, flameTop + flameH / 2, 22, flameH / 2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Inner yellow core
-  var grad2 = ctx.createLinearGradient(flameX, flameTop, flameX, flameTop + flameH * 0.7);
-  grad2.addColorStop(0, '#FFEB3B');
-  grad2.addColorStop(1, 'rgba(255,235,59,0)');
-  ctx.fillStyle = grad2;
-  ctx.beginPath();
-  ctx.ellipse(flameX, flameTop + flameH / 3, 11, flameH / 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  // Two rocket flame plumes, one under each foot (drawn first so they appear behind the body)
+  var leftFootX  = visualBx + BOSS_VISUAL_W * 0.30;
+  var rightFootX = visualBx + BOSS_VISUAL_W * 0.70;
+  var flameTop = visualBy + BOSS_VISUAL_H - 6;
+  [leftFootX, rightFootX].forEach(function(fx, i) {
+    var localFlicker = Math.sin(Date.now() / 60 + i * 1.7) * 3;
+    var fh = 22 + localFlicker;
+    ctx.save();
+    // Outer orange flame
+    var grad1 = ctx.createLinearGradient(fx, flameTop, fx, flameTop + fh);
+    grad1.addColorStop(0, '#FFB300');
+    grad1.addColorStop(0.6, '#FF6F00');
+    grad1.addColorStop(1, 'rgba(244,67,54,0)');
+    ctx.fillStyle = grad1;
+    ctx.beginPath();
+    ctx.ellipse(fx, flameTop + fh / 2, 13, fh / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Inner yellow core
+    var grad2 = ctx.createLinearGradient(fx, flameTop, fx, flameTop + fh * 0.7);
+    grad2.addColorStop(0, '#FFEB3B');
+    grad2.addColorStop(1, 'rgba(255,235,59,0)');
+    ctx.fillStyle = grad2;
+    ctx.beginPath();
+    ctx.ellipse(fx, flameTop + fh / 3, 6, fh / 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
 
   drawSprite(spriteName, visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H, true, true);
 
