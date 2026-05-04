@@ -36,13 +36,8 @@
                    border-radius: 6px; background: rgba(0,0,0,0.4); overflow: hidden; }
   #progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #4CAF50, #FFEB3B);
                    transition: width 0.2s; }
-  #boss-hp-row {
-    position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
-    z-index: 5; pointer-events: none;
-    width: min(280px, 70vw); text-align: center; font-size: 14px;
-  }
-  #boss-hp-label { color: #FF5252; margin-bottom: 2px; }
-  #boss-hp-bg { width: 100%; height: 8px; background: rgba(0,0,0,0.6);
+  #boss-hp-row { grid-column: 3; grid-row: 1; justify-self: end; }
+  #boss-hp-bg { width: 140px; height: 12px; background: rgba(0,0,0,0.4);
                 border: 2px solid rgba(255,255,255,0.5); border-radius: 6px; overflow: hidden; }
   #boss-hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #FF5252, #FF1744);
                   transition: width 0.25s; }
@@ -122,10 +117,7 @@
   <div id="shield-row" style="display:none">▢▢▢▢</div>
   <div id="weapon-label">⚡ Foam Blaster</div>
   <div id="progress-bar"><div id="progress-fill"></div></div>
-  <div id="boss-hp-row" style="display:none">
-    <div id="boss-hp-label">🤖 FOREMAN-BOT 9000</div>
-    <div id="boss-hp-bg"><div id="boss-hp-fill"></div></div>
-  </div>
+  <div id="boss-hp-row" style="display:none"><div id="boss-hp-bg"><div id="boss-hp-fill"></div></div></div>
 </div>
 
 <div id="ctrl-left"  class="ctrl-btn">◄</div>
@@ -171,6 +163,7 @@ var levelLength = 4270; // pre-boss scaled to 20% (3220 px) + 1050 boss arena
 var heartsEl   = document.getElementById('hearts-row');
 var shieldEl   = document.getElementById('shield-row');
 var weaponEl   = document.getElementById('weapon-label');
+var progressBar = document.getElementById('progress-bar');
 var progressEl = document.getElementById('progress-fill');
 var bossRow    = document.getElementById('boss-hp-row');
 var bossFill   = document.getElementById('boss-hp-fill');
@@ -283,6 +276,7 @@ function startGame() {
   lastCheckpoint = { x: 80, y: GROUND_Y };
   boss = { active: false, x: 0, y: 0, w: 80, h: 80, phase: 1, hp: 54, hpMaxP1: 54, hpMaxP2: 70, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5, minionSpawnT: 4, entryT: 0 };
   bossRow.style.display = 'none';
+  progressBar.style.display = '';
   shieldEl.style.display = 'none';
   shakeT = 0;
   aimUpHintShown = false;
@@ -1173,6 +1167,7 @@ function activateBoss() {
   boss.hp = boss.hpMaxP1;
   boss.phase = 1;
   bossRow.style.display = 'block';
+  progressBar.style.display = 'none';
   showBanner('🤖 FOREMAN-BOT 9000', 1500);
 }
 
@@ -1289,6 +1284,7 @@ function onBossDefeated() {
   boss.active = false;
   boss.defeated = true;
   bossRow.style.display = 'none';
+  progressBar.style.display = '';
   scene = 'win';
   showBanner('🎉 Sector Cleared!', 2000);
   setTimeout(function() { winOverlay.classList.add('show'); }, 1500);
