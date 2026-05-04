@@ -493,47 +493,30 @@ var GROUND_Y = 0;       // canvas-y of the ground top; resolved on first draw
 var PLATFORM_HEIGHT = 14;
 var level = {
   segments: [
-    { name: 'A', x0: 0,    x1:  840 },
-    { name: 'B', x0: 840,  x1: 2520 },
-    { name: 'C', x0: 2520, x1: 3220 },
-    { name: 'D', x0: 3220, x1: 4270 },   // boss arena
+    { name: 'A', x0: 0,    x1: 1100 },
+    { name: 'B', x0: 1100, x1: 2700 },
+    { name: 'C', x0: 2700, x1: 3770 },
+    { name: 'D', x0: 3770, x1: 4270 },   // boss arena (Fix 2 narrows this)
   ],
   pits: [
-    { x: 100,  w: 50 },
-    { x: 200,  w: 60 },
-    { x: 320,  w: 50 },
-    { x: 450,  w: 60 },
-    { x: 580,  w: 50 },
-    { x: 720,  w: 50 },
-    // Segment B
-    { x: 950,  w: 60 },  { x: 1100, w: 60 },  { x: 1250, w: 70 },
-    { x: 1450, w: 60 },  { x: 1620, w: 60 },  { x: 1800, w: 70 },
-    { x: 2000, w: 60 },  { x: 2200, w: 70 },  { x: 2380, w: 60 },
-    // Segment C
-    { x: 2620, w: 70 },  { x: 2800, w: 70 },  { x: 3000, w: 60 },
+    { x:  450, w: 70 },
+    { x:  900, w: 70 },
+    { x: 1450, w: 80 },
+    { x: 2050, w: 80 },
+    { x: 2550, w: 70 },
+    { x: 3200, w: 70 },
   ],
   platforms: [
-    { x: 320,  w: 100, top: -120, beltDir:  0 },
-    { x: 510,  w: 100, top: -150, beltDir:  1 },
-    { x: 690,  w: 100, top: -120, beltDir: -1 },
-    // Segment B platforms
-    { x: 990,  w: 120, top: -120, beltDir:  1 },
-    { x: 1180, w: 120, top: -180, beltDir: -1 },
-    { x: 1380, w: 120, top: -120, beltDir:  0 },
-    { x: 1580, w: 120, top: -200, beltDir:  1 },
-    { x: 1780, w: 120, top: -120, beltDir: -1 },
-    { x: 1980, w: 120, top: -180, beltDir:  1 },
-    { x: 2180, w: 120, top: -120, beltDir:  0 },
-    // Segment C platforms
-    { x: 2700, w: 120, top: -120, beltDir:  1 },
-    { x: 2900, w: 120, top: -180, beltDir: -1 },
-    { x: 3080, w: 120, top: -120, beltDir:  0 },
+    { x:  600, w: 140, top: -120, beltDir:  0 },
+    { x: 1100, w: 140, top: -150, beltDir:  1 },
+    { x: 1650, w: 140, top: -120, beltDir: -1 },
+    { x: 2200, w: 140, top: -180, beltDir:  1 },
+    { x: 2750, w: 140, top: -120, beltDir:  0 },
+    { x: 3350, w: 140, top: -150, beltDir: -1 },
   ],
   floorBelts: [
-    { x: 880,  w: 100, dir:  1 },
-    { x: 1300, w: 100, dir: -1 },
-    { x: 1700, w: 100, dir:  1 },
-    { x: 2300, w: 100, dir: -1 },
+    { x: 1300, w: 200, dir:  1 },
+    { x: 2300, w: 200, dir: -1 },
   ],
 };
 function resolveLevelGeometry() {
@@ -739,29 +722,19 @@ function spawnEnemy(kind, x) {
 }
 
 function setupLevelEnemies() {
-  // Segment A (0-840)
-  spawnEnemy('walker', 60);
-  spawnEnemy('copter', 150);
-  spawnEnemy('walker', 270);
-  spawnEnemy('bolt',   400);
-  spawnEnemy('walker', 540);
-  spawnEnemy('copter', 700);
-  // Segment B (840-2520)
-  spawnEnemy('walker', 920);
-  spawnEnemy('bolt',   1080);
-  spawnEnemy('copter', 1240);
+  // Segment A
+  spawnEnemy('walker',  300);
+  spawnEnemy('copter',  650);
+  spawnEnemy('bolt',   1000);
+  // Segment B
   spawnEnemy('walker', 1400);
-  spawnEnemy('bolt',   1560);
-  spawnEnemy('copter', 1720);
-  spawnEnemy('walker', 1880);
-  spawnEnemy('bolt',   2040);
-  spawnEnemy('walker', 2200);
-  spawnEnemy('copter', 2380);
-  // Segment C (2520-3220)
-  spawnEnemy('walker', 2580);
-  spawnEnemy('copter', 2750);
-  spawnEnemy('bolt',   2900);
-  spawnEnemy('walker', 3060);
+  spawnEnemy('copter', 1800);
+  spawnEnemy('bolt',   2200);
+  spawnEnemy('walker', 2500);
+  // Segment C
+  spawnEnemy('copter', 2900);
+  spawnEnemy('walker', 3200);
+  spawnEnemy('bolt',   3500);
 }
 
 function updateEnemies(dt) {
@@ -1053,11 +1026,11 @@ function spawnPickup(kind, x, y) {
 }
 
 function setupLevelPickups() {
-  spawnPickup('spark',  340);     // Segment A
-  spawnPickup('shield', 1330);    // Mid-Segment B
-  spawnPickup('heart', 2310);     // Late-Segment B
-  spawnPickup('shield', 2730);    // Segment C
-  spawnPickup('heart', 3150);     // Pre-boss
+  spawnPickup('spark',   600);
+  spawnPickup('shield', 1700);
+  spawnPickup('heart',  2400);
+  spawnPickup('shield', 3100);
+  spawnPickup('heart',  3700);
 }
 
 function updatePickups(dt) {
@@ -1125,10 +1098,9 @@ var checkpoints = [];        // { x, y, name, touched }
 var lastCheckpoint = { x: 80, y: 0 };   // y resolved on first frame
 
 function setupLevelCheckpoints() {
-  checkpoints.push({ x:  830, y: 0, name: '1', touched: false });
-  checkpoints.push({ x: 1680, y: 0, name: '2', touched: false });
-  checkpoints.push({ x: 2510, y: 0, name: '3', touched: false });
-  checkpoints.push({ x: 3200, y: 0, name: '4', touched: false });
+  checkpoints.push({ x: 1100, y: 0, name: '1', touched: false });
+  checkpoints.push({ x: 2700, y: 0, name: '2', touched: false });
+  checkpoints.push({ x: 3700, y: 0, name: '3', touched: false });
 }
 
 function updateCheckpoints(dt) {
@@ -1178,8 +1150,8 @@ var boss = {
   minionT: 5,
   minionSpawnT: 4,                // phase 2 minion-from-right cadence
 };
-var BOSS_TRIGGER_X = 3220;
-var BOSS_ARENA_LEFT  = 3220;
+var BOSS_TRIGGER_X = 3770;
+var BOSS_ARENA_LEFT  = 3770;
 var BOSS_ARENA_RIGHT = 4270;
 
 function activateBoss() {
@@ -1201,17 +1173,8 @@ function updateBoss(dt) {
   if (boss.hitFlash > 0) boss.hitFlash -= dt;
   if (boss.invuln > 0) boss.invuln -= dt;
   boss.bobT = (boss.bobT || 0) + dt;
-  // Boss tracks the player horizontally (offset oscillates ±200px) so both stay on-screen.
-  // Slowed cadence (0.7 → 0.45) and reduced amplitude (full arena → ±200) per playtest.
-  if (!boss.currentAttack || boss.currentAttack.kind !== 'ram') {
-    var sideOffset = Math.sin(boss.bobT * 0.45) * 200;
-    var targetX = player.x + player.w * 0.5 + sideOffset;
-    // Smooth follow so the boss doesn't snap each frame
-    boss.x += (targetX - boss.x) * Math.min(1, dt * 2.5);
-    // Clamp inside arena bounds
-    if (boss.x < BOSS_ARENA_LEFT  + boss.w / 2) boss.x = BOSS_ARENA_LEFT  + boss.w / 2;
-    if (boss.x > BOSS_ARENA_RIGHT - boss.w / 2) boss.x = BOSS_ARENA_RIGHT - boss.w / 2;
-  }
+  // Boss is anchored at the right edge of the arena; only y-bob varies.
+  boss.x = BOSS_ARENA_RIGHT - boss.w * 0.6 - 20;
   // Always orient the boss toward the player so the "front" sensor faces them.
   boss.facing = (player.x + player.w * 0.5 < boss.x) ? -1 : 1;
 
@@ -1233,17 +1196,13 @@ function updateBoss(dt) {
     boss.attackT -= dt;
     if (boss.attackT <= 0) {
       var roll = Math.random();
+      // Volley-only — boss is now a stationary turret. Faster cadence in Phase 2.
       if (boss.phase === 1) {
-        boss.currentAttack = roll < 0.5
-          ? { kind: 'volley', t: 0, life: 0.5 + 0.5 }
-          : { kind: 'ram',    t: 0, life: 2.2 };
+        boss.currentAttack = { kind: 'volley', t: 0, life: 0.5 + 0.5 };
       } else {
-        boss.currentAttack = roll < 0.5
-          ? { kind: 'volley', t: 0, life: 0.5 + 0.4 }
-          : { kind: 'ram',    t: 0, life: 2.2 };
+        boss.currentAttack = { kind: 'volley', t: 0, life: 0.5 + 0.4 };
       }
-      // Phase 2 attacks fire faster to keep the kid honest.
-      boss.attackT = boss.phase === 1 ? 1.6 : 1.2;
+      boss.attackT = boss.phase === 1 ? 1.4 : 1.0;
     }
   }
 
@@ -1254,7 +1213,7 @@ function updateBoss(dt) {
     if (a.kind === 'volley') {
       if (a.t > 0.5 && !a.fired) {
         a.fired = true;
-        var bobNow2 = Math.sin(boss.bobT * 1.6) * 60;
+        var bobNow2 = Math.sin(boss.bobT * 1.2) * 130;
         var sX = boss.x;
         var sY = GROUND_Y - boss.h * 0.5 - 80 + bobNow2;
         var pdx = (player.x + player.w * 0.5) - sX;
@@ -1272,36 +1231,9 @@ function updateBoss(dt) {
           });
         }
       }
-    } else if (a.kind === 'ram') {
-      // Ram is now player-relative: starts on the OPPOSITE side of the player
-      // (~240px away) and sweeps across to ~240px past the player on the same
-      // side. Total sweep ~480px, takes 1.5s → ~320 px/s. Slow enough to
-      // jump over comfortably; both player and boss stay on-screen the whole time.
-      var pcx = player.x + player.w * 0.5;
-      if (a.t < 0.5) {
-        a.ramFromX = (player.x < boss.x) ? pcx + 240 : pcx - 240;
-        a.ramToX   = (player.x < boss.x) ? pcx - 240 : pcx + 240;
-        boss.x = a.ramFromX;
-      } else if (a.t < 2.0) {
-        var k2 = Math.min(1, (a.t - 0.5) / 1.5);
-        boss.x = a.ramFromX + (a.ramToX - a.ramFromX) * k2;
-      }
-      // Clamp inside arena (in case player is near an edge)
-      if (boss.x < BOSS_ARENA_LEFT  + boss.w / 2) boss.x = BOSS_ARENA_LEFT  + boss.w / 2;
-      if (boss.x > BOSS_ARENA_RIGHT - boss.w / 2) boss.x = BOSS_ARENA_RIGHT - boss.w / 2;
     }
     if (a.t >= a.life) {
       boss.currentAttack = null;
-    }
-  }
-
-  // Ram contact damage: boss body itself hurts the player while ramming
-  if (boss.currentAttack && boss.currentAttack.kind === 'ram') {
-    var ramTopY = GROUND_Y - boss.h - 4;
-    if (player.invuln <= 0 && shieldBubble <= 0 &&
-        rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
-                     boss.x - boss.w / 2, ramTopY, boss.w, boss.h)) {
-      hurtPlayer(2, boss.x);
     }
   }
 
@@ -1310,11 +1242,8 @@ function updateBoss(dt) {
     var p = projectiles[j];
     if (p.kind !== 'foam' && p.kind !== 'spark') continue;
     if (boss.invuln > 0) continue;
-    var bobYHit = Math.sin(boss.bobT * 1.6) * 60;
+    var bobYHit = Math.sin(boss.bobT * 1.2) * 130;
     var bossTopY = GROUND_Y - boss.h - 80 + bobYHit;
-    if (boss.currentAttack && boss.currentAttack.kind === 'ram') {
-      bossTopY = GROUND_Y - boss.h - 4;
-    }
     if (rectsOverlap(p.x - 6, p.y - 6, 12, 12, boss.x - boss.w / 2, bossTopY, boss.w, boss.h)) {
       boss.hp -= 1;
       boss.hitFlash = 0.15;
@@ -1368,13 +1297,9 @@ function updateBossHazards(dt) {
 
 function drawBoss() {
   if (!boss.active) return;
-  var bobY = Math.sin(boss.bobT * 1.6) * 60;     // ±60px vertical sway
+  var bobY = Math.sin(boss.bobT * 1.2) * 130;     // ±60px vertical sway
   var bx = boss.x - boss.w / 2;
   var by = GROUND_Y - boss.h - 80 + bobY;        // boss is anchored 80px above ground baseline + bob
-  // Ram attack lowers the boss to floor-skim height (jumpable)
-  if (boss.currentAttack && boss.currentAttack.kind === 'ram') {
-    by = GROUND_Y - boss.h - 4;     // boss bottom = GROUND_Y - 4 (just off floor)
-  }
   var flash = boss.hitFlash > 0;
   ctx.fillStyle = flash ? '#FFFFFF' : '#9E9E9E';
   ctx.fillRect(bx, by, boss.w, boss.h);
