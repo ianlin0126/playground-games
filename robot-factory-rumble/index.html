@@ -37,13 +37,13 @@
   #progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #4CAF50, #FFEB3B);
                    transition: width 0.2s; }
   #boss-hp-row {
-    position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+    position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
     z-index: 5; pointer-events: none;
-    width: min(360px, 80vw); text-align: center; font-size: 18px;
+    width: min(280px, 70vw); text-align: center; font-size: 14px;
   }
-  #boss-hp-label { color: #FF5252; margin-bottom: 4px; }
-  #boss-hp-bg { width: 100%; height: 14px; background: rgba(0,0,0,0.6);
-                border: 2px solid rgba(255,255,255,0.5); border-radius: 8px; overflow: hidden; }
+  #boss-hp-label { color: #FF5252; margin-bottom: 2px; }
+  #boss-hp-bg { width: 100%; height: 8px; background: rgba(0,0,0,0.6);
+                border: 2px solid rgba(255,255,255,0.5); border-radius: 6px; overflow: hidden; }
   #boss-hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #FF5252, #FF1744);
                   transition: width 0.25s; }
   #banner {
@@ -281,7 +281,7 @@ function startGame() {
   checkpoints = [];
   lastCheckpoint = { x: 80, y: GROUND_Y };
   vehicle = { x: 3500, y: 0, w: 64, h: 56, mounted: false, shield: 4, pistonT: 0, pistonCool: 0, alive: true, promptVisible: false };
-  boss = { active: false, x: 4750, y: 0, w: 120, h: 140, phase: 1, hp: 10, hpMaxP1: 10, hpMaxP2: 8, attackT: 3.0, currentAttack: null, hitFlash: 0, invuln: 0 };
+  boss = { active: false, x: 4500, y: 0, w: 120, h: 140, phase: 1, hp: 18, hpMaxP1: 18, hpMaxP2: 14, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false };
   bossRow.style.display = 'none';
   shieldEl.style.display = 'none';
   shakeT = 0;
@@ -368,6 +368,7 @@ function updatePlayer(dt) {
 
   player.x += player.vx * dt;
   player.y += player.vy * dt;
+  if (player.x < 0) player.x = 0;
 
   var standY = resolveStandY(player.x + player.w * 0.5, player.y);
   // Belt horizontal modifier when standing on a conveyor
@@ -381,17 +382,17 @@ function updatePlayer(dt) {
   }
   player.x += beltMod * dt;
 
-  if (player.y >= standY) {
-    if (standY === Infinity) {
-      if (player.y > H + 60) onPitFall();
-      player.onGround = false;
-    } else {
-      player.y = standY;
-      player.vy = 0;
-      if (!player.onGround) {
-        player.onGround = true;
-        player.coyote = COYOTE_TIME;
-      }
+  if (standY === Infinity) {
+    // Over a pit — keep falling until we trigger the kill plane.
+    player.onGround = false;
+    if (player.coyote > 0) player.coyote -= dt;
+    if (player.y > H + 60) onPitFall();
+  } else if (player.y >= standY) {
+    player.y = standY;
+    player.vy = 0;
+    if (!player.onGround) {
+      player.onGround = true;
+      player.coyote = COYOTE_TIME;
     }
   } else {
     player.onGround = false;
@@ -1137,7 +1138,7 @@ function drawVehicle() {
 // ── Boss ───────────────────────────────────────────────────────────────────
 var boss = {
   active: false,
-  x: 4750, y: 0,
+  x: 4500, y: 0,
   w: 120, h: 140,
   phase: 1,
   hp: 18,
@@ -1147,13 +1148,15 @@ var boss = {
   currentAttack: null,
   hitFlash: 0,
   invuln: 0,
+  defeated: false,
 };
 var BOSS_TRIGGER_X = 4250;
 
 function activateBoss() {
   if (boss.active) return;
   boss.active = true;
-  boss.x = 4750;
+  boss.x = 4500;
+  boss.attackT = 1.6;     // First attack at the spec'd cadence (Fix 5)
   boss.hp = boss.hpMaxP1;
   boss.phase = 1;
   bossRow.style.display = 'block';
@@ -1162,7 +1165,7 @@ function activateBoss() {
 
 function updateBoss(dt) {
   if (!boss.active) {
-    if (player.x >= BOSS_TRIGGER_X) activateBoss();
+    if (!boss.defeated && player.x >= BOSS_TRIGGER_X) activateBoss();
     return;
   }
   if (boss.hitFlash > 0) boss.hitFlash -= dt;
@@ -1242,23 +1245,28 @@ function updateBoss(dt) {
       boss.hp -= dmg;
       boss.hitFlash = 0.15;
       if (p.kind !== 'mech-piston') projectiles.splice(j, 1);
-      if (boss.hp <= 0 && boss.phase === 1) {
-        // Phase 1 → Phase 2 transition (T14 wires the visuals)
-        boss.phase = 2;
-        boss.hp = boss.hpMaxP2;
-        boss.invuln = 1.0;
-        triggerShake(6, 1.0);
-        showBanner('⚡ Phase 2!', 1500);
-        spawnPickup('heart', boss.x - 60, GROUND_Y - 20);
-      } else if (boss.hp <= 0 && boss.phase === 2) {
-        onBossDefeated();
-      }
+    }
+  }
+
+  // Phase transition / defeat — run every frame regardless of damage source.
+  if (boss.invuln <= 0) {
+    if (boss.hp <= 0 && boss.phase === 1) {
+      boss.phase = 2;
+      boss.hp = boss.hpMaxP2;
+      boss.invuln = 1.0;
+      triggerShake(6, 1.0);
+      showBanner('⚡ Phase 2!', 1500);
+      // Heart spawns IN FRONT of the boss so the kid can grab it safely (Fix 8).
+      spawnPickup('heart', boss.x - 200, GROUND_Y - 20);
+    } else if (boss.hp <= 0 && boss.phase === 2) {
+      onBossDefeated();
     }
   }
 }
 
 function onBossDefeated() {
   boss.active = false;
+  boss.defeated = true;
   bossRow.style.display = 'none';
   scene = 'win';
   showBanner('🎉 Sector Cleared!', 2000);
@@ -1360,6 +1368,11 @@ function loop(now) {
 }
 function update(dt) {
   resolveLevelGeometry();
+  // Freeze entity updates outside of active gameplay.
+  if (scene !== 'playing') {
+    if (shakeT > 0) shakeT -= dt;
+    return;
+  }
   updateVehicle(dt);
   updateBoss(dt);
   updateBossHazards(dt);
