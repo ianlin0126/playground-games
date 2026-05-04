@@ -510,14 +510,22 @@ function drawSprite(name, dx, dy, dw, dh, flipped) {
   if (!atlas || !spriteMap) return;
   var s = spriteMap[name];
   if (!s) return;
+  // Aspect-preserving letterbox: fit sprite inside (dw, dh), anchored to bottom
+  var sa = s.w / s.h;
+  var da = dw / dh;
+  var rw, rh;
+  if (sa > da) { rw = dw; rh = dw / sa; }
+  else         { rh = dh; rw = dh * sa; }
+  var rdx = dx + (dw - rw) / 2;
+  var rdy = dy + (dh - rh);   // anchor to bottom of hitbox (feet on ground)
   if (flipped) {
     ctx.save();
-    ctx.translate(dx + dw, dy);
+    ctx.translate(rdx + rw, rdy);
     ctx.scale(-1, 1);
-    ctx.drawImage(atlas, s.x, s.y, s.w, s.h, 0, 0, dw, dh);
+    ctx.drawImage(atlas, s.x, s.y, s.w, s.h, 0, 0, rw, rh);
     ctx.restore();
   } else {
-    ctx.drawImage(atlas, s.x, s.y, s.w, s.h, dx, dy, dw, dh);
+    ctx.drawImage(atlas, s.x, s.y, s.w, s.h, rdx, rdy, rw, rh);
   }
 }
 
@@ -1062,9 +1070,18 @@ function drawEnemies() {
     }
     var spriteName = currentSpriteOf(e);
     if (!spriteName) continue;
-    var ex = e.x, ey = e.y - e.h;
     var flipped = (e.vx || 0) < 0;
-    drawSprite(spriteName, ex, ey, e.w, e.h, flipped);
+    if (e.kind === 'copter') {
+      // Copter sprites are portrait (160×242) but hitbox is landscape (28×24).
+      // Render at a taller visual box so the cupcake shape is legible.
+      var COPTER_VW = 48, COPTER_VH = 72;
+      var vex = e.x + e.w / 2 - COPTER_VW / 2;
+      var vey = e.y - COPTER_VH;
+      drawSprite(spriteName, vex, vey, COPTER_VW, COPTER_VH, flipped);
+    } else {
+      var ex = e.x, ey = e.y - e.h;
+      drawSprite(spriteName, ex, ey, e.w, e.h, flipped);
+    }
   }
 }
 
@@ -1419,8 +1436,17 @@ function drawBoss() {
     by = bossCenterTop + introY;
   }
 
+  // Render boss sprite at a larger visual size than the 80×80 hitbox.
+  // Boss sprites are wide (177-213px) and short (136-137px) — a landscape shape.
+  // 120×140 gives the boss an imposing screen presence while letterboxing preserves aspect.
+  var BOSS_VISUAL_W = 120;
+  var BOSS_VISUAL_H = 140;
+  var visualBx = boss.x - BOSS_VISUAL_W / 2;
+  // Bottom-anchor: visual bottom aligns with hitbox bottom (by + boss.h)
+  var visualBy = by + boss.h - BOSS_VISUAL_H;
+
   var spriteName = currentSpriteOf(boss) || 'boss_idle';
-  drawSprite(spriteName, bx, by, boss.w, boss.h, false);
+  drawSprite(spriteName, visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H, false);
 
   // Phase 2 sensor color — code-side composite tint, no separate sprite
   if (boss.phase === 2) {
@@ -1428,7 +1454,7 @@ function drawBoss() {
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.35;
     ctx.fillStyle = '#FF8800';
-    ctx.fillRect(bx, by, boss.w, boss.h);
+    ctx.fillRect(visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H);
     ctx.restore();
   }
 }
