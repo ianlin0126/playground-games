@@ -52,8 +52,11 @@
   .panel { background: #fff; border-radius: 28px; padding: 28px 32px; max-width: 360px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
   .panel h1 { font-size: 32px; color: #c0392b; margin-bottom: 12px; }
   .panel p { font-size: 24px; color: #333; margin-bottom: 20px; line-height: 1.4; }
-  .panel button { font-size: 26px; font-weight: 800; padding: 14px 28px; min-height: 52px; min-width: 160px; border: none; border-radius: 18px; background: #e74c3c; color: white; cursor: pointer; box-shadow: 0 4px 0 #b03a2e; }
+  .panel button { font-size: 26px; font-weight: 800; padding: 14px 22px; min-height: 52px; min-width: 140px; border: none; border-radius: 18px; background: #e74c3c; color: white; cursor: pointer; box-shadow: 0 4px 0 #b03a2e; }
   .panel button:active { transform: translateY(2px); box-shadow: 0 2px 0 #b03a2e; }
+  .panel button.secondary { background: #546e7a; box-shadow: 0 4px 0 #37474f; }
+  .panel button.secondary:active { box-shadow: 0 2px 0 #37474f; }
+  .msg-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
   #toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.95); color: #c0392b; padding: 16px 28px; border-radius: 20px; font-size: 28px; font-weight: 900; box-shadow: 0 6px 20px rgba(0,0,0,0.2); pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 8; }
   #toast.show { opacity: 1; }
@@ -146,7 +149,10 @@
   <div class="panel">
     <h1 id="msgTitle">Great job!</h1>
     <p id="msgText">Ready for the next level?</p>
-    <button id="msgBtn">Next</button>
+    <div class="msg-btns">
+      <button id="msgBtn">Next</button>
+      <button id="msgBtn2" class="secondary" style="display:none;"></button>
+    </div>
   </div>
 </div>
 
@@ -211,6 +217,7 @@
   var msgTitle = document.getElementById('msgTitle');
   var msgText = document.getElementById('msgText');
   var msgBtn = document.getElementById('msgBtn');
+  var msgBtn2 = document.getElementById('msgBtn2');
   var toastEl = document.getElementById('toast');
   var wrapEl = document.getElementById('wrap');
   var hudEl = document.getElementById('hud');
@@ -243,6 +250,60 @@
   resize();
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', resize);
+
+  // -------- Sprite atlas + backgrounds --------
+  var ATLAS = new Image();
+  ATLAS.src = './assets/red-ball-atlas.png';
+  var BG_W1 = new Image(); BG_W1.src = './assets/bg-w1.png';
+  var BG_W2 = new Image(); BG_W2.src = './assets/bg-w2.png';
+  var BG_W3 = new Image(); BG_W3.src = './assets/bg-w3.png';
+  var TILE = new Image(); TILE.src = './assets/ground-tiles.png';
+
+  // Three horizontal ground/cliff cross-section strips packed vertically
+  // in a single 1024x1024 image. Each strip: top `surfaceH` pixels are the
+  // visible ground surface (grass / rock / metal); below is the cliff
+  // cross-section (dirt / stone / industrial layers).
+  var TILE_STRIPS = {
+    w1: { y: 0,   h: 347, surfaceH: 30 },
+    w2: { y: 347, h: 334, surfaceH: 30 },
+    w3: { y: 681, h: 343, surfaceH: 30 }
+  };
+  function tileForWorld(){
+    return state.world === 0 ? TILE_STRIPS.w1 : (state.world === 1 ? TILE_STRIPS.w2 : TILE_STRIPS.w3);
+  }
+  function tileReady(){ return TILE.complete && TILE.naturalWidth > 0; }
+
+  var SPRITES = {
+    player_ball:   { x: 44,  y: 44,  w: 279, h: 279 },
+    square_minion: { x: 371, y: 43,  w: 286, h: 280 },
+    coin:          { x: 712, y: 45,  w: 273, h: 275 },
+    scorpion:      { x: 43,  y: 374, w: 294, h: 278 },
+    bubble_cube:   { x: 380, y: 358, w: 274, h: 310 },
+    noodle_cube:   { x: 708, y: 375, w: 283, h: 286 },
+    boss_w1:       { x: 52,  y: 678, w: 274, h: 336 },
+    boss_w2:       { x: 388, y: 690, w: 262, h: 323 },
+    boss_w3:       { x: 710, y: 689, w: 276, h: 324 }
+  };
+
+  function imgReady(img){ return img.complete && img.naturalWidth > 0; }
+  function atlasReady(){ return imgReady(ATLAS); }
+
+  function drawSpriteCentered(name, cx, cy, dw, dh){
+    if(!atlasReady()) return false;
+    var s = SPRITES[name]; if(!s) return false;
+    ctx.drawImage(ATLAS, s.x, s.y, s.w, s.h, cx - dw/2, cy - dh/2, dw, dh);
+    return true;
+  }
+
+  // Anchor sprite bottom-center to (cx, bottomY). Width is dw; height
+  // preserves the source aspect ratio. Use for ground-standing entities.
+  function drawSpriteBottom(name, cx, bottomY, dw){
+    if(!atlasReady()) return false;
+    var s = SPRITES[name]; if(!s) return false;
+    var dh = dw * (s.h / s.w);
+    ctx.drawImage(ATLAS, s.x, s.y, s.w, s.h, cx - dw/2, bottomY - dh, dw, dh);
+    return true;
+  }
 
   // -------- World/Level data --------
   // World 1 — Sunny Hills (the original 3 levels, but L3 has its boss removed; that's the dedicated boss arena now)
@@ -603,9 +664,9 @@
     }
     return {
       isBoss: true,
-      width: 1100, height: 600, spawn: {x: 80, y: 460},
+      width: 2000, height: 600, spawn: {x: 80, y: 460},
       platforms: [
-        {x: 0, y: 540, w: 1100, h: 60, color: opts.floor}
+        {x: 0, y: 540, w: 2000, h: 60, color: opts.floor}
       ],
       pits: [],
       enemies: enemies,
@@ -667,6 +728,16 @@
     }
   };
 
+  // -------- Debug param: ?unlock=all --------
+  var DEBUG_UNLOCK_ALL = (new URLSearchParams(window.location.search).get('unlock') === 'all');
+  if(DEBUG_UNLOCK_ALL){
+    state.coins = Math.max(state.coins || 0, 999);
+    var _badge = document.createElement('div');
+    _badge.textContent = 'DEBUG: unlock=all';
+    _badge.style.cssText = 'position:fixed;top:6px;left:6px;background:rgba(255,193,7,0.85);color:#222;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:bold;z-index:9999;pointer-events:none';
+    document.body.appendChild(_badge);
+  }
+
   var ball = {
     x: 0, y: 0, r: 22,
     vx: 0, vy: 0,
@@ -711,6 +782,7 @@
   }
 
   function bossUnlocked(worldIdx){
+    if(DEBUG_UNLOCK_ALL) return true;
     var p = state.progress[worldIdx];
     var done = (p[0] ? 1 : 0) + (p[1] ? 1 : 0) + (p[2] ? 1 : 0);
     return done >= 2;
@@ -1016,7 +1088,7 @@
     showToast._t = setTimeout(function(){ toastEl.classList.remove('show'); }, 900);
   }
 
-  function showMessage(title, text, btn, cb){
+  function showMessage(title, text, btn, cb, btn2, cb2){
     msgTitle.textContent = title;
     msgText.textContent = text;
     msgBtn.textContent = btn;
@@ -1027,6 +1099,18 @@
       state.paused = false;
       if(cb) cb();
     };
+    if(btn2){
+      msgBtn2.textContent = btn2;
+      msgBtn2.style.display = '';
+      msgBtn2.onclick = function(){
+        msgEl.classList.remove('show');
+        state.paused = false;
+        if(cb2) cb2();
+      };
+    } else {
+      msgBtn2.style.display = 'none';
+      msgBtn2.onclick = null;
+    }
   }
 
   // -------- Physics --------
@@ -1080,9 +1164,17 @@
     }
     keys.jumpPressed = false;
 
+    // Variable-height jump: when the player releases the button while
+    // still rising, cut upward velocity short. Tap = small hop, hold =
+    // full jump.
+    if(!keys.jumpHeld && ball.vy < -4){
+      ball.vy = -4;
+    }
+
     ball.vy += GRAVITY;
     if(ball.vy > 18) ball.vy = 18;
 
+    var prevBallX = ball.x;
     ball.x += ball.vx;
     ball.rot += ball.vx * 0.05;
 
@@ -1090,9 +1182,20 @@
     for(var i=0;i<solids.length;i++){
       var s = solids[i];
       if(circleRectCollide(ball.x, ball.y, ball.r, s.x, s.y, s.w, s.h)){
-        if(ball.vx > 0){ ball.x = s.x - ball.r; }
-        else if(ball.vx < 0){ ball.x = s.x + s.w + ball.r; }
-        ball.vx = 0;
+        // Only push horizontally if the ball was fully outside this solid's
+        // x-range last frame — i.e., this is a real side-collision rather
+        // than a corner overlap from standing on / falling past the top.
+        // Without this guard, walking off an edge with the ball even 1px
+        // embedded in the platform's y-range teleports the ball across.
+        if(ball.vx > 0 && prevBallX + ball.r <= s.x + 1){
+          ball.x = s.x - ball.r;
+          ball.vx = 0;
+        } else if(ball.vx < 0 && prevBallX - ball.r >= s.x + s.w - 1){
+          ball.x = s.x + s.w + ball.r;
+          ball.vx = 0;
+        }
+        // Otherwise: corner overlap — the y-pass handles the vertical
+        // resolution, and the ball is allowed to walk past the edge.
       }
     }
 
@@ -1102,10 +1205,15 @@
     for(var j=0;j<solids.length;j++){
       var s2 = solids[j];
       if(circleRectCollide(ball.x, ball.y, ball.r, s2.x, s2.y, s2.w, s2.h)){
+        // Land/bonk only if the ball's center is within the solid's x-range
+        // (with a 2px tolerance for forgiveness on edges). Without this,
+        // a ball clipping the corner from outside would still snap to the
+        // top, "skating" past the edge of the platform.
+        var withinX = (ball.x > s2.x - 2) && (ball.x < s2.x + s2.w + 2);
         // Use previous y to determine which face the ball entered through.
         // This prevents edge-overlap from triggering a side-push that teleports
         // the ball across the platform.
-        if(prevBallY + ball.r <= s2.y + 1){
+        if(withinX && prevBallY + ball.r <= s2.y + 1){
           // Ball was above the platform last frame → land on top
           ball.y = s2.y - ball.r;
           ball.vy = 0;
@@ -1114,29 +1222,27 @@
           if(s2.vx !== undefined){
             ball.x += s2._lastDx || 0;
           }
-        } else if(prevBallY - ball.r >= s2.y + s2.h - 1){
+        } else if(withinX && prevBallY - ball.r >= s2.y + s2.h - 1){
           // Ball was below the platform last frame → bonk head on bottom
           ball.y = s2.y + s2.h + ball.r;
           ball.vy = 0;
         }
-        // Otherwise: ball was already side-overlapping pre-step — let the
-        // x-collision pass handle it; don't push y.
+        // Otherwise: corner-grazing or already-side-overlapping —
+        // let the x-pass handle it; don't push y.
       }
     }
 
     if(ball.x - ball.r < 0){ ball.x = ball.r; ball.vx = 0; }
     if(ball.x + ball.r > current.width){ ball.x = current.width - ball.r; ball.vx = 0; }
 
-    if(ball.y - ball.r > current.height + 50){
+    // Respawn when the ball has fallen past the world bottom AND past
+    // the visible canvas — whichever is lower. This lets the ball fall
+    // visibly off-screen into a pit before respawning, instead of
+    // disappearing the moment it crosses the floor surface.
+    var fallThreshold = Math.max(current.height + 50, camera.y + H + 50);
+    if(ball.y - ball.r > fallThreshold){
       respawn();
       return;
-    }
-    for(var p=0;p<current.pits.length;p++){
-      var pit = current.pits[p];
-      if(ball.y > pit.y + 5 && ball.x > pit.x && ball.x < pit.x + pit.w){
-        respawn();
-        return;
-      }
     }
 
     current.moving.forEach(function(m){
@@ -1349,16 +1455,38 @@
       if(hitOccurred) return;
       if(!e.alive) return;
       if(rectsOverlap(ball.x - ball.r, ball.y - ball.r, ball.r*2, ball.r*2, e.x, e.y, e.size, e.size)){
-        var ballBottomPrev = ball.y + ball.r - ball.vy;
-        if(ball.vy > 1 && ballBottomPrev <= e.y + 6){
-          // Boss invulnerable: bounce ball off, no damage
+        // Classify the collision by closest-edge penetration: whichever
+        // face of the enemy has the smallest overlap with the ball is
+        // the side the ball came in through. If it's the top, the player
+        // stomped; otherwise it's a side/bottom hit and the player takes
+        // damage. This is robust to slow descents (vy near 0 just after
+        // the jump peak) which the old vy-threshold check was missing.
+        var ballL = ball.x - ball.r, ballR = ball.x + ball.r;
+        var ballT = ball.y - ball.r, ballB = ball.y + ball.r;
+        var penTop   = ballB - e.y;
+        var penBot   = (e.y + e.size) - ballT;
+        var penLeft  = ballR - e.x;
+        var penRight = (e.x + e.size) - ballL;
+        var minPen = Math.min(penTop, penBot, penLeft, penRight);
+        var fromTop = (minPen === penTop) && ball.vy >= -1; // not actively rising into the boss
+        if(fromTop){
+          // Stomp away vector: bounce up + push horizontally away from
+          // the boss centre so the ball is repelled and can't immediately
+          // re-stomp. Stronger for bosses than minions.
+          var bossCx = e.x + e.size/2;
+          var awaySign = (ball.x < bossCx) ? -1 : 1;
+          var bounceVy = (e.type === 'boss') ? -14 : -10;
+          var bounceVx = (e.type === 'boss') ? awaySign * 5.5 : ball.vx;
           if(e.type === 'boss' && e.invulnT > 0){
-            ball.vy = -10;
+            // Boss is in fire-aura state: bounce off, no damage to boss.
+            ball.vy = bounceVy;
+            ball.vx = bounceVx;
             spawnSparkle(e.x + e.size/2, e.y);
             showToast('Not yet!');
           } else {
             e.hp -= 1;
-            ball.vy = -10;
+            ball.vy = bounceVy;
+            ball.vx = bounceVx;
             if(e.hp <= 0){
               e.alive = false;
               spawnPoof(e.x + e.size/2, e.y + e.size/2);
@@ -1464,9 +1592,20 @@
     if(state.paused) return;
     state.progress[state.world][state.levelInWorld] = true;
     var msg = 'Yay! Great rolling!';
-    showMessage('Level Complete!', msg, 'World Map', function(){
-      setScene('world-map');
-    });
+    var nextL = state.levelInWorld + 1;
+    var hasNext = nextL < WORLDS[state.world].levels.length;
+    if(hasNext){
+      showMessage('Level Complete!', msg, 'Next Level', function(){
+        state.levelInWorld = nextL;
+        enterLevel();
+      }, 'World Map', function(){
+        setScene('world-map');
+      });
+    } else {
+      showMessage('Level Complete!', msg, 'World Map', function(){
+        setScene('world-map');
+      });
+    }
   }
 
   function onBossDefeated(){
@@ -1492,8 +1631,25 @@
     ctx.translate(-camera.x, -camera.y);
 
     current.pits.forEach(function(pit){
-      ctx.fillStyle = '#1a1a1a';
-      ctx.fillRect(pit.x, pit.y, pit.w, pit.h + 200);
+      // Pits cliff off — the floor segments on either side already draw
+      // their cross-section walls; the pit itself is just empty space.
+      // Background shows through, with a soft black gradient overlay
+      // (light at top, dark at bottom) for depth, and a darker rim at
+      // the very top to sell the cliff lip.
+      var pitBottom = Math.max(current.height + 200, camera.y + H + 100);
+      var pitH = pitBottom - pit.y;
+      var grad = ctx.createLinearGradient(0, pit.y, 0, pit.y + pitH);
+      grad.addColorStop(0, 'rgba(0,0,0,0.30)');
+      grad.addColorStop(0.5, 'rgba(0,0,0,0.55)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.85)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(pit.x, pit.y, pit.w, pitH);
+      // Sharper rim shadow at the very top — pulls the eye to the lip.
+      var rim = ctx.createLinearGradient(0, pit.y, 0, pit.y + 28);
+      rim.addColorStop(0, 'rgba(0,0,0,0.55)');
+      rim.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = rim;
+      ctx.fillRect(pit.x, pit.y, pit.w, 28);
     });
 
     current.platforms.forEach(function(p){ drawPlatform(p); });
@@ -1551,7 +1707,38 @@
     else drawLabW3();
   }
 
+  function drawBgImage(img){
+    // Cover-fit the bg image to the canvas, with a slow horizontal
+    // parallax shift based on camera position.
+    var iw = img.naturalWidth, ih = img.naturalHeight;
+    var canvasAR = W / H, imgAR = iw / ih;
+    var dw, dh, dx, dy;
+    if(imgAR > canvasAR){
+      // image is wider than canvas — fit by height, allow horizontal slack
+      dh = H;
+      dw = H * imgAR;
+    } else {
+      dw = W;
+      dh = W / imgAR;
+    }
+    // base centered placement
+    dx = (W - dw) / 2;
+    dy = (H - dh) / 2;
+    // parallax: shift image opposite to camera at 0.15x speed; clamp so
+    // the image still covers the canvas edges
+    var slack = Math.max(0, dw - W);
+    if(slack > 0 && current && current.width){
+      var t = (current.width > W) ? Math.max(0, Math.min(1, camera.x / (current.width - W))) : 0.5;
+      dx = -slack * t;
+    }
+    ctx.drawImage(img, dx, dy, dw, dh);
+  }
+
   function drawHillsW1(){
+    if(imgReady(BG_W1)){
+      drawBgImage(BG_W1);
+      return;
+    }
     ctx.save();
     ctx.fillStyle = '#a5d6a7';
     var off = -camera.x * 0.3;
@@ -1586,6 +1773,10 @@
   }
 
   function drawCaveW2(){
+    if(imgReady(BG_W2)){
+      drawBgImage(BG_W2);
+      return;
+    }
     ctx.save();
     // Crystal rocks in the back
     ctx.fillStyle = '#3a4569';
@@ -1626,6 +1817,10 @@
   }
 
   function drawLabW3(){
+    if(imgReady(BG_W3)){
+      drawBgImage(BG_W3);
+      return;
+    }
     ctx.save();
     // Distant rocket silhouettes
     ctx.fillStyle = '#3a1a1a';
@@ -1670,6 +1865,40 @@
   }
 
   function drawPlatform(p){
+    if(tileReady()){
+      var t = tileForWorld();
+      // Ground-floor platforms (those reaching the world bottom) get
+      // their cross-section extended all the way past the visible canvas
+      // so the bg hills can't peek through below.
+      var isFloor = (p.y + p.h >= current.height - 5);
+      var crossDH;
+      if(isFloor){
+        var floorBottom = Math.max(current.height + 200, camera.y + H + 100);
+        crossDH = floorBottom - (p.y + t.surfaceH);
+      } else {
+        crossDH = p.h - t.surfaceH;
+      }
+      if(p.h <= t.surfaceH){
+        // Thin platform — stretch just the surface band to fill height.
+        ctx.drawImage(TILE, 0, t.y, 1024, t.surfaceH, p.x, p.y, p.w, p.h);
+      } else {
+        // Surface band on top + cliff cross-section below.
+        ctx.drawImage(TILE, 0, t.y, 1024, t.surfaceH, p.x, p.y, p.w, t.surfaceH);
+        if(crossDH > 0){
+          ctx.drawImage(TILE, 0, t.y + t.surfaceH, 1024, t.h - t.surfaceH,
+                        p.x, p.y + t.surfaceH, p.w, crossDH);
+        }
+      }
+      // W1's grass tint and the bg's distant hills sit in the same hue
+      // family, which makes the floor read as a slab floating above more
+      // grass. Darken+saturate the grass surface band so it pops forward.
+      if(state.world === 0){
+        var bandH = (p.h <= t.surfaceH) ? p.h : t.surfaceH;
+        ctx.fillStyle = 'rgba(28, 70, 14, 0.32)';
+        ctx.fillRect(p.x, p.y, p.w, bandH);
+      }
+      return;
+    }
     var color = p.color || '#7cb342';
     var underColor = (state.world === 0) ? '#5d4037' : (state.world === 1) ? '#2c3550' : '#3e2f1f';
     ctx.fillStyle = underColor;
@@ -1727,6 +1956,12 @@
   function drawCoin(x, y){
     ctx.save();
     ctx.translate(x, y);
+    if(atlasReady() && state.world !== 1){
+      // Atlas coin for W1/W3 (gold). W2 keeps the cyan-crystal canvas draw.
+      drawSpriteCentered('coin', 0, 0, 26, 26);
+      ctx.restore();
+      return;
+    }
     if(state.world === 1){
       // Glowing crystal
       ctx.fillStyle = '#80deea';
@@ -1788,56 +2023,86 @@
     if(e.type === 'noodlecube'){ drawNoodleCube(e); return; }
     var cx = e.x + e.size/2, cy = e.y + e.size/2;
     ctx.save();
-    var color;
-    if(e.color){
-      color = e.color;
-    } else if(e.type === 'boss'){
-      color = '#7e57c2';
-    } else if(e.isMinion){
-      color = '#9575cd';
-    } else if(state.world === 0){
-      color = '#5e8a4a';
-    } else if(state.world === 1){
-      color = '#5d4e7a';
-    } else {
-      color = '#bf3f3f';
+    var spriteName = (e.type === 'boss') ? ('boss_w' + (state.world + 1)) : 'square_minion';
+    var spriteW = (e.type === 'boss') ? e.size * 1.45 : e.size * 1.18;
+    var bottomY = e.y + e.size + 2;
+    var spriteOK = drawSpriteBottom(spriteName, cx, bottomY, spriteW);
+    if(!spriteOK){
+      var color;
+      if(e.color){
+        color = e.color;
+      } else if(e.type === 'boss'){
+        color = '#7e57c2';
+      } else if(e.isMinion){
+        color = '#9575cd';
+      } else if(state.world === 0){
+        color = '#5e8a4a';
+      } else if(state.world === 1){
+        color = '#5d4e7a';
+      } else {
+        color = '#bf3f3f';
+      }
+      ctx.fillStyle = color;
+      roundRect(e.x, e.y, e.size, e.size, 6);
+      ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      var eyeY = cy - 4;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(cx - 8, eyeY, 5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 8, eyeY, 5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#222';
+      ctx.beginPath(); ctx.arc(cx - 8, eyeY + 1, 2.5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 8, eyeY + 1, 2.5, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(cx - 12, eyeY - 6); ctx.lineTo(cx - 4, eyeY - 3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + 12, eyeY - 6); ctx.lineTo(cx + 4, eyeY - 3); ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy + 10, 4, Math.PI, Math.PI*2);
+      ctx.stroke();
     }
-    ctx.fillStyle = color;
-    roundRect(e.x, e.y, e.size, e.size, 6);
-    ctx.fill();
-    ctx.strokeStyle = '#222';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    var eyeY = cy - 4;
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(cx - 8, eyeY, 5, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + 8, eyeY, 5, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#222';
-    ctx.beginPath(); ctx.arc(cx - 8, eyeY + 1, 2.5, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + 8, eyeY + 1, 2.5, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#222';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(cx - 12, eyeY - 6); ctx.lineTo(cx - 4, eyeY - 3); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx + 12, eyeY - 6); ctx.lineTo(cx + 4, eyeY - 3); ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx, cy + 10, 4, Math.PI, Math.PI*2);
-    ctx.stroke();
     if(e.type === 'boss'){
-      // Invulnerable flash: yellow pulsing ring + white tint overlay
+      // Invulnerable state: pulsing red fire aura. Threatening enough
+      // that the kid reads "don't touch me right now" without text.
       if(e.invulnT > 0){
-        var flashPhase = Math.sin((performance.now() - (e.invulnStartT || 0)) / 80);
-        if(flashPhase > 0){
-          ctx.globalAlpha = 0.45 * flashPhase;
-          ctx.fillStyle = '#fff9c4';
-          roundRect(e.x, e.y, e.size, e.size, 6);
+        var t = performance.now() / 1000;
+        var baseR = e.size/2;
+        // Outer pulsing fire layers — additive, hot oranges fading to dim red.
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for(var ring = 0; ring < 3; ring++){
+          var ringPhase = (t * 1.4 + ring * 0.45) % 1;
+          var rad = baseR + 8 + ringPhase * 22;
+          var alpha = (1 - ringPhase) * 0.45;
+          ctx.fillStyle = 'rgba(255, ' + (60 + Math.floor(ringPhase * 80)) + ', 10, ' + alpha.toFixed(3) + ')';
+          ctx.beginPath();
+          ctx.arc(cx, cy, rad, 0, Math.PI*2);
           ctx.fill();
-          ctx.globalAlpha = 1;
         }
-        ctx.strokeStyle = '#ffd600';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(cx, cy, e.size/2 + 7, 0, Math.PI*2);
-        ctx.stroke();
+        // Flame tongues orbiting the boss — flickering yellow-orange dots.
+        var tongueCount = 10;
+        for(var fi = 0; fi < tongueCount; fi++){
+          var ang = (t * 1.6 + fi * (Math.PI*2 / tongueCount));
+          var dist = baseR + 12 + Math.sin(t * 6 + fi) * 5;
+          var fx = cx + Math.cos(ang) * dist;
+          var fy = cy + Math.sin(ang) * dist;
+          var sz = 6 + Math.sin(t * 8 + fi * 1.7) * 3;
+          ctx.fillStyle = 'rgba(255, 60, 10, 0.55)';
+          ctx.beginPath(); ctx.arc(fx, fy, sz * 1.6, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = 'rgba(255, 200, 60, 0.85)';
+          ctx.beginPath(); ctx.arc(fx, fy, sz, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = 'rgba(255, 255, 200, 0.9)';
+          ctx.beginPath(); ctx.arc(fx, fy, sz * 0.4, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.restore();
+        // Slight red tint on the boss body itself — subtle, signals "hot".
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = 'rgba(255, 60, 30, ' + (0.18 + Math.abs(Math.sin(t*5))*0.18).toFixed(3) + ')';
+        ctx.fillRect(e.x - 4, e.y - 4, e.size + 8, e.size + 8);
+        ctx.restore();
       }
       // Show HP pips above the boss
       var hp = e.hp;
@@ -1851,8 +2116,11 @@
         ctx.lineWidth = 1;
         ctx.stroke();
       }
-      // Crown / gem / antenna decoration
-      if(e.crown === 'gem'){
+      // Crown / gem / antenna decoration — skipped when boss sprite is loaded
+      // (decoration is baked into the sprite).
+      if(spriteOK){
+        // sprite has crown/gem/antenna baked in — nothing to draw here
+      } else if(e.crown === 'gem'){
         ctx.fillStyle = '#80deea';
         ctx.beginPath();
         ctx.moveTo(cx, e.y - 8);
@@ -1896,6 +2164,22 @@
   function drawScorpion(e){
     var cx = e.x + e.size/2, cy = e.y + e.size/2;
     ctx.save();
+    if(atlasReady()){
+      var bottomY = e.y + e.size + 2;
+      var sprW = e.size * 1.35;
+      ctx.save();
+      if(e.dir < 0){
+        ctx.translate(cx, 0);
+        ctx.scale(-1, 1);
+        drawSpriteBottom('scorpion', 0, bottomY, sprW);
+      } else {
+        drawSpriteBottom('scorpion', cx, bottomY, sprW);
+      }
+      ctx.restore();
+      ctx.restore();
+      return;
+    }
+    // Fallback canvas-shape draw
     // Body — friendly rounded oval, sandy color
     ctx.fillStyle = '#d4a373';
     ctx.beginPath();
@@ -1951,6 +2235,22 @@
   function drawBubbleCube(e){
     var cx = e.x + e.size/2, cy = e.y + e.size/2;
     ctx.save();
+    if(atlasReady()){
+      var bottomY = e.y + e.size + 2;
+      var sprW = e.size * 1.30;
+      ctx.save();
+      if(e.dir < 0){
+        ctx.translate(cx, 0);
+        ctx.scale(-1, 1);
+        drawSpriteBottom('bubble_cube', 0, bottomY, sprW);
+      } else {
+        drawSpriteBottom('bubble_cube', cx, bottomY, sprW);
+      }
+      ctx.restore();
+      ctx.restore();
+      return;
+    }
+    // Fallback canvas-shape draw
     // Cube body (pastel teal)
     ctx.fillStyle = '#80cbc4';
     roundRect(e.x, e.y, e.size, e.size, 6);
@@ -1994,13 +2294,18 @@
   function drawNoodleCube(e){
     var cx = e.x + e.size/2, cy = e.y + e.size/2;
     ctx.save();
-    // Bigger cube body (lavender)
-    ctx.fillStyle = '#9fa8da';
-    roundRect(e.x, e.y, e.size, e.size, 8);
-    ctx.fill();
-    ctx.strokeStyle = '#3949ab';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    if(atlasReady()){
+      var bottomY = e.y + e.size + 2;
+      drawSpriteBottom('noodle_cube', cx, bottomY, e.size * 1.25);
+    } else {
+      // Bigger cube body (lavender)
+      ctx.fillStyle = '#9fa8da';
+      roundRect(e.x, e.y, e.size, e.size, 8);
+      ctx.fill();
+      ctx.strokeStyle = '#3949ab';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
     // HP pips above
     var pipMax = 2;
     for(var h = 0; h < pipMax; h++){
@@ -2048,19 +2353,20 @@
     ctx.arc(dirN * nlen, 0, 8, 0, Math.PI*2);
     ctx.fill();
     ctx.restore();
-    // Eyes
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(cx - 8, cy - 4, 5, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + 8, cy - 4, 5, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#222';
-    ctx.beginPath(); ctx.arc(cx - 8, cy - 3, 2.5, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + 8, cy - 3, 2.5, 0, Math.PI*2); ctx.fill();
-    // Slight frown / smile
-    ctx.strokeStyle = '#222';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy + 10, 4, 0.1, Math.PI - 0.1);
-    ctx.stroke();
+    if(!atlasReady()){
+      // Eyes / smile only drawn when sprite isn't loaded (sprite has them baked in)
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(cx - 8, cy - 4, 5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 8, cy - 4, 5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#222';
+      ctx.beginPath(); ctx.arc(cx - 8, cy - 3, 2.5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 8, cy - 3, 2.5, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy + 10, 4, 0.1, Math.PI - 0.1);
+      ctx.stroke();
+    }
     // Telegraph indicator during wind-up
     if(e.swingState === 'wind'){
       ctx.fillStyle = '#fff176';
@@ -2147,29 +2453,32 @@
     ctx.save();
     ctx.translate(ball.x, ball.y);
     ctx.rotate(ball.rot);
-    var grad = ctx.createRadialGradient(-6, -6, 4, 0, 0, ball.r);
-    grad.addColorStop(0, '#ff7b6f');
-    grad.addColorStop(0.5, '#e53935');
-    grad.addColorStop(1, '#9b1c1c');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(0, 0, ball.r, 0, Math.PI*2);
-    ctx.fill();
-    ctx.strokeStyle = '#7a1212';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, ball.r - 6, -0.4, 0.4);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 0, ball.r - 6, Math.PI - 0.4, Math.PI + 0.4);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.beginPath();
-    ctx.arc(-7, -7, 5, 0, Math.PI*2);
-    ctx.fill();
+    var ballSize = ball.r * 2.2;
+    if(!drawSpriteCentered('player_ball', 0, 0, ballSize, ballSize)){
+      var grad = ctx.createRadialGradient(-6, -6, 4, 0, 0, ball.r);
+      grad.addColorStop(0, '#ff7b6f');
+      grad.addColorStop(0.5, '#e53935');
+      grad.addColorStop(1, '#9b1c1c');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, ball.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#7a1212';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, ball.r - 6, -0.4, 0.4);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, ball.r - 6, Math.PI - 0.4, Math.PI + 0.4);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.arc(-7, -7, 5, 0, Math.PI*2);
+      ctx.fill();
+    }
     ctx.restore();
 
     ctx.save();
