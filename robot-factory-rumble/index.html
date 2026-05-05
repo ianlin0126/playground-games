@@ -186,7 +186,7 @@ window.addEventListener('resize', resize);
 var scene = 'menu';     // 'menu' | 'playing' | 'respawn' | 'win'
 var hp = 5;             // player hearts (0..5)
 var maxHp = 5;
-var levelLength = 4270; // pre-boss scaled to 20% (3220 px) + 1050 boss arena
+var levelLength = 7490; // pre-boss ~6440 px + 1050 boss arena
 
 var heartsEl   = document.getElementById('hearts-row');
 var shieldEl   = document.getElementById('shield-row');
@@ -295,7 +295,7 @@ function startGame() {
   pickups = [];
   checkpoints = [];
   lastCheckpoint = { x: 80, y: GROUND_Y };
-  boss = { active: false, x: 0, y: 0, w: 80, h: 80, phase: 1, hp: 54, hpMaxP1: 54, hpMaxP2: 70, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5, minionSpawnT: 4, entryT: 0 };
+  boss = { active: false, x: 0, y: 0, w: 80, h: 80, phase: 1, hp: 70, hpMaxP1: 70, hpMaxP2: 91, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5, minionSpawnT: 4, entryT: 0 };
   bossRow.style.display = 'none';
   progressBar.style.display = '';
   shieldEl.style.display = 'none';
@@ -606,6 +606,12 @@ var level = {
     { x: 2050, w: 80 },
     { x: 2550, w: 70 },
     { x: 3200, w: 70 },
+    { x: 3650, w: 80 },
+    { x: 4150, w: 70 },
+    { x: 4700, w: 80 },
+    { x: 5180, w: 70 },
+    { x: 5700, w: 80 },
+    { x: 6130, w: 70 },
   ],
   platforms: [
     { x:  600, w: 140, top: -120, beltDir:  0 },
@@ -617,11 +623,17 @@ var level = {
   ],
   floorBelts: [
     { x:  600, w: 200, dir:  1 },   // Segment A
-    { x: 1300, w: 200, dir:  1 },
+    { x: 1300, w: 150, dir:  1 },   // truncated to avoid pit at x=1450
     { x: 1700, w: 200, dir: -1 },   // Mid Segment B
     { x: 2300, w: 200, dir: -1 },
     { x: 2800, w: 200, dir:  1 },   // Segment C
     { x: 3400, w: 200, dir: -1 },   // Late Segment C, just before boss arena
+    { x: 3850, w: 150, dir:  1 },   // Segment D
+    { x: 4350, w: 150, dir: -1 },
+    { x: 4900, w: 200, dir:  1 },
+    { x: 5450, w: 150, dir: -1 },
+    { x: 5950, w: 150, dir:  1 },
+    { x: 6300, w: 100, dir:  1 },
   ],
 };
 function resolveLevelGeometry() {
@@ -887,19 +899,30 @@ function spawnEnemy(kind, x) {
 }
 
 function setupLevelEnemies() {
-  // Segment A
-  spawnEnemy('walker',  300);
-  spawnEnemy('copter',  650);
-  spawnEnemy('bolt',   1000);
-  // Segment B
-  spawnEnemy('walker', 1400);
-  spawnEnemy('copter', 1800);
-  spawnEnemy('bolt',   2200);
-  spawnEnemy('walker', 2500);
-  // Segment C
-  spawnEnemy('copter', 2900);
-  spawnEnemy('walker', 3200);
-  spawnEnemy('bolt',   3500);
+  // Segment A (0–1300)
+  spawnEnemy('walker',  550);
+  spawnEnemy('walker',  900);
+  spawnEnemy('copter', 1200);
+  // Segment B (1300–2700)
+  spawnEnemy('bolt',   1550);
+  spawnEnemy('bolt',   1850);
+  spawnEnemy('walker', 2100);
+  spawnEnemy('walker', 2600);
+  // Segment C (2700–4400)
+  spawnEnemy('copter', 3300);
+  spawnEnemy('bolt',   3750);
+  spawnEnemy('copter', 4050);
+  spawnEnemy('bolt',   4300);
+  // Segment D (4400–6440)
+  spawnEnemy('walker', 4600);
+  spawnEnemy('copter', 4850);
+  spawnEnemy('bolt',   5100);
+  spawnEnemy('walker', 5350);
+  spawnEnemy('copter', 5600);
+  spawnEnemy('walker', 5900);
+  spawnEnemy('bolt',   6050);
+  spawnEnemy('copter', 6200);
+  spawnEnemy('walker', 6350);
 }
 
 function updateEnemies(dt) {
@@ -930,9 +953,25 @@ function updateEnemies(dt) {
       if (e.wobbleT > 0) {
         e.wobbleT -= dt;
       } else {
-        e.x += e.vx * dt;
-        if (e.x <= e.patrolMin && e.vx < 0) { e.wobbleT = 0.3; e.vx = 60; }
-        if (e.x >= e.patrolMax && e.vx > 0) { e.wobbleT = 0.3; e.vx = -60; }
+        // Pit-edge detection: check the leading edge one step ahead
+        var leadEdge = e.x + (e.vx > 0 ? e.w : 0);
+        var nextLeadEdge = leadEdge + e.vx * dt;
+        var willFallIntoPit = false;
+        for (var pi = 0; pi < level.pits.length; pi++) {
+          var pit = level.pits[pi];
+          if (nextLeadEdge > pit.x && nextLeadEdge < pit.x + pit.w) {
+            willFallIntoPit = true;
+            break;
+          }
+        }
+        if (willFallIntoPit) {
+          e.wobbleT = 0.3;
+          e.vx = -e.vx;
+        } else {
+          e.x += e.vx * dt;
+          if (e.x <= e.patrolMin && e.vx < 0) { e.wobbleT = 0.3; e.vx = 60; }
+          if (e.x >= e.patrolMax && e.vx > 0) { e.wobbleT = 0.3; e.vx = -60; }
+        }
       }
       // Laser shot at player when nearby + on cadence
       e.shotT -= dt;
@@ -1302,9 +1341,9 @@ var boss = {
   x: 0, y: 0,                    // resolved in activateBoss / startGame to BOSS_ARENA_LEFT + 200
   w: 80, h: 80,
   phase: 1,
-  hp: 54,
-  hpMaxP1: 54,
-  hpMaxP2: 70,
+  hp: 70,
+  hpMaxP1: 70,
+  hpMaxP2: 91,
   attackT: 1.6,
   currentAttack: null,
   hitFlash: 0,
@@ -1315,9 +1354,9 @@ var boss = {
   minionSpawnT: 4,                // phase 2 minion-from-right cadence
   entryT: 0,
 };
-var BOSS_TRIGGER_X = 4070;        // ~200px from level end; arena bounds set dynamically at activation
-var BOSS_ARENA_LEFT  = 4070;       // overridden in activateBoss()
-var BOSS_ARENA_RIGHT = 4270;       // overridden in activateBoss()
+var BOSS_TRIGGER_X = 7090;        // ~400px from level end; arena bounds set dynamically at activation
+var BOSS_ARENA_LEFT  = 7090;       // overridden in activateBoss()
+var BOSS_ARENA_RIGHT = 7490;       // overridden in activateBoss()
 
 function activateBoss() {
   if (boss.active) return;
