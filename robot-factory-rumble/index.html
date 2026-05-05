@@ -186,7 +186,7 @@ window.addEventListener('resize', resize);
 var scene = 'menu';     // 'menu' | 'playing' | 'respawn' | 'win'
 var hp = 5;             // player hearts (0..5)
 var maxHp = 5;
-var levelLength = 4270; // pre-boss scaled to 20% (3220 px) + 1050 boss arena
+var levelLength = 7490; // pre-boss ~6440 px + 1050 boss arena
 
 var heartsEl   = document.getElementById('hearts-row');
 var shieldEl   = document.getElementById('shield-row');
@@ -295,7 +295,7 @@ function startGame() {
   pickups = [];
   checkpoints = [];
   lastCheckpoint = { x: 80, y: GROUND_Y };
-  boss = { active: false, x: 0, y: 0, w: 80, h: 80, phase: 1, hp: 54, hpMaxP1: 54, hpMaxP2: 70, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5, minionSpawnT: 4, entryT: 0 };
+  boss = { active: false, x: 0, y: 0, w: 80, h: 80, phase: 1, hp: 70, hpMaxP1: 70, hpMaxP2: 91, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5, minionSpawnT: 4, entryT: 0 };
   bossRow.style.display = 'none';
   progressBar.style.display = '';
   shieldEl.style.display = 'none';
@@ -617,7 +617,7 @@ var level = {
   ],
   floorBelts: [
     { x:  600, w: 200, dir:  1 },   // Segment A
-    { x: 1300, w: 200, dir:  1 },
+    { x: 1300, w: 150, dir:  1 },   // truncated to avoid pit at x=1450
     { x: 1700, w: 200, dir: -1 },   // Mid Segment B
     { x: 2300, w: 200, dir: -1 },
     { x: 2800, w: 200, dir:  1 },   // Segment C
@@ -887,19 +887,30 @@ function spawnEnemy(kind, x) {
 }
 
 function setupLevelEnemies() {
-  // Segment A
-  spawnEnemy('walker',  300);
-  spawnEnemy('copter',  650);
-  spawnEnemy('bolt',   1000);
-  // Segment B
-  spawnEnemy('walker', 1400);
-  spawnEnemy('copter', 1800);
-  spawnEnemy('bolt',   2200);
-  spawnEnemy('walker', 2500);
-  // Segment C
-  spawnEnemy('copter', 2900);
-  spawnEnemy('walker', 3200);
-  spawnEnemy('bolt',   3500);
+  // Segment A (0–1300)
+  spawnEnemy('walker',  550);
+  spawnEnemy('walker',  900);
+  spawnEnemy('copter', 1200);
+  // Segment B (1300–2700)
+  spawnEnemy('bolt',   1550);
+  spawnEnemy('bolt',   1850);
+  spawnEnemy('walker', 2100);
+  spawnEnemy('walker', 2600);
+  // Segment C (2700–4400)
+  spawnEnemy('copter', 3300);
+  spawnEnemy('bolt',   3750);
+  spawnEnemy('copter', 4050);
+  spawnEnemy('bolt',   4300);
+  // Segment D (4400–6440)
+  spawnEnemy('walker', 4600);
+  spawnEnemy('copter', 4850);
+  spawnEnemy('bolt',   5100);
+  spawnEnemy('walker', 5350);
+  spawnEnemy('copter', 5600);
+  spawnEnemy('walker', 5900);
+  spawnEnemy('bolt',   6050);
+  spawnEnemy('copter', 6200);
+  spawnEnemy('walker', 6350);
 }
 
 function updateEnemies(dt) {
@@ -1302,9 +1313,9 @@ var boss = {
   x: 0, y: 0,                    // resolved in activateBoss / startGame to BOSS_ARENA_LEFT + 200
   w: 80, h: 80,
   phase: 1,
-  hp: 54,
-  hpMaxP1: 54,
-  hpMaxP2: 70,
+  hp: 70,
+  hpMaxP1: 70,
+  hpMaxP2: 91,
   attackT: 1.6,
   currentAttack: null,
   hitFlash: 0,
@@ -1315,9 +1326,9 @@ var boss = {
   minionSpawnT: 4,                // phase 2 minion-from-right cadence
   entryT: 0,
 };
-var BOSS_TRIGGER_X = 4070;        // ~200px from level end; arena bounds set dynamically at activation
-var BOSS_ARENA_LEFT  = 4070;       // overridden in activateBoss()
-var BOSS_ARENA_RIGHT = 4270;       // overridden in activateBoss()
+var BOSS_TRIGGER_X = 7090;        // ~400px from level end; arena bounds set dynamically at activation
+var BOSS_ARENA_LEFT  = 7090;       // overridden in activateBoss()
+var BOSS_ARENA_RIGHT = 7490;       // overridden in activateBoss()
 
 function activateBoss() {
   if (boss.active) return;
