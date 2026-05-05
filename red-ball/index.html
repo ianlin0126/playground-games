@@ -1,0 +1,2358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Red Ball</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #87ceeb; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; }
+  #wrap { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(#87ceeb 0%, #b8e3f5 60%, #d4f0d0 100%); transition: background 0.4s; }
+  #wrap.world-1 { background: linear-gradient(#87ceeb 0%, #b8e3f5 60%, #d4f0d0 100%); }
+  #wrap.world-2 { background: linear-gradient(#2c3e6e 0%, #4a5a8a 50%, #5d4e7a 100%); }
+  #wrap.world-3 { background: linear-gradient(#1a1a2e 0%, #5d2a4a 60%, #7a3f1a 100%); }
+  canvas { display: block; background: transparent; max-width: 100%; max-height: 100%; image-rendering: -webkit-optimize-contrast; }
+
+  #hud { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; z-index: 5; flex-wrap: wrap; gap: 8px; }
+  .pill { background: rgba(255,255,255,0.85); padding: 8px 16px; border-radius: 24px; font-size: 24px; font-weight: 800; color: #c0392b; box-shadow: 0 3px 8px rgba(0,0,0,0.15); }
+  .pill.coin { color: #b8860b; }
+  .pill.world { color: #4a3c8a; }
+  #mapBtn { pointer-events: auto; cursor: pointer; background: rgba(255,255,255,0.9); padding: 8px 16px; border-radius: 24px; font-size: 24px; font-weight: 800; color: #2e7d32; box-shadow: 0 3px 8px rgba(0,0,0,0.2); border: none; }
+  #mapBtn:active { transform: scale(0.95); }
+  #shopBtnHud { pointer-events: auto; cursor: pointer; background: rgba(255,255,255,0.9); min-width: 56px; min-height: 56px; padding: 8px 14px; border-radius: 28px; font-size: 28px; font-weight: 800; color: #2e7d32; box-shadow: 0 3px 8px rgba(0,0,0,0.2); border: none; display: flex; align-items: center; justify-content: center; }
+  #shopBtnHud:active { transform: scale(0.95); }
+
+  /* In-game shop overlay (modal that floats above gameplay without changing scene) */
+  #shopOverlay { position: fixed; inset: 0; display: none; z-index: 30; background: rgba(0,0,0,0.55); align-items: flex-start; justify-content: center; overflow-y: auto; padding: 24px 16px 40px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+  #shopOverlay.show { display: flex; }
+  #shopOverlay .scene-inner { background: linear-gradient(#e8f5e9 0%, #fff9c4 50%, #ffe0b2 100%); border-radius: 28px; padding: 22px 18px 28px; width: 100%; max-width: 480px; box-shadow: 0 12px 36px rgba(0,0,0,0.35); max-height: 85vh; overflow-y: auto; -webkit-overflow-scrolling: touch; position: relative; }
+  #shopOverlayXBtn { position: absolute; top: 12px; right: 12px; min-width: 44px; min-height: 44px; width: 44px; height: 44px; border: none; border-radius: 50%; background: rgba(0,0,0,0.12); color: #333; font-size: 22px; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  #shopOverlayXBtn:active { background: rgba(0,0,0,0.22); }
+
+  /* Allow touch scrolling inside overlay scenes — override the global touch-action:none */
+  #menu *, #worldMap *, #shop *, #shopOverlay * { touch-action: pan-y; }
+
+  /* Vertical world-map cards with extra height + scroll hint */
+  .world-card.tall { min-height: 44vh; display: flex; flex-direction: column; justify-content: center; }
+  #scrollHint { position: fixed; left: 0; right: 0; bottom: 12px; text-align: center; pointer-events: none; font-size: 22px; font-weight: 800; color: #c0392b; text-shadow: 0 2px 0 rgba(255,255,255,0.7); animation: bounceHint 1.2s ease-in-out infinite; z-index: 21; display: none; }
+  #scrollHint.show { display: block; }
+  @keyframes bounceHint { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+
+  #controls { position: fixed; left: 0; right: 0; bottom: 0; padding: 16px; display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none; z-index: 6; }
+  #controls.hidden { display: none; }
+  .pad { display: flex; gap: 12px; pointer-events: auto; }
+  .btn { width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.85); border: 4px solid #c0392b; color: #c0392b; font-size: 36px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2); cursor: pointer; touch-action: none; }
+  .btn:active { transform: scale(0.92); background: #ffe6e0; }
+  .btn-jump { width: 96px; height: 96px; font-size: 28px; background: #ffd54a; border-color: #f39c12; color: #b35900; }
+  .btn-jump:active { background: #ffe88a; }
+
+  #message { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); z-index: 10; padding: 20px; }
+  #message.show { display: flex; }
+  .panel { background: #fff; border-radius: 28px; padding: 28px 32px; max-width: 360px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+  .panel h1 { font-size: 32px; color: #c0392b; margin-bottom: 12px; }
+  .panel p { font-size: 24px; color: #333; margin-bottom: 20px; line-height: 1.4; }
+  .panel button { font-size: 26px; font-weight: 800; padding: 14px 28px; min-height: 52px; min-width: 160px; border: none; border-radius: 18px; background: #e74c3c; color: white; cursor: pointer; box-shadow: 0 4px 0 #b03a2e; }
+  .panel button:active { transform: translateY(2px); box-shadow: 0 2px 0 #b03a2e; }
+
+  #toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.95); color: #c0392b; padding: 16px 28px; border-radius: 20px; font-size: 28px; font-weight: 900; box-shadow: 0 6px 20px rgba(0,0,0,0.2); pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 8; }
+  #toast.show { opacity: 1; }
+
+  /* Menu / map / shop overlays */
+  #menu, #worldMap, #shop { position: fixed; inset: 0; display: none; z-index: 20; overflow-y: auto; padding: 24px 16px 40px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+  #menu.show, #worldMap.show, #shop.show { display: block; }
+  #menu { background: linear-gradient(#87ceeb 0%, #b8e3f5 60%, #d4f0d0 100%); }
+  #worldMap { background: linear-gradient(#fff7e0 0%, #ffe0b2 50%, #ffccbc 100%); }
+  #shop { background: linear-gradient(#e8f5e9 0%, #fff9c4 50%, #ffe0b2 100%); }
+
+  .scene-inner { max-width: 480px; margin: 0 auto; }
+  .scene-title { font-size: 40px; font-weight: 900; color: #c0392b; text-align: center; margin: 16px 0 8px; text-shadow: 0 3px 0 rgba(255,255,255,0.6); }
+  .scene-subtitle { font-size: 22px; color: #444; text-align: center; margin-bottom: 20px; font-weight: 700; }
+
+  .menu-ball { width: 120px; height: 120px; margin: 24px auto 16px; display: block; }
+
+  .big-btn { display: block; width: 100%; max-width: 360px; margin: 14px auto; min-height: 64px; padding: 16px 24px; font-size: 26px; font-weight: 800; border: none; border-radius: 22px; cursor: pointer; box-shadow: 0 5px 0 rgba(0,0,0,0.18); color: white; }
+  .big-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,0.18); }
+  .big-btn.play { background: #e74c3c; }
+  .big-btn.shop { background: #43a047; }
+  .big-btn.map { background: #5e35b2; }
+
+  .world-card { background: #fff; border-radius: 22px; padding: 18px 18px 14px; margin: 14px auto; box-shadow: 0 6px 16px rgba(0,0,0,0.15); border: 4px solid transparent; }
+  .world-card.w0 { border-color: #7cb342; }
+  .world-card.w1 { border-color: #5e35b2; }
+  .world-card.w2 { border-color: #ef6c00; }
+  .world-card h2 { font-size: 26px; font-weight: 900; margin-bottom: 4px; color: #333; }
+  .world-card .progress { font-size: 20px; color: #555; margin-bottom: 12px; font-weight: 700; }
+  .level-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .level-node { flex: 1 1 80px; min-width: 70px; min-height: 64px; border: 3px solid #999; background: #f5f5f5; color: #333; border-radius: 16px; font-size: 22px; font-weight: 800; cursor: pointer; padding: 10px 8px; }
+  .level-node.done { background: #c8e6c9; border-color: #43a047; color: #1b5e20; }
+  .level-node.done::after { content: ' \2605'; }
+  .level-node:active { transform: scale(0.95); }
+  .boss-btn { display: block; width: 100%; min-height: 56px; padding: 12px 20px; font-size: 22px; font-weight: 900; border: none; border-radius: 16px; cursor: pointer; }
+  .boss-btn.unlocked { background: #ff6f00; color: white; box-shadow: 0 4px 0 #b35a00; }
+  .boss-btn.unlocked:active { transform: translateY(2px); box-shadow: 0 2px 0 #b35a00; }
+  .boss-btn.locked { background: #cfd8dc; color: #607d8b; box-shadow: 0 4px 0 #90a4ae; cursor: default; }
+
+  .shop-row { background: #fff; border-radius: 20px; padding: 16px; margin: 12px auto; display: flex; align-items: center; gap: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+  .shop-icon { width: 56px; height: 56px; border-radius: 14px; background: #fff3e0; display: flex; align-items: center; justify-content: center; font-size: 34px; flex-shrink: 0; }
+  .shop-info { flex: 1; min-width: 0; }
+  .shop-info h3 { font-size: 22px; font-weight: 900; color: #333; margin-bottom: 2px; }
+  .shop-info p { font-size: 16px; color: #666; line-height: 1.3; }
+  .shop-buy { min-width: 92px; min-height: 52px; font-size: 18px; font-weight: 800; border: none; border-radius: 14px; cursor: pointer; padding: 8px 12px; background: #43a047; color: white; box-shadow: 0 3px 0 #2e7d32; }
+  .shop-buy:active { transform: translateY(2px); box-shadow: 0 1px 0 #2e7d32; }
+  .shop-buy.owned { background: #e0e0e0; color: #555; box-shadow: 0 3px 0 #bdbdbd; cursor: default; }
+  .shop-buy.cant { background: #ffccbc; color: #bf360c; box-shadow: 0 3px 0 #ff8a65; cursor: default; }
+
+  .back-btn { display: block; margin: 24px auto 0; min-width: 180px; min-height: 56px; padding: 12px 28px; font-size: 22px; font-weight: 800; border: none; border-radius: 18px; background: #546e7a; color: white; cursor: pointer; box-shadow: 0 4px 0 #37474f; }
+  .back-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #37474f; }
+
+  @media (max-width: 380px) {
+    .btn { width: 68px; height: 68px; font-size: 30px; }
+    .btn-jump { width: 84px; height: 84px; font-size: 24px; }
+    .scene-title { font-size: 32px; }
+    .pill { font-size: 20px; padding: 6px 12px; }
+    #mapBtn { font-size: 20px; padding: 6px 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+</div>
+
+<div id="hud">
+  <div class="pill" id="levelLabel">Level 1</div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <div class="pill coin" id="coinLabel">Coins: 0</div>
+    <div class="pill" id="livesLabel">Tries: 3</div>
+    <button id="mapBtn">Map</button>
+    <button id="shopBtnHud" aria-label="Shop">&#128722;</button>
+  </div>
+</div>
+
+<div id="controls">
+  <div class="pad">
+    <div class="btn" id="leftBtn">&#9664;</div>
+    <div class="btn" id="rightBtn">&#9654;</div>
+  </div>
+  <div class="pad">
+    <div class="btn btn-jump" id="jumpBtn">JUMP</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="message">
+  <div class="panel">
+    <h1 id="msgTitle">Great job!</h1>
+    <p id="msgText">Ready for the next level?</p>
+    <button id="msgBtn">Next</button>
+  </div>
+</div>
+
+<!-- Menu scene -->
+<div id="menu">
+  <div class="scene-inner">
+    <h1 class="scene-title">Red Ball</h1>
+    <p class="scene-subtitle">Roll, jump, and POOF the bad guys!</p>
+    <canvas class="menu-ball" id="menuBall" width="120" height="120"></canvas>
+    <button class="big-btn play" id="menuPlayBtn">Play!</button>
+    <button class="big-btn map" id="menuMapBtn">World Map</button>
+    <button class="big-btn shop" id="menuShopBtn">Shop</button>
+  </div>
+</div>
+
+<!-- World map scene -->
+<div id="worldMap">
+  <div class="scene-inner">
+    <h1 class="scene-title">World Map</h1>
+    <p class="scene-subtitle" id="mapCoinLabel">You have 0 coins</p>
+    <div id="worldsList"></div>
+    <button class="big-btn shop" id="mapShopBtn">Shop</button>
+    <button class="back-btn" id="mapBackBtn">Back to Menu</button>
+  </div>
+</div>
+
+<!-- Shop scene -->
+<div id="shop">
+  <div class="scene-inner">
+    <h1 class="scene-title">Power Shop</h1>
+    <p class="scene-subtitle" id="shopCoinLabel">You have 0 coins</p>
+    <div id="shopList"></div>
+    <button class="back-btn" id="shopBackBtn">Back</button>
+  </div>
+</div>
+
+<!-- In-game shop overlay (does not change scene) -->
+<div id="shopOverlay">
+  <div class="scene-inner">
+    <button id="shopOverlayXBtn" aria-label="Close shop">&#10005;</button>
+    <h1 class="scene-title">Power Shop</h1>
+    <p class="scene-subtitle" id="shopOverlayCoinLabel">You have 0 coins</p>
+    <div id="shopOverlayList"></div>
+    <button class="back-btn" id="shopOverlayCloseBtn">Keep Playing</button>
+  </div>
+</div>
+
+<!-- Scroll hint shown on world-map until user scrolls down -->
+<div id="scrollHint">&#8595; More worlds</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  var levelLabel = document.getElementById('levelLabel');
+  var coinLabel = document.getElementById('coinLabel');
+  var livesLabel = document.getElementById('livesLabel');
+  var mapBtn = document.getElementById('mapBtn');
+  var msgEl = document.getElementById('message');
+  var msgTitle = document.getElementById('msgTitle');
+  var msgText = document.getElementById('msgText');
+  var msgBtn = document.getElementById('msgBtn');
+  var toastEl = document.getElementById('toast');
+  var wrapEl = document.getElementById('wrap');
+  var hudEl = document.getElementById('hud');
+  var controlsEl = document.getElementById('controls');
+
+  var menuEl = document.getElementById('menu');
+  var worldMapEl = document.getElementById('worldMap');
+  var shopEl = document.getElementById('shop');
+  var worldsListEl = document.getElementById('worldsList');
+  var shopListEl = document.getElementById('shopList');
+  var mapCoinLabel = document.getElementById('mapCoinLabel');
+  var shopCoinLabel = document.getElementById('shopCoinLabel');
+  var shopOverlayEl = document.getElementById('shopOverlay');
+  var shopOverlayList = document.getElementById('shopOverlayList');
+  var shopOverlayCoinLabel = document.getElementById('shopOverlayCoinLabel');
+  var shopBtnHud = document.getElementById('shopBtnHud');
+  var scrollHintEl = document.getElementById('scrollHint');
+
+  var W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize(){
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
+
+  // -------- World/Level data --------
+  // World 1 — Sunny Hills (the original 3 levels, but L3 has its boss removed; that's the dedicated boss arena now)
+  var WORLD_1 = [
+    {
+      width: 1800, height: 600, spawn: {x: 80, y: 400},
+      platforms: [
+        {x: 0, y: 540, w: 1800, h: 60, color: '#7cb342'}
+      ],
+      pits: [],
+      enemies: [
+        {x: 600, y: 500, type: 'square'},
+        {x: 1100, y: 500, type: 'square'}
+      ],
+      coins: [
+        {x: 300, y: 480}, {x: 350, y: 480}, {x: 400, y: 480},
+        {x: 800, y: 460}, {x: 850, y: 460},
+        {x: 1300, y: 480}, {x: 1350, y: 480}
+      ],
+      blocks: [
+        {x: 500, y: 500, w: 40, h: 40, color: '#a1887f'},
+        {x: 540, y: 500, w: 40, h: 40, color: '#a1887f'}
+      ],
+      goal: {x: 1700, y: 480}
+    },
+    {
+      width: 2400, height: 600, spawn: {x: 80, y: 400},
+      platforms: [
+        {x: 0, y: 540, w: 600, h: 60, color: '#7cb342'},
+        {x: 800, y: 540, w: 400, h: 60, color: '#7cb342'},
+        {x: 1400, y: 540, w: 1000, h: 60, color: '#7cb342'},
+        {x: 950, y: 420, w: 120, h: 22, color: '#8d6e63'},
+        {x: 1700, y: 420, w: 140, h: 22, color: '#8d6e63'}
+      ],
+      pits: [
+        {x: 600, y: 540, w: 200, h: 60},
+        {x: 1200, y: 540, w: 200, h: 60}
+      ],
+      enemies: [
+        {x: 400, y: 500, type: 'square'},
+        {x: 1000, y: 500, type: 'square'},
+        {x: 1550, y: 500, type: 'square'},
+        {x: 2000, y: 500, type: 'square'}
+      ],
+      coins: [
+        {x: 250, y: 480},{x: 300, y: 480},
+        {x: 970, y: 380},{x: 1010, y: 380},
+        {x: 1720, y: 380},{x: 1770, y: 380},
+        {x: 2150, y: 480},{x: 2200, y: 480}
+      ],
+      blocks: [
+        {x: 1500, y: 500, w: 40, h: 40, color: '#a1887f'},
+        {x: 1900, y: 500, w: 40, h: 40, color: '#a1887f'},
+        {x: 1940, y: 500, w: 40, h: 40, color: '#a1887f'}
+      ],
+      moving: [
+        {x: 1230, y: 460, w: 130, h: 20, minX: 1220, maxX: 1380, vx: 1.2, color: '#ff9800'}
+      ],
+      goal: {x: 2300, y: 480}
+    },
+    {
+      // L3 of W1 — vertical climb (no boss; the boss is now its own scene)
+      width: 2200, height: 900, spawn: {x: 80, y: 800},
+      platforms: [
+        {x: 0, y: 840, w: 800, h: 60, color: '#7cb342'},
+        {x: 950, y: 760, w: 180, h: 22, color: '#8d6e63'},
+        {x: 1200, y: 660, w: 180, h: 22, color: '#8d6e63'},
+        {x: 950, y: 540, w: 180, h: 22, color: '#8d6e63'},
+        {x: 1200, y: 420, w: 220, h: 22, color: '#8d6e63'},
+        {x: 1500, y: 320, w: 220, h: 22, color: '#8d6e63'},
+        {x: 1800, y: 220, w: 400, h: 22, color: '#8d6e63'},
+        {x: 700, y: 420, w: 180, h: 22, color: '#8d6e63'},
+        {x: 1500, y: 600, w: 180, h: 22, color: '#8d6e63'}
+      ],
+      pits: [
+        {x: 800, y: 840, w: 1400, h: 60}
+      ],
+      enemies: [
+        {x: 300, y: 800, type: 'square'},
+        {x: 500, y: 800, type: 'square'},
+        {x: 1230, y: 620, type: 'square'},
+        {x: 1240, y: 380, type: 'square'},
+        {x: 1550, y: 280, type: 'square'}
+      ],
+      coins: [
+        {x: 200, y: 780},{x: 250, y: 780},
+        {x: 1000, y: 720},{x: 1260, y: 620},
+        {x: 1000, y: 500},{x: 1280, y: 380},
+        {x: 1580, y: 280},{x: 1900, y: 180},
+        {x: 2050, y: 180}
+      ],
+      blocks: [],
+      moving: [
+        {x: 800, y: 660, w: 110, h: 20, minX: 800, maxX: 940, vx: 1.5, color: '#ff9800'},
+        {x: 1380, y: 540, w: 110, h: 20, minX: 1380, maxX: 1500, vx: 1.4, color: '#ff9800'},
+        {x: 1700, y: 420, w: 110, h: 20, minX: 1700, maxX: 1800, vx: 1.3, color: '#ff9800'}
+      ],
+      goal: {x: 2120, y: 160}
+    }
+  ];
+
+  // World 2 — Cool Caves (slate-blue / purple, glowing crystal coins)
+  var W2_PLAT = '#5d6e94';
+  var W2_FLOOR = '#3e4a6b';
+  var W2_BLOCK = '#7a6d9c';
+  var WORLD_2 = [
+    {
+      width: 2000, height: 600, spawn: {x: 80, y: 400},
+      platforms: [
+        {x: 0, y: 540, w: 700, h: 60, color: W2_PLAT},
+        {x: 850, y: 540, w: 300, h: 60, color: W2_PLAT},
+        {x: 1300, y: 540, w: 700, h: 60, color: W2_PLAT},
+        {x: 950, y: 400, w: 140, h: 20, color: W2_BLOCK}
+      ],
+      pits: [
+        {x: 700, y: 540, w: 150, h: 60},
+        {x: 1150, y: 540, w: 150, h: 60}
+      ],
+      enemies: [
+        {x: 400, y: 500, type: 'square'},
+        {x: 920, y: 500, type: 'scorpion'},
+        {x: 1500, y: 500, type: 'square'},
+        {x: 1750, y: 500, type: 'scorpion'}
+      ],
+      coins: [
+        {x: 200, y: 480},{x: 250, y: 480},{x: 300, y: 480},
+        {x: 1000, y: 360},{x: 1050, y: 360},
+        {x: 1400, y: 480},{x: 1450, y: 480},
+        {x: 1850, y: 480},{x: 1900, y: 480}
+      ],
+      blocks: [
+        {x: 600, y: 500, w: 40, h: 40, color: W2_BLOCK},
+        {x: 1600, y: 500, w: 40, h: 40, color: W2_BLOCK}
+      ],
+      goal: {x: 1950, y: 480}
+    },
+    {
+      width: 2400, height: 800, spawn: {x: 80, y: 600},
+      platforms: [
+        {x: 0, y: 740, w: 500, h: 60, color: W2_PLAT},
+        {x: 650, y: 640, w: 180, h: 20, color: W2_BLOCK},
+        {x: 900, y: 540, w: 180, h: 20, color: W2_BLOCK},
+        {x: 1150, y: 640, w: 200, h: 20, color: W2_BLOCK},
+        {x: 1450, y: 540, w: 180, h: 20, color: W2_BLOCK},
+        {x: 1700, y: 740, w: 700, h: 60, color: W2_PLAT},
+        {x: 1750, y: 600, w: 140, h: 20, color: W2_BLOCK},
+        {x: 2050, y: 500, w: 160, h: 20, color: W2_BLOCK}
+      ],
+      pits: [
+        {x: 500, y: 740, w: 1200, h: 60}
+      ],
+      enemies: [
+        {x: 200, y: 700, type: 'square'},
+        {x: 700, y: 600, type: 'scorpion'},
+        {x: 1180, y: 600, type: 'square'},
+        {x: 1850, y: 700, type: 'scorpion'},
+        {x: 2100, y: 460, type: 'square'}
+      ],
+      coins: [
+        {x: 150, y: 680},{x: 200, y: 680},
+        {x: 700, y: 600},{x: 740, y: 600},
+        {x: 950, y: 500},{x: 1000, y: 500},
+        {x: 1200, y: 600},{x: 1250, y: 600},
+        {x: 1500, y: 500},{x: 1550, y: 500},
+        {x: 1800, y: 560},{x: 2100, y: 460},
+        {x: 2300, y: 680}
+      ],
+      blocks: [],
+      moving: [
+        {x: 1080, y: 580, w: 100, h: 20, minX: 1080, maxX: 1170, vx: 1.4, color: '#9575cd'}
+      ],
+      goal: {x: 2350, y: 680}
+    },
+    {
+      // W2 L3 — twisty crystal cave with deep pits and tall jumps
+      width: 2400, height: 900, spawn: {x: 80, y: 700},
+      platforms: [
+        {x: 0, y: 840, w: 600, h: 60, color: W2_PLAT},
+        {x: 700, y: 740, w: 160, h: 20, color: W2_BLOCK},
+        {x: 920, y: 640, w: 180, h: 20, color: W2_BLOCK},
+        {x: 1150, y: 540, w: 180, h: 20, color: W2_BLOCK},
+        {x: 920, y: 420, w: 180, h: 20, color: W2_BLOCK},
+        {x: 700, y: 320, w: 200, h: 20, color: W2_BLOCK},
+        {x: 1000, y: 220, w: 250, h: 20, color: W2_BLOCK},
+        {x: 1400, y: 220, w: 1000, h: 60, color: W2_PLAT},
+        {x: 1500, y: 380, w: 140, h: 20, color: W2_BLOCK},
+        {x: 1750, y: 480, w: 140, h: 20, color: W2_BLOCK}
+      ],
+      pits: [
+        {x: 600, y: 840, w: 800, h: 60}
+      ],
+      enemies: [
+        {x: 200, y: 800, type: 'square'},
+        {x: 400, y: 800, type: 'square'},
+        {x: 950, y: 600, type: 'square'},
+        {x: 950, y: 380, type: 'square'},
+        {x: 1450, y: 180, type: 'square'},
+        {x: 1900, y: 180, type: 'square'},
+        {x: 2200, y: 180, type: 'square'}
+      ],
+      coins: [
+        {x: 200, y: 780},{x: 280, y: 780},
+        {x: 770, y: 700},
+        {x: 980, y: 600},{x: 1030, y: 600},
+        {x: 1200, y: 500},
+        {x: 980, y: 380},
+        {x: 770, y: 280},
+        {x: 1080, y: 180},{x: 1130, y: 180},
+        {x: 1500, y: 180},{x: 1700, y: 180},{x: 1900, y: 180},
+        {x: 2100, y: 180},{x: 2300, y: 180},
+        {x: 1560, y: 340},{x: 1810, y: 440}
+      ],
+      blocks: [],
+      moving: [
+        {x: 1330, y: 460, w: 100, h: 20, minX: 1330, maxX: 1480, vx: 1.5, color: '#9575cd'}
+      ],
+      goal: {x: 2350, y: 200}
+    }
+  ];
+
+  // World 3 — Rocket Lab (sci-fi yellow/red, conveyors, vertical climbs)
+  var W3_PLAT = '#bf360c';
+  var W3_FLOOR = '#4e342e';
+  var W3_BLOCK = '#ffb300';
+  var WORLD_3 = [
+    {
+      width: 2200, height: 600, spawn: {x: 80, y: 400},
+      platforms: [
+        {x: 0, y: 540, w: 800, h: 60, color: W3_PLAT},
+        {x: 1000, y: 540, w: 400, h: 60, color: W3_PLAT},
+        {x: 1600, y: 540, w: 600, h: 60, color: W3_PLAT},
+        {x: 1100, y: 400, w: 200, h: 18, color: W3_BLOCK}
+      ],
+      pits: [
+        {x: 800, y: 540, w: 200, h: 60},
+        {x: 1400, y: 540, w: 200, h: 60}
+      ],
+      enemies: [
+        {x: 350, y: 500, type: 'square'},
+        {x: 600, y: 500, type: 'bubblecube'},
+        {x: 1200, y: 500, type: 'square'},
+        {x: 1800, y: 494, type: 'noodlecube'},
+        {x: 2050, y: 500, type: 'square'}
+      ],
+      coins: [
+        {x: 300, y: 480},{x: 350, y: 480},{x: 400, y: 480},
+        {x: 1150, y: 360},{x: 1200, y: 360},{x: 1250, y: 360},
+        {x: 1700, y: 480},{x: 1750, y: 480},
+        {x: 2000, y: 480}
+      ],
+      blocks: [
+        {x: 700, y: 500, w: 40, h: 40, color: W3_BLOCK}
+      ],
+      moving: [
+        {x: 850, y: 460, w: 130, h: 20, minX: 820, maxX: 970, vx: 1.6, color: '#ffeb3b'},
+        {x: 1430, y: 460, w: 130, h: 20, minX: 1410, maxX: 1570, vx: 1.6, color: '#ffeb3b'}
+      ],
+      goal: {x: 2100, y: 480}
+    },
+    {
+      // W3 L2 — vertical climb tower
+      width: 1600, height: 1000, spawn: {x: 80, y: 900},
+      platforms: [
+        {x: 0, y: 940, w: 600, h: 60, color: W3_PLAT},
+        {x: 700, y: 840, w: 180, h: 18, color: W3_BLOCK},
+        {x: 950, y: 740, w: 180, h: 18, color: W3_BLOCK},
+        {x: 700, y: 640, w: 180, h: 18, color: W3_BLOCK},
+        {x: 950, y: 540, w: 180, h: 18, color: W3_BLOCK},
+        {x: 700, y: 440, w: 180, h: 18, color: W3_BLOCK},
+        {x: 950, y: 340, w: 180, h: 18, color: W3_BLOCK},
+        {x: 700, y: 240, w: 180, h: 18, color: W3_BLOCK},
+        {x: 1100, y: 200, w: 500, h: 60, color: W3_PLAT}
+      ],
+      pits: [
+        {x: 600, y: 940, w: 1000, h: 60}
+      ],
+      enemies: [
+        {x: 200, y: 900, type: 'square'},
+        {x: 400, y: 900, type: 'bubblecube'},
+        {x: 740, y: 800, type: 'square'},
+        {x: 990, y: 694, type: 'noodlecube'},
+        {x: 740, y: 400, type: 'square'},
+        {x: 1200, y: 160, type: 'square'},
+        {x: 1400, y: 160, type: 'square'}
+      ],
+      coins: [
+        {x: 200, y: 880},{x: 400, y: 880},
+        {x: 770, y: 800},
+        {x: 1010, y: 700},{x: 1050, y: 700},
+        {x: 770, y: 600},
+        {x: 1010, y: 500},
+        {x: 770, y: 400},
+        {x: 1010, y: 300},
+        {x: 770, y: 200},
+        {x: 1200, y: 160},{x: 1400, y: 160},{x: 1500, y: 160}
+      ],
+      blocks: [],
+      moving: [
+        {x: 880, y: 880, w: 100, h: 20, minX: 870, maxX: 980, vx: 1.5, color: '#ffeb3b'}
+      ],
+      goal: {x: 1550, y: 160}
+    },
+    {
+      // W3 L3 — long conveyor run
+      width: 2600, height: 700, spawn: {x: 80, y: 500},
+      platforms: [
+        {x: 0, y: 640, w: 500, h: 60, color: W3_PLAT},
+        {x: 700, y: 640, w: 300, h: 60, color: W3_PLAT},
+        {x: 1200, y: 640, w: 300, h: 60, color: W3_PLAT},
+        {x: 1700, y: 640, w: 300, h: 60, color: W3_PLAT},
+        {x: 2200, y: 640, w: 400, h: 60, color: W3_PLAT},
+        {x: 600, y: 480, w: 200, h: 18, color: W3_BLOCK},
+        {x: 1100, y: 380, w: 220, h: 18, color: W3_BLOCK},
+        {x: 1600, y: 480, w: 200, h: 18, color: W3_BLOCK},
+        {x: 2050, y: 380, w: 220, h: 18, color: W3_BLOCK}
+      ],
+      pits: [
+        {x: 500, y: 640, w: 200, h: 60},
+        {x: 1000, y: 640, w: 200, h: 60},
+        {x: 1500, y: 640, w: 200, h: 60},
+        {x: 2000, y: 640, w: 200, h: 60}
+      ],
+      enemies: [
+        {x: 300, y: 600, type: 'square'},
+        {x: 800, y: 600, type: 'bubblecube'},
+        {x: 1300, y: 600, type: 'square'},
+        {x: 1800, y: 594, type: 'noodlecube'},
+        {x: 2350, y: 600, type: 'square'},
+        {x: 2450, y: 600, type: 'square'},
+        {x: 1150, y: 340, type: 'square'},
+        {x: 2100, y: 340, type: 'square'}
+      ],
+      coins: [
+        {x: 200, y: 580},{x: 300, y: 580},{x: 400, y: 580},
+        {x: 660, y: 440},{x: 700, y: 440},{x: 740, y: 440},
+        {x: 1150, y: 340},{x: 1200, y: 340},{x: 1250, y: 340},
+        {x: 1660, y: 440},{x: 1700, y: 440},{x: 1740, y: 440},
+        {x: 2100, y: 340},{x: 2150, y: 340},{x: 2200, y: 340},
+        {x: 2400, y: 580},{x: 2500, y: 580}
+      ],
+      blocks: [],
+      moving: [
+        {x: 850, y: 540, w: 110, h: 20, minX: 800, maxX: 990, vx: 1.7, color: '#ffeb3b'},
+        {x: 1350, y: 540, w: 110, h: 20, minX: 1300, maxX: 1490, vx: 1.7, color: '#ffeb3b'},
+        {x: 1850, y: 540, w: 110, h: 20, minX: 1800, maxX: 1990, vx: 1.7, color: '#ffeb3b'}
+      ],
+      goal: {x: 2550, y: 580}
+    }
+  ];
+
+  // Boss arenas — flat little stages, ball at one end, boss at the other
+  function makeBossArena(opts){
+    var enemies = [
+      {x: 900, y: 460, type: 'boss', hp: opts.hp, color: opts.color, crown: opts.crown, spawnsCubes: !!opts.spawnsCubes}
+    ];
+    if(opts.extras){
+      for(var i=0;i<opts.extras.length;i++) enemies.push(opts.extras[i]);
+    }
+    return {
+      isBoss: true,
+      width: 1100, height: 600, spawn: {x: 80, y: 460},
+      platforms: [
+        {x: 0, y: 540, w: 1100, h: 60, color: opts.floor}
+      ],
+      pits: [],
+      enemies: enemies,
+      coins: [],
+      blocks: [],
+      moving: [],
+      goal: null
+    };
+  }
+
+  var WORLDS = [
+    {
+      name: 'Sunny Hills',
+      cssClass: 'world-1',
+      levels: WORLD_1,
+      boss: makeBossArena({hp: 3, floor: '#7cb342', color: '#7e57c2', crown: 'crown', spawnsCubes: true})
+    },
+    {
+      name: 'Cool Caves',
+      cssClass: 'world-2',
+      levels: WORLD_2,
+      boss: makeBossArena({hp: 3, floor: W2_PLAT, color: '#26a69a', crown: 'gem', extras: [
+        {x: 350, y: 500, type: 'scorpion'},
+        {x: 600, y: 500, type: 'scorpion'}
+      ]})
+    },
+    {
+      name: 'Rocket Lab',
+      cssClass: 'world-3',
+      levels: WORLD_3,
+      boss: makeBossArena({hp: 4, floor: W3_PLAT, color: '#d84315', crown: 'antenna', extras: [
+        {x: 300, y: 500, type: 'bubblecube'},
+        {x: 500, y: 494, type: 'noodlecube'},
+        {x: 700, y: 500, type: 'bubblecube'}
+      ]})
+    }
+  ];
+
+  // -------- Game state --------
+  var state = {
+    scene: 'menu', // 'menu' | 'world-map' | 'shop' | 'level' | 'boss'
+    world: 0,
+    levelInWorld: 0,
+    lives: 3,
+    coins: 0,
+    paused: false,
+    shopOverlay: false,
+    progress: [
+      [false, false, false], // world 1 levels completed
+      [false, false, false],
+      [false, false, false]
+    ],
+    bossesBeat: [false, false, false],
+    owned: {
+      'double-jump': false,
+      'bigger-bounce': false,
+      'magnet': false,
+      'extra-heart': false
+    }
+  };
+
+  var ball = {
+    x: 0, y: 0, r: 22,
+    vx: 0, vy: 0,
+    onGround: false,
+    rot: 0,
+    jumpsLeft: 1,
+    stunT: 0
+  };
+
+  var keys = { left: false, right: false, jumpPressed: false, jumpHeld: false };
+
+  var camera = { x: 0, y: 0 };
+  var current = null;
+  var particles = [];
+  var projectiles = [];
+
+  var POWERS = [
+    {id: 'double-jump', name: 'Double Jump', icon: '✨', desc: 'Jump again in midair!', price: 15},
+    {id: 'bigger-bounce', name: 'Bigger Bounce', icon: '⬆', desc: 'Jump higher than before.', price: 10},
+    {id: 'magnet', name: 'Coin Magnet', icon: '🧲', desc: 'Coins fly toward you.', price: 25},
+    {id: 'extra-heart', name: 'Extra Heart', icon: '❤', desc: '+1 try every level.', price: 8}
+  ];
+
+  // -------- Scene management --------
+  function setScene(name){
+    state.scene = name;
+    menuEl.classList.toggle('show', name === 'menu');
+    worldMapEl.classList.toggle('show', name === 'world-map');
+    shopEl.classList.toggle('show', name === 'shop');
+    var inGame = (name === 'level' || name === 'boss');
+    hudEl.style.display = inGame ? 'flex' : 'none';
+    controlsEl.classList.toggle('hidden', !inGame);
+    // Always hide the in-game shop overlay when switching scenes
+    if(state.shopOverlay){
+      state.shopOverlay = false;
+      shopOverlayEl.classList.remove('show');
+    }
+    if(name === 'world-map') renderWorldMap();
+    if(name === 'shop') renderShop();
+    if(name === 'menu') drawMenuBall();
+    if(name !== 'world-map') scrollHintEl.classList.remove('show');
+  }
+
+  function bossUnlocked(worldIdx){
+    var p = state.progress[worldIdx];
+    var done = (p[0] ? 1 : 0) + (p[1] ? 1 : 0) + (p[2] ? 1 : 0);
+    return done >= 2;
+  }
+
+  function levelsDoneCount(worldIdx){
+    var p = state.progress[worldIdx];
+    return (p[0] ? 1 : 0) + (p[1] ? 1 : 0) + (p[2] ? 1 : 0);
+  }
+
+  function renderWorldMap(){
+    mapCoinLabel.textContent = 'You have ' + state.coins + ' coins';
+    var html = '';
+    for(var w = 0; w < WORLDS.length; w++){
+      var world = WORLDS[w];
+      var doneCount = levelsDoneCount(w);
+      var bossUnlock = bossUnlocked(w);
+      var bossDone = state.bossesBeat[w];
+      html += '<div class="world-card tall w' + w + '" id="worldCard' + w + '">';
+      html += '<h2>' + world.name + '</h2>';
+      html += '<div class="progress">' + doneCount + '/3 levels' + (bossDone ? ' ★ Boss POOFED!' : '') + '</div>';
+      html += '<div class="level-row">';
+      for(var l = 0; l < 3; l++){
+        var done = state.progress[w][l];
+        html += '<button class="level-node ' + (done ? 'done' : '') + '" data-world="' + w + '" data-level="' + l + '">L' + (l+1) + '</button>';
+      }
+      html += '</div>';
+      if(bossUnlock){
+        html += '<button class="boss-btn unlocked" data-boss="' + w + '">' + (bossDone ? 'Boss Fight Again!' : 'Boss Fight!') + '</button>';
+      } else {
+        html += '<button class="boss-btn locked">Try a couple of levels first!</button>';
+      }
+      html += '</div>';
+    }
+    worldsListEl.innerHTML = html;
+    // Wire up buttons
+    var nodes = worldsListEl.querySelectorAll('.level-node');
+    for(var i = 0; i < nodes.length; i++){
+      nodes[i].addEventListener('click', onLevelNodeClick);
+    }
+    var bossButtons = worldsListEl.querySelectorAll('.boss-btn.unlocked');
+    for(var j = 0; j < bossButtons.length; j++){
+      bossButtons[j].addEventListener('click', onBossButtonClick);
+    }
+    updateScrollHint();
+  }
+
+  function updateScrollHint(){
+    if(state.scene !== 'world-map'){
+      scrollHintEl.classList.remove('show');
+      return;
+    }
+    // Hint shown if there's more content below current scroll
+    var sc = worldMapEl;
+    var more = (sc.scrollHeight - sc.scrollTop - sc.clientHeight) > 40;
+    scrollHintEl.classList.toggle('show', more);
+  }
+
+  function onLevelNodeClick(e){
+    var w = parseInt(e.currentTarget.getAttribute('data-world'), 10);
+    var l = parseInt(e.currentTarget.getAttribute('data-level'), 10);
+    state.world = w;
+    state.levelInWorld = l;
+    enterLevel();
+  }
+
+  function onBossButtonClick(e){
+    var w = parseInt(e.currentTarget.getAttribute('data-boss'), 10);
+    state.world = w;
+    enterBoss();
+  }
+
+  function renderShop(){
+    shopCoinLabel.textContent = 'You have ' + state.coins + ' coins';
+    var html = '';
+    for(var i = 0; i < POWERS.length; i++){
+      var p = POWERS[i];
+      var owned = state.owned[p.id];
+      var canBuy = !owned && state.coins >= p.price;
+      var btnClass = owned ? 'owned' : (canBuy ? '' : 'cant');
+      var btnLabel = owned ? '✓ Owned' : (canBuy ? 'Buy ' + p.price : p.price + ' coins');
+      html += '<div class="shop-row">';
+      html += '<div class="shop-icon">' + p.icon + '</div>';
+      html += '<div class="shop-info"><h3>' + p.name + '</h3><p>' + p.desc + '</p></div>';
+      html += '<button class="shop-buy ' + btnClass + '" data-power="' + p.id + '">' + btnLabel + '</button>';
+      html += '</div>';
+    }
+    shopListEl.innerHTML = html;
+    var buys = shopListEl.querySelectorAll('.shop-buy');
+    for(var j = 0; j < buys.length; j++){
+      buys[j].addEventListener('click', onShopBuyClick);
+    }
+  }
+
+  function onShopBuyClick(e){
+    var id = e.currentTarget.getAttribute('data-power');
+    var btn = e.currentTarget;
+    if(btn.classList.contains('owned') || btn.classList.contains('cant')) return;
+    var power = null;
+    for(var i = 0; i < POWERS.length; i++){ if(POWERS[i].id === id){ power = POWERS[i]; break; } }
+    if(!power) return;
+    if(state.coins < power.price) return;
+    state.coins -= power.price;
+    state.owned[id] = true;
+    showToast('Power Up!');
+    renderShop();
+    // Keep the in-game overlay copy in sync if it's open
+    if(state.shopOverlay) renderShopOverlay();
+    // Apply some powers immediately to live ball
+    if(id === 'extra-heart' && (state.scene === 'level' || state.scene === 'boss')){
+      state.lives += 1;
+      updateHud();
+    }
+    if(id === 'double-jump' && (state.scene === 'level' || state.scene === 'boss')){
+      // top up jumps so the kid feels it right away if airborne
+      ball.jumpsLeft = Math.max(ball.jumpsLeft, 1);
+    }
+  }
+
+  function renderShopOverlay(){
+    shopOverlayCoinLabel.textContent = 'You have ' + state.coins + ' coins';
+    var html = '';
+    for(var i = 0; i < POWERS.length; i++){
+      var p = POWERS[i];
+      var owned = state.owned[p.id];
+      var canBuy = !owned && state.coins >= p.price;
+      var btnClass = owned ? 'owned' : (canBuy ? '' : 'cant');
+      var btnLabel = owned ? '✓ Owned' : (canBuy ? 'Buy ' + p.price : p.price + ' coins');
+      html += '<div class="shop-row">';
+      html += '<div class="shop-icon">' + p.icon + '</div>';
+      html += '<div class="shop-info"><h3>' + p.name + '</h3><p>' + p.desc + '</p></div>';
+      html += '<button class="shop-buy ' + btnClass + '" data-power="' + p.id + '">' + btnLabel + '</button>';
+      html += '</div>';
+    }
+    shopOverlayList.innerHTML = html;
+    var buys = shopOverlayList.querySelectorAll('.shop-buy');
+    for(var j = 0; j < buys.length; j++){
+      buys[j].addEventListener('click', onShopBuyClick);
+    }
+  }
+
+  function openShopOverlay(){
+    if(state.scene !== 'level' && state.scene !== 'boss') return;
+    state.shopOverlay = true;
+    renderShopOverlay();
+    shopOverlayEl.classList.add('show');
+  }
+
+  function closeShopOverlay(){
+    state.shopOverlay = false;
+    shopOverlayEl.classList.remove('show');
+  }
+
+  function drawMenuBall(){
+    var mc = document.getElementById('menuBall');
+    if(!mc) return;
+    var mctx = mc.getContext('2d');
+    mctx.clearRect(0, 0, 120, 120);
+    mctx.save();
+    mctx.translate(60, 60);
+    var grad = mctx.createRadialGradient(-12, -12, 8, 0, 0, 50);
+    grad.addColorStop(0, '#ff7b6f');
+    grad.addColorStop(0.5, '#e53935');
+    grad.addColorStop(1, '#9b1c1c');
+    mctx.fillStyle = grad;
+    mctx.beginPath();
+    mctx.arc(0, 0, 50, 0, Math.PI*2);
+    mctx.fill();
+    mctx.strokeStyle = '#7a1212';
+    mctx.lineWidth = 3;
+    mctx.stroke();
+    mctx.fillStyle = '#fff';
+    mctx.beginPath(); mctx.arc(-14, -8, 10, 0, Math.PI*2); mctx.fill();
+    mctx.beginPath(); mctx.arc(14, -8, 10, 0, Math.PI*2); mctx.fill();
+    mctx.fillStyle = '#222';
+    mctx.beginPath(); mctx.arc(-12, -6, 5, 0, Math.PI*2); mctx.fill();
+    mctx.beginPath(); mctx.arc(16, -6, 5, 0, Math.PI*2); mctx.fill();
+    mctx.strokeStyle = '#222';
+    mctx.lineWidth = 3;
+    mctx.beginPath();
+    mctx.arc(0, 12, 12, 0.1, Math.PI - 0.1);
+    mctx.stroke();
+    mctx.restore();
+  }
+
+  // -------- Level loading --------
+  function applyWorldTheme(){
+    wrapEl.className = '';
+    wrapEl.id = 'wrap';
+    wrapEl.classList.add(WORLDS[state.world].cssClass);
+  }
+
+  function startingLives(){
+    return state.owned['extra-heart'] ? 4 : 3;
+  }
+
+  function jumpVelocity(){
+    return state.owned['bigger-bounce'] ? 15 : 12.5;
+  }
+
+  function maxJumps(){
+    return state.owned['double-jump'] ? 2 : 1;
+  }
+
+  function loadLevel(src, isBossArena){
+    current = JSON.parse(JSON.stringify(src));
+    current.isBoss = !!isBossArena;
+    current.enemies.forEach(function(e){
+      e.alive = true;
+      if(e.type === 'boss') e.size = isBossArena ? 76 : 56;
+      else if(e.type === 'noodlecube') e.size = 46;
+      else e.size = 40;
+      if(e.hp === undefined){
+        if(e.type === 'boss') e.hp = 2;
+        else if(e.type === 'noodlecube') e.hp = 2;
+        else e.hp = 1;
+      }
+      e.dir = -1;
+      var speedMult = (e.type === 'scorpion') ? 1.4 : 1;
+      e.vx = 0.6 * e.dir * speedMult;
+      e.poof = 0;
+      // per-enemy timers
+      e.shootT = 1.5 + Math.random() * 1.5; // first shot after a delay
+      e.swingT = 2.0 + Math.random() * 1.5;
+      e.swingState = 'idle'; // 'idle' | 'wind' | 'sweep'
+      e.swingPhase = 0;
+      e.spawnT = 3.0; // boss minion timer
+      e.isMinion = !!e.isMinion;
+      // Boss invulnerable state: invulnT > 0 = currently invulnerable (seconds)
+      // invulnCycle counts down to next invuln phase
+      if(e.type === 'boss'){
+        e.invulnT = 0;
+        e.invulnCycle = 5.0 + Math.random() * 1.0; // first shield after ~5s
+        // Boss patrol speed — W3 boss is faster
+        var isW3 = isBossArena && state.world === 2;
+        e.patrolSpeed = isW3 ? 1.8 : 1.4;
+        e.vx = -e.patrolSpeed;
+      }
+    });
+    current.coins.forEach(function(c){ c.taken = false; c.bob = Math.random() * Math.PI * 2; });
+    current.moving = current.moving || [];
+    ball.x = current.spawn.x;
+    ball.y = current.spawn.y;
+    ball.vx = 0; ball.vy = 0; ball.rot = 0;
+    ball.jumpsLeft = maxJumps();
+    ball.stunT = 0;
+    camera.x = 0; camera.y = 0;
+    state.lives = startingLives();
+    updateHud();
+    particles.length = 0;
+    projectiles.length = 0;
+    applyWorldTheme();
+  }
+
+  function updateHud(){
+    if(state.scene === 'boss'){
+      levelLabel.textContent = WORLDS[state.world].name + ' Boss';
+    } else {
+      levelLabel.textContent = WORLDS[state.world].name + ' L' + (state.levelInWorld + 1);
+    }
+    coinLabel.textContent = 'Coins: ' + state.coins;
+    livesLabel.textContent = 'Tries: ' + state.lives;
+  }
+
+  function enterLevel(){
+    setScene('level');
+    loadLevel(WORLDS[state.world].levels[state.levelInWorld], false);
+  }
+
+  function enterBoss(){
+    setScene('boss');
+    loadLevel(WORLDS[state.world].boss, true);
+  }
+
+  function respawn(){
+    state.lives -= 1;
+    livesLabel.textContent = 'Tries: ' + Math.max(0, state.lives);
+    showToast('Try again, you got this!');
+    ball.x = current.spawn.x;
+    ball.y = current.spawn.y;
+    ball.vx = 0; ball.vy = 0;
+    ball.jumpsLeft = maxJumps();
+    ball.stunT = 0;
+    projectiles.length = 0;
+    if(state.lives <= 0){
+      state.lives = startingLives();
+      livesLabel.textContent = 'Tries: ' + state.lives;
+      showMessage('You got this!', 'Have another go — you are doing great.', 'Restart', function(){
+        if(state.scene === 'boss') enterBoss();
+        else enterLevel();
+      });
+    }
+  }
+
+  function showToast(text){
+    toastEl.textContent = text;
+    toastEl.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function(){ toastEl.classList.remove('show'); }, 900);
+  }
+
+  function showMessage(title, text, btn, cb){
+    msgTitle.textContent = title;
+    msgText.textContent = text;
+    msgBtn.textContent = btn;
+    state.paused = true;
+    msgEl.classList.add('show');
+    msgBtn.onclick = function(){
+      msgEl.classList.remove('show');
+      state.paused = false;
+      if(cb) cb();
+    };
+  }
+
+  // -------- Physics --------
+  var GRAVITY = 0.55;
+  var MOVE_ACC = 0.45;
+  var MAX_VX = 5.0;
+  var FRICTION = 0.86;
+
+  function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh){
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+  }
+
+  function circleRectCollide(cx, cy, cr, rx, ry, rw, rh){
+    var nx = Math.max(rx, Math.min(cx, rx + rw));
+    var ny = Math.max(ry, Math.min(cy, ry + rh));
+    var dx = cx - nx, dy = cy - ny;
+    return (dx*dx + dy*dy) < cr*cr;
+  }
+
+  function update(dt){
+    if(state.scene !== 'level' && state.scene !== 'boss') return;
+    if(state.paused || !current) return;
+    if(state.shopOverlay) return;
+
+    // Stun: block input and slow down ball
+    var stunned = ball.stunT > 0;
+    if(stunned){
+      ball.stunT -= dt * 16.67;
+      ball.vx *= 0.85;
+      keys.jumpPressed = false;
+    }
+
+    // Input (ignored when stunned)
+    if(!stunned){
+      if(keys.left) ball.vx -= MOVE_ACC;
+      if(keys.right) ball.vx += MOVE_ACC;
+      if(!keys.left && !keys.right) ball.vx *= FRICTION;
+    }
+    if(ball.vx > MAX_VX) ball.vx = MAX_VX;
+    if(ball.vx < -MAX_VX) ball.vx = -MAX_VX;
+
+    if(!stunned && keys.jumpPressed){
+      if(ball.onGround){
+        ball.vy = -jumpVelocity();
+        ball.onGround = false;
+        ball.jumpsLeft = maxJumps() - 1;
+      } else if(ball.jumpsLeft > 0){
+        ball.vy = -jumpVelocity() * 0.92;
+        ball.jumpsLeft -= 1;
+      }
+    }
+    keys.jumpPressed = false;
+
+    ball.vy += GRAVITY;
+    if(ball.vy > 18) ball.vy = 18;
+
+    ball.x += ball.vx;
+    ball.rot += ball.vx * 0.05;
+
+    var solids = collectSolids();
+    for(var i=0;i<solids.length;i++){
+      var s = solids[i];
+      if(circleRectCollide(ball.x, ball.y, ball.r, s.x, s.y, s.w, s.h)){
+        if(ball.vx > 0){ ball.x = s.x - ball.r; }
+        else if(ball.vx < 0){ ball.x = s.x + s.w + ball.r; }
+        ball.vx = 0;
+      }
+    }
+
+    ball.y += ball.vy;
+    ball.onGround = false;
+    for(var j=0;j<solids.length;j++){
+      var s2 = solids[j];
+      if(circleRectCollide(ball.x, ball.y, ball.r, s2.x, s2.y, s2.w, s2.h)){
+        if(ball.vy >= 0){
+          // Snap onto the top surface: only if ball center is above the midpoint of the rect
+          // and ball is horizontally overlapping (within a small tolerance for edge corners)
+          var ballOverlapX = ball.x >= s2.x - 4 && ball.x <= s2.x + s2.w + 4;
+          if(ballOverlapX && ball.y - ball.r < s2.y + s2.h * 0.5){
+            ball.y = s2.y - ball.r;
+            ball.vy = 0;
+            ball.onGround = true;
+            ball.jumpsLeft = maxJumps();
+            if(s2.vx !== undefined){
+              ball.x += s2._lastDx || 0;
+            }
+          } else {
+            // Side push (ball hit the side of the rect while moving down)
+            if(ball.vx > 0){ ball.x = s2.x - ball.r; }
+            else { ball.x = s2.x + s2.w + ball.r; }
+          }
+        } else if(ball.vy < 0){
+          ball.y = s2.y + s2.h + ball.r;
+          ball.vy = 0;
+        }
+      }
+    }
+
+    if(ball.x - ball.r < 0){ ball.x = ball.r; ball.vx = 0; }
+    if(ball.x + ball.r > current.width){ ball.x = current.width - ball.r; ball.vx = 0; }
+
+    if(ball.y - ball.r > current.height + 50){
+      respawn();
+      return;
+    }
+    for(var p=0;p<current.pits.length;p++){
+      var pit = current.pits[p];
+      if(ball.y > pit.y + 5 && ball.x > pit.x && ball.x < pit.x + pit.w){
+        respawn();
+        return;
+      }
+    }
+
+    current.moving.forEach(function(m){
+      var prevX = m.x;
+      m.x += m.vx;
+      if(m.x < m.minX){ m.x = m.minX; m.vx *= -1; }
+      if(m.x > m.maxX){ m.x = m.maxX; m.vx *= -1; }
+      m._lastDx = m.x - prevX;
+    });
+
+    var newMinions = [];
+    current.enemies.forEach(function(e){
+      if(!e.alive){
+        e.poof += dt;
+        return;
+      }
+      var nextX = e.x + e.vx;
+      var groundFound = false;
+      var groundY = e.y + e.size;
+      for(var k=0;k<current.platforms.length;k++){
+        var pl = current.platforms[k];
+        if(nextX + e.size/2 > pl.x && nextX + e.size/2 < pl.x + pl.w && Math.abs(pl.y - groundY) < 4){
+          groundFound = true; break;
+        }
+      }
+      var hitBlock = false;
+      if(current.blocks && e.type !== 'boss'){
+        var leadX = (e.vx > 0) ? nextX + e.size : nextX;
+        for(var bi = 0; bi < current.blocks.length; bi++){
+          var blk = current.blocks[bi];
+          if(leadX > blk.x && leadX < blk.x + blk.w &&
+             e.y < blk.y + blk.h && e.y + e.size > blk.y){
+            hitBlock = true; break;
+          }
+        }
+      }
+      if(!groundFound || hitBlock){
+        e.dir *= -1;
+        var sm = (e.type === 'boss') ? 1.4 : (e.type === 'scorpion' ? 1.4 : 1);
+        e.vx = 0.6 * e.dir * sm;
+      } else {
+        e.x = nextX;
+      }
+      if(e.x < 10){ e.x = 10; e.dir = 1; e.vx = Math.abs(e.vx); }
+      if(e.x + e.size > current.width - 10){ e.x = current.width - 10 - e.size; e.dir = -1; e.vx = -Math.abs(e.vx); }
+
+      // Per-type behavior
+      var dts = dt / 60; // approx seconds per frame
+      if(e.type === 'scorpion'){
+        e.shootT -= dts;
+        if(e.shootT <= 0){
+          e.shootT = 4.0 + Math.random() * 1.5;
+          // fire a small star puff toward the player
+          var sx = e.x + e.size/2, sy = e.y + e.size/2 - 6;
+          var dxp = ball.x - sx, dyp = ball.y - sy;
+          var ln = Math.max(1, Math.sqrt(dxp*dxp + dyp*dyp));
+          var sp = 3.0;
+          projectiles.push({
+            x: sx, y: sy, vx: (dxp/ln)*sp, vy: (dyp/ln)*sp,
+            kind: 'star', life: 220, r: 8
+          });
+        }
+      } else if(e.type === 'bubblecube'){
+        e.shootT -= dts;
+        if(e.shootT <= 0){
+          e.shootT = 3.0;
+          var bx = e.x + e.size/2, by = e.y + 4;
+          var dirX = (ball.x < bx) ? -1 : 1;
+          projectiles.push({
+            x: bx, y: by, vx: dirX * 2.2, vy: -0.4,
+            kind: 'bubble', life: 200, r: 12
+          });
+        }
+      } else if(e.type === 'noodlecube'){
+        if(e.swingState === 'idle'){
+          e.swingT -= dts;
+          if(e.swingT <= 0){
+            e.swingState = 'wind';
+            e.swingPhase = 0;
+          }
+        } else if(e.swingState === 'wind'){
+          e.swingPhase += dts;
+          if(e.swingPhase >= 0.5){
+            e.swingState = 'sweep';
+            e.swingPhase = 0;
+          }
+        } else if(e.swingState === 'sweep'){
+          e.swingPhase += dts;
+          if(e.swingPhase >= 0.35){
+            e.swingState = 'idle';
+            e.swingT = 4.0;
+            e.swingPhase = 0;
+          }
+        }
+      } else if(e.type === 'boss' && current.isBoss){
+        // Invulnerable cycle countdown
+        if(e.invulnT > 0){
+          e.invulnT -= dts;
+          if(e.invulnT <= 0){
+            e.invulnT = 0;
+            var isW3boss = state.world === 2;
+            e.invulnCycle = isW3boss ? 4.5 : 5.0;
+          }
+        } else {
+          e.invulnCycle -= dts;
+          if(e.invulnCycle <= 0){
+            var isW3bossInvuln = state.world === 2;
+            e.invulnT = isW3bossInvuln ? 1.4 : 1.0;
+            showToast('Watch out!');
+          }
+        }
+        // Patrol: ensure boss vx is set to patrolSpeed in current direction
+        e.vx = e.patrolSpeed * e.dir;
+
+        // Minion spawning (W1 boss)
+        if(e.spawnsCubes){
+          e.spawnT -= dts;
+          var aliveMinions = 0;
+          for(var mi = 0; mi < current.enemies.length; mi++){
+            var em = current.enemies[mi];
+            if(em.isMinion && em.alive) aliveMinions++;
+          }
+          if(e.spawnT <= 0 && aliveMinions < 3){
+            e.spawnT = 3.0;
+            var spawnX = e.x - 60;
+            if(spawnX < 60) spawnX = e.x + 60;
+            newMinions.push({
+              x: spawnX, y: 508, type: 'square', isMinion: true,
+              alive: true, size: 32, hp: 1, dir: -1, vx: -0.6, poof: 0,
+              shootT: 0, swingT: 0, swingState: 'idle', swingPhase: 0, spawnT: 0
+            });
+            spawnSparkle(spawnX + 16, 510);
+          }
+        }
+      }
+    });
+    if(newMinions.length){
+      for(var nm = 0; nm < newMinions.length; nm++) current.enemies.push(newMinions[nm]);
+    }
+
+    // Update projectiles
+    for(var pi = projectiles.length - 1; pi >= 0; pi--){
+      var pr = projectiles[pi];
+      pr.x += pr.vx;
+      pr.y += pr.vy;
+      if(pr.kind === 'bubble'){
+        pr.vy += 0.02; // bubbles drift gently
+      }
+      pr.life -= 1;
+      if(pr.life <= 0 || pr.y > current.height + 100 || pr.x < -50 || pr.x > current.width + 50){
+        projectiles.splice(pi, 1);
+        continue;
+      }
+      // Hit ball?
+      var bdx = pr.x - ball.x, bdy = pr.y - ball.y;
+      var rad = ball.r + pr.r;
+      if(bdx*bdx + bdy*bdy < rad*rad){
+        if(pr.kind === 'star'){
+          if(ball.stunT <= 0){
+            ball.stunT = 1000; // ms
+            showToast('Sparkle stun!');
+          }
+        } else if(pr.kind === 'bubble'){
+          ball.x -= 60;
+          if(ball.x < ball.r) ball.x = ball.r;
+          ball.vx = -3;
+          showToast('Knockback!');
+        }
+        spawnSparkle(pr.x, pr.y);
+        projectiles.splice(pi, 1);
+      }
+    }
+
+    // Noodle sweep: ball-vs-noodle hitbox during 'sweep' state
+    var noodleHit = false;
+    current.enemies.forEach(function(e){
+      if(noodleHit) return;
+      if(!e.alive) return;
+      if(e.type !== 'noodlecube') return;
+      if(e.swingState !== 'sweep') return;
+      // noodle hitbox extends out from the cube horizontally based on facing dir
+      var ncx = e.x + e.size/2;
+      var ncy = e.y + e.size/2;
+      var reach = 70;
+      var dirN = e.dir; // -1 left, +1 right
+      var nx = (dirN < 0) ? ncx - reach : ncx;
+      var ny = ncy - 14;
+      var nw = reach;
+      var nh = 28;
+      if(rectsOverlap(ball.x - ball.r, ball.y - ball.r, ball.r*2, ball.r*2, nx, ny, nw, nh)){
+        noodleHit = true;
+      }
+    });
+    if(noodleHit){ respawn(); return; }
+
+    // Ball vs enemies
+    var hitOccurred = false;
+    current.enemies.forEach(function(e){
+      if(hitOccurred) return;
+      if(!e.alive) return;
+      if(rectsOverlap(ball.x - ball.r, ball.y - ball.r, ball.r*2, ball.r*2, e.x, e.y, e.size, e.size)){
+        var ballBottomPrev = ball.y + ball.r - ball.vy;
+        if(ball.vy > 1 && ballBottomPrev <= e.y + 6){
+          // Boss invulnerable: bounce ball off, no damage
+          if(e.type === 'boss' && e.invulnT > 0){
+            ball.vy = -10;
+            spawnSparkle(e.x + e.size/2, e.y);
+            showToast('Not yet!');
+          } else {
+            e.hp -= 1;
+            ball.vy = -10;
+            if(e.hp <= 0){
+              e.alive = false;
+              spawnPoof(e.x + e.size/2, e.y + e.size/2);
+              showToast(e.type === 'boss' ? 'Boss POOFED!' : 'POOF!');
+              if(e.type === 'boss' && current.isBoss){
+                onBossDefeated();
+              }
+            } else {
+              spawnPoof(e.x + e.size/2, e.y + e.size/2, true);
+              showToast(e.type === 'boss' ? 'Boss bonked!' : 'Bounce again!');
+            }
+          }
+        } else {
+          spawnPoof(ball.x, ball.y, true);
+          hitOccurred = true;
+        }
+      }
+    });
+    if(hitOccurred){ respawn(); return; }
+
+    // Coin magnet
+    if(state.owned['magnet']){
+      current.coins.forEach(function(c){
+        if(c.taken) return;
+        var dx = ball.x - c.x, dy = ball.y - c.y;
+        var dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < 80 && dist > 1){
+          c.x += (dx / dist) * 4;
+          c.y += (dy / dist) * 4;
+        }
+      });
+    }
+
+    // Coin pickup
+    current.coins.forEach(function(c){
+      if(c.taken) return;
+      var dx = ball.x - c.x, dy = ball.y - c.y;
+      if(dx*dx + dy*dy < (ball.r + 12) * (ball.r + 12)){
+        c.taken = true;
+        state.coins += 1;
+        coinLabel.textContent = 'Coins: ' + state.coins;
+        spawnSparkle(c.x, c.y);
+      }
+    });
+
+    // Goal flag
+    if(current.goal && !current.isBoss){
+      var g = current.goal;
+      if(rectsOverlap(ball.x - ball.r, ball.y - ball.r, ball.r*2, ball.r*2, g.x - 20, g.y - 50, 40, 70)){
+        onLevelComplete();
+      }
+    }
+
+    // Camera follow
+    var targetX = ball.x - W / 2;
+    var targetY = ball.y - H * 0.6;
+    targetX = Math.max(0, Math.min(targetX, current.width - W));
+    targetY = Math.max(-100, Math.min(targetY, current.height - H + 100));
+    camera.x += (targetX - camera.x) * 0.12;
+    camera.y += (targetY - camera.y) * 0.12;
+
+    for(var pi = particles.length - 1; pi >= 0; pi--){
+      var part = particles[pi];
+      part.x += part.vx;
+      part.y += part.vy;
+      part.vy += 0.2;
+      part.life -= 1;
+      if(part.life <= 0) particles.splice(pi, 1);
+    }
+  }
+
+  function collectSolids(){
+    var arr = [];
+    for(var i=0;i<current.platforms.length;i++) arr.push(current.platforms[i]);
+    if(current.blocks) for(var j=0;j<current.blocks.length;j++) arr.push(current.blocks[j]);
+    if(current.moving) for(var k=0;k<current.moving.length;k++) arr.push(current.moving[k]);
+    return arr;
+  }
+
+  function spawnPoof(x, y, small){
+    var n = small ? 6 : 14;
+    for(var i=0;i<n;i++){
+      var ang = (Math.PI * 2) * (i / n) + Math.random() * 0.4;
+      var sp = 2 + Math.random() * 3;
+      particles.push({
+        x: x, y: y, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp - 1,
+        life: 30 + Math.floor(Math.random()*15), color: ['#ffd54a','#ff8a65','#fff176','#ffb74d'][i%4],
+        kind: 'star', size: 6 + Math.random()*4
+      });
+    }
+  }
+
+  function spawnSparkle(x, y){
+    for(var i=0;i<5;i++){
+      particles.push({
+        x: x, y: y, vx: (Math.random()-0.5)*3, vy: -2 - Math.random()*2,
+        life: 25, color: '#fff176', kind: 'sparkle', size: 4
+      });
+    }
+  }
+
+  function onLevelComplete(){
+    if(state.paused) return;
+    state.progress[state.world][state.levelInWorld] = true;
+    var msg = 'Yay! Great rolling!';
+    showMessage('Level Complete!', msg, 'World Map', function(){
+      setScene('world-map');
+    });
+  }
+
+  function onBossDefeated(){
+    state.bossesBeat[state.world] = true;
+    state.paused = true;
+    setTimeout(function(){
+      var name = WORLDS[state.world].name;
+      showMessage('Boss POOFED!', 'You bonked the ' + name + ' boss! Amazing!', 'World Map', function(){
+        setScene('world-map');
+      });
+    }, 600);
+  }
+
+  // -------- Rendering --------
+  function draw(){
+    ctx.clearRect(0, 0, W, H);
+    if(state.scene !== 'level' && state.scene !== 'boss') return;
+    if(!current) return;
+
+    drawBackground();
+
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+
+    current.pits.forEach(function(pit){
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(pit.x, pit.y, pit.w, pit.h + 200);
+    });
+
+    current.platforms.forEach(function(p){ drawPlatform(p); });
+
+    if(current.blocks) current.blocks.forEach(function(b){ drawBlock(b); });
+
+    if(current.moving) current.moving.forEach(function(m){
+      ctx.fillStyle = m.color || '#ff9800';
+      roundRect(m.x, m.y, m.w, m.h, 6);
+      ctx.fill();
+      ctx.strokeStyle = '#e65100';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+
+    if(current.goal) drawGoal(current.goal);
+
+    current.coins.forEach(function(c){
+      if(c.taken) return;
+      c.bob += 0.08;
+      drawCoin(c.x, c.y + Math.sin(c.bob) * 3);
+    });
+
+    current.enemies.forEach(function(e){
+      if(!e.alive) return;
+      drawEnemy(e);
+    });
+
+    projectiles.forEach(function(pr){
+      drawProjectile(pr);
+    });
+
+    particles.forEach(function(part){
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, part.life / 40);
+      if(part.kind === 'star'){
+        drawStar(part.x, part.y, part.size, part.color);
+      } else {
+        ctx.fillStyle = part.color;
+        ctx.beginPath();
+        ctx.arc(part.x, part.y, part.size, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    });
+
+    drawBall();
+
+    ctx.restore();
+  }
+
+  function drawBackground(){
+    if(state.world === 0) drawHillsW1();
+    else if(state.world === 1) drawCaveW2();
+    else drawLabW3();
+  }
+
+  function drawHillsW1(){
+    ctx.save();
+    ctx.fillStyle = '#a5d6a7';
+    var off = -camera.x * 0.3;
+    for(var i = -1; i < 6; i++){
+      var hx = i * 320 + (off % 320);
+      ctx.beginPath();
+      ctx.arc(hx, H - 60, 200, Math.PI, 0);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#81c784';
+    var off2 = -camera.x * 0.5;
+    for(var k = -1; k < 7; k++){
+      var hx2 = k * 240 + (off2 % 240);
+      ctx.beginPath();
+      ctx.arc(hx2, H - 30, 130, Math.PI, 0);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#fff176';
+    ctx.beginPath();
+    ctx.arc(W - 70, 80, 36, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,241,118,0.4)';
+    ctx.beginPath();
+    ctx.arc(W - 70, 80, 50, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    var coff = -camera.x * 0.2;
+    drawCloud(80 + (coff % 500), 100);
+    drawCloud(380 + (coff % 500), 70);
+    drawCloud(680 + (coff % 500), 130);
+    ctx.restore();
+  }
+
+  function drawCaveW2(){
+    ctx.save();
+    // Crystal rocks in the back
+    ctx.fillStyle = '#3a4569';
+    var off = -camera.x * 0.3;
+    for(var i = -1; i < 7; i++){
+      var hx = i * 280 + (off % 280);
+      ctx.beginPath();
+      ctx.moveTo(hx, H - 30);
+      ctx.lineTo(hx + 80, H - 180);
+      ctx.lineTo(hx + 160, H - 30);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = '#4a5680';
+    var off2 = -camera.x * 0.5;
+    for(var k = -1; k < 8; k++){
+      var hx2 = k * 200 + (off2 % 200);
+      ctx.beginPath();
+      ctx.moveTo(hx2, H - 20);
+      ctx.lineTo(hx2 + 60, H - 130);
+      ctx.lineTo(hx2 + 120, H - 20);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Glowing crystals on the ceiling
+    ctx.fillStyle = 'rgba(186,140,255,0.45)';
+    var coff = -camera.x * 0.2;
+    for(var c = 0; c < 6; c++){
+      var cx = (c * 220 + (coff % 220)) + 100;
+      ctx.beginPath();
+      ctx.moveTo(cx, 20);
+      ctx.lineTo(cx + 14, 60);
+      ctx.lineTo(cx - 14, 60);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawLabW3(){
+    ctx.save();
+    // Distant rocket silhouettes
+    ctx.fillStyle = '#3a1a1a';
+    var off = -camera.x * 0.3;
+    for(var i = -1; i < 6; i++){
+      var hx = i * 360 + (off % 360);
+      ctx.fillRect(hx, H - 220, 60, 220);
+      ctx.beginPath();
+      ctx.moveTo(hx, H - 220);
+      ctx.lineTo(hx + 30, H - 280);
+      ctx.lineTo(hx + 60, H - 220);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Stars
+    ctx.fillStyle = '#fff176';
+    for(var s = 0; s < 30; s++){
+      var sx = (s * 73 + (-camera.x * 0.1) % W);
+      sx = ((sx % W) + W) % W;
+      var sy = (s * 41) % (H - 200);
+      ctx.fillRect(sx, sy, 2, 2);
+    }
+    // Big moon
+    ctx.fillStyle = '#ffe082';
+    ctx.beginPath();
+    ctx.arc(W - 80, 90, 32, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,224,130,0.4)';
+    ctx.beginPath();
+    ctx.arc(W - 80, 90, 46, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCloud(x, y){
+    ctx.beginPath();
+    ctx.arc(x, y, 22, 0, Math.PI*2);
+    ctx.arc(x+22, y-8, 24, 0, Math.PI*2);
+    ctx.arc(x+44, y, 22, 0, Math.PI*2);
+    ctx.arc(x+22, y+6, 22, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawPlatform(p){
+    var color = p.color || '#7cb342';
+    var underColor = (state.world === 0) ? '#5d4037' : (state.world === 1) ? '#2c3550' : '#3e2f1f';
+    ctx.fillStyle = underColor;
+    ctx.fillRect(p.x, p.y + 8, p.w, p.h - 8);
+    ctx.fillStyle = color;
+    ctx.fillRect(p.x, p.y, p.w, 14);
+    if(state.world === 0){
+      ctx.fillStyle = '#558b2f';
+      for(var x = p.x; x < p.x + p.w; x += 18){
+        ctx.fillRect(x + 2, p.y - 3, 2, 4);
+        ctx.fillRect(x + 6, p.y - 4, 2, 5);
+      }
+    } else if(state.world === 1){
+      // crystal sparkles
+      ctx.fillStyle = '#bb86fc';
+      for(var x2 = p.x; x2 < p.x + p.w; x2 += 28){
+        ctx.fillRect(x2 + 4, p.y + 4, 3, 3);
+      }
+    } else {
+      // metal rivets
+      ctx.fillStyle = '#ffeb3b';
+      for(var x3 = p.x; x3 < p.x + p.w; x3 += 26){
+        ctx.beginPath();
+        ctx.arc(x3 + 8, p.y + 7, 2, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawBlock(b){
+    ctx.fillStyle = b.color || '#a1887f';
+    roundRect(b.x, b.y, b.w, b.h, 4);
+    ctx.fill();
+    ctx.strokeStyle = (state.world === 0) ? '#5d4037' : (state.world === 1) ? '#2c3550' : '#5d2a0d';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function drawGoal(g){
+    ctx.fillStyle = '#8d6e63';
+    ctx.fillRect(g.x - 3, g.y - 50, 6, 110);
+    ctx.fillStyle = '#fdd835';
+    ctx.beginPath();
+    ctx.moveTo(g.x + 3, g.y - 50);
+    ctx.lineTo(g.x + 40, g.y - 38);
+    ctx.lineTo(g.x + 3, g.y - 26);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#f57f17';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    drawStar(g.x + 18, g.y - 38, 5, '#fff176');
+  }
+
+  function drawCoin(x, y){
+    ctx.save();
+    ctx.translate(x, y);
+    if(state.world === 1){
+      // Glowing crystal
+      ctx.fillStyle = '#80deea';
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.lineTo(7, 0);
+      ctx.lineTo(0, 10);
+      ctx.lineTo(-7, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#00838f';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#e0f7fa';
+      ctx.beginPath();
+      ctx.moveTo(-2, -4);
+      ctx.lineTo(2, -4);
+      ctx.lineTo(0, 0);
+      ctx.closePath();
+      ctx.fill();
+    } else if(state.world === 2){
+      // Energy bolt
+      ctx.fillStyle = '#ffeb3b';
+      ctx.beginPath();
+      ctx.arc(0, 0, 9, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#f57f17';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(-2, -5);
+      ctx.lineTo(2, -1);
+      ctx.lineTo(0, 0);
+      ctx.lineTo(2, 5);
+      ctx.lineTo(-2, 1);
+      ctx.lineTo(0, 0);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#ffd54a';
+      ctx.beginPath();
+      ctx.arc(0, 0, 9, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#f9a825';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#fff8e1';
+      ctx.beginPath();
+      ctx.arc(-2, -2, 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawEnemy(e){
+    if(e.type === 'scorpion'){ drawScorpion(e); return; }
+    if(e.type === 'bubblecube'){ drawBubbleCube(e); return; }
+    if(e.type === 'noodlecube'){ drawNoodleCube(e); return; }
+    var cx = e.x + e.size/2, cy = e.y + e.size/2;
+    ctx.save();
+    var color;
+    if(e.color){
+      color = e.color;
+    } else if(e.type === 'boss'){
+      color = '#7e57c2';
+    } else if(e.isMinion){
+      color = '#9575cd';
+    } else if(state.world === 0){
+      color = '#5e8a4a';
+    } else if(state.world === 1){
+      color = '#5d4e7a';
+    } else {
+      color = '#bf3f3f';
+    }
+    ctx.fillStyle = color;
+    roundRect(e.x, e.y, e.size, e.size, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    var eyeY = cy - 4;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 8, eyeY, 5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 8, eyeY, 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.arc(cx - 8, eyeY + 1, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 8, eyeY + 1, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - 12, eyeY - 6); ctx.lineTo(cx - 4, eyeY - 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 12, eyeY - 6); ctx.lineTo(cx + 4, eyeY - 3); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy + 10, 4, Math.PI, Math.PI*2);
+    ctx.stroke();
+    if(e.type === 'boss'){
+      // Invulnerable flash: yellow pulsing ring + white tint overlay
+      if(e.invulnT > 0){
+        var flashPhase = Math.sin(performance.now() / 80);
+        if(flashPhase > 0){
+          ctx.globalAlpha = 0.45 * flashPhase;
+          ctx.fillStyle = '#fff9c4';
+          roundRect(e.x, e.y, e.size, e.size, 6);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        ctx.strokeStyle = '#ffd600';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, e.size/2 + 7, 0, Math.PI*2);
+        ctx.stroke();
+      }
+      // Show HP pips above the boss
+      var hp = e.hp;
+      var pipMax = (current && current.isBoss) ? ((state.world === 2) ? 4 : 3) : 2;
+      for(var h = 0; h < pipMax; h++){
+        ctx.fillStyle = (h < hp) ? '#ff5252' : '#cccccc';
+        ctx.beginPath();
+        ctx.arc(e.x + 8 + h * 14, e.y - 16, 5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      // Crown / gem / antenna decoration
+      if(e.crown === 'gem'){
+        ctx.fillStyle = '#80deea';
+        ctx.beginPath();
+        ctx.moveTo(cx, e.y - 8);
+        ctx.lineTo(cx + 8, e.y - 2);
+        ctx.lineTo(cx, e.y + 4);
+        ctx.lineTo(cx - 8, e.y - 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#00838f';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else if(e.crown === 'antenna'){
+        ctx.strokeStyle = '#ffeb3b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx, e.y);
+        ctx.lineTo(cx, e.y - 14);
+        ctx.stroke();
+        ctx.fillStyle = '#ffeb3b';
+        ctx.beginPath();
+        ctx.arc(cx, e.y - 16, 4, 0, Math.PI*2);
+        ctx.fill();
+      } else {
+        // crown
+        ctx.fillStyle = '#ffd54a';
+        ctx.beginPath();
+        ctx.moveTo(e.x + 6, e.y - 2);
+        ctx.lineTo(e.x + 14, e.y - 12);
+        ctx.lineTo(e.x + e.size/2, e.y - 4);
+        ctx.lineTo(e.x + e.size - 14, e.y - 12);
+        ctx.lineTo(e.x + e.size - 6, e.y - 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#f57f17';
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawScorpion(e){
+    var cx = e.x + e.size/2, cy = e.y + e.size/2;
+    ctx.save();
+    // Body — friendly rounded oval, sandy color
+    ctx.fillStyle = '#d4a373';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 4, e.size/2 - 2, e.size/2 - 6, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#8b5a2b';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Curled tail
+    var tailDir = (e.dir < 0) ? -1 : 1;
+    ctx.strokeStyle = '#b88553';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - tailDir * 14, cy);
+    ctx.quadraticCurveTo(cx - tailDir * 22, cy - 18, cx - tailDir * 8, cy - 22);
+    ctx.stroke();
+    // Tail tip — rounded little ball (no stinger)
+    ctx.fillStyle = '#d4a373';
+    ctx.beginPath();
+    ctx.arc(cx - tailDir * 8, cy - 22, 5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#8b5a2b';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Tiny pincers in front
+    ctx.strokeStyle = '#8b5a2b';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx + tailDir * 14, cy + 6);
+    ctx.lineTo(cx + tailDir * 22, cy + 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + tailDir * 14, cy + 10);
+    ctx.lineTo(cx + tailDir * 22, cy + 12);
+    ctx.stroke();
+    // Big friendly eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 6, cy - 4, 6, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 6, cy - 4, 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.arc(cx - 6, cy - 3, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 6, cy - 3, 3, 0, Math.PI*2); ctx.fill();
+    // Smile
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy + 6, 4, 0.1, Math.PI - 0.1);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawBubbleCube(e){
+    var cx = e.x + e.size/2, cy = e.y + e.size/2;
+    ctx.save();
+    // Cube body (pastel teal)
+    ctx.fillStyle = '#80cbc4';
+    roundRect(e.x, e.y, e.size, e.size, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#00695c';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Bubble pipe sticking up — small pastel pipe (curved tube)
+    var pipeDir = (e.dir < 0) ? -1 : 1;
+    ctx.strokeStyle = '#ce93d8';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx, e.y + 4);
+    ctx.quadraticCurveTo(cx + pipeDir * 6, e.y - 6, cx + pipeDir * 14, e.y - 8);
+    ctx.stroke();
+    // Pipe ring (where bubble forms)
+    ctx.strokeStyle = '#ab47bc';
+    ctx.lineWidth = 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.arc(cx + pipeDir * 18, e.y - 8, 4, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+    // Eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 7, cy - 2, 5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 7, cy - 2, 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.arc(cx - 7, cy - 1, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 7, cy - 1, 2.5, 0, Math.PI*2); ctx.fill();
+    // Smile
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy + 8, 4, 0.1, Math.PI - 0.1);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawNoodleCube(e){
+    var cx = e.x + e.size/2, cy = e.y + e.size/2;
+    ctx.save();
+    // Bigger cube body (lavender)
+    ctx.fillStyle = '#9fa8da';
+    roundRect(e.x, e.y, e.size, e.size, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#3949ab';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // HP pips above
+    var pipMax = 2;
+    for(var h = 0; h < pipMax; h++){
+      ctx.fillStyle = (h < e.hp) ? '#ff7043' : '#cccccc';
+      ctx.beginPath();
+      ctx.arc(e.x + 8 + h * 14, e.y - 10, 4, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // Pool noodle held horizontally — direction by e.dir
+    var dirN = (e.dir < 0) ? -1 : 1;
+    var nlen = 70;
+    // animate angle based on swingState
+    var ang = 0;
+    if(e.swingState === 'wind'){
+      // tilt up before sweep
+      ang = -0.6 * (e.swingPhase / 0.5);
+    } else if(e.swingState === 'sweep'){
+      // sweep down through horizontal
+      ang = -0.6 + 1.3 * (e.swingPhase / 0.35);
+    }
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(ang * dirN);
+    // shaft of noodle (soft pink)
+    ctx.strokeStyle = '#f48fb1';
+    ctx.lineWidth = 14;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(dirN * nlen, 0);
+    ctx.stroke();
+    // Stripe accent
+    ctx.strokeStyle = '#ce93d8';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(dirN * 14, -2);
+    ctx.lineTo(dirN * (nlen - 14), -2);
+    ctx.stroke();
+    // Rounded tip
+    ctx.fillStyle = '#f06292';
+    ctx.beginPath();
+    ctx.arc(dirN * nlen, 0, 8, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    // Eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 8, cy - 4, 5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 8, cy - 4, 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.arc(cx - 8, cy - 3, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 8, cy - 3, 2.5, 0, Math.PI*2); ctx.fill();
+    // Slight frown / smile
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy + 10, 4, 0.1, Math.PI - 0.1);
+    ctx.stroke();
+    // Telegraph indicator during wind-up
+    if(e.swingState === 'wind'){
+      ctx.fillStyle = '#fff176';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('!', cx, e.y - 24);
+    }
+    ctx.restore();
+  }
+
+  function drawProjectile(pr){
+    if(pr.kind === 'star'){
+      ctx.save();
+      // soft sparkly glow
+      ctx.fillStyle = 'rgba(255,235,120,0.4)';
+      ctx.beginPath();
+      ctx.arc(pr.x, pr.y, pr.r + 4, 0, Math.PI*2);
+      ctx.fill();
+      drawStar(pr.x, pr.y, pr.r, '#fff176');
+      ctx.restore();
+    } else if(pr.kind === 'bubble'){
+      ctx.save();
+      ctx.strokeStyle = '#90caf9';
+      ctx.lineWidth = 2;
+      ctx.fillStyle = 'rgba(187,222,251,0.45)';
+      ctx.beginPath();
+      ctx.arc(pr.x, pr.y, pr.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+      // little white shine
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.beginPath();
+      ctx.arc(pr.x - pr.r*0.4, pr.y - pr.r*0.4, pr.r*0.25, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function computeGroundUnderBall(){
+    var bestY = current.height + 60;
+    var solids = collectSolids();
+    for(var gi = 0; gi < solids.length; gi++){
+      var gs = solids[gi];
+      if(ball.x >= gs.x && ball.x <= gs.x + gs.w && gs.y >= ball.y - 4){
+        if(gs.y < bestY) bestY = gs.y;
+      }
+    }
+    return bestY;
+  }
+
+  function drawBall(){
+    // Shadow — fixed in world space, stays on ground below ball
+    var groundY = computeGroundUnderBall();
+    var shadowDist = groundY - ball.y;
+    var shadowAlpha = shadowDist < 200 ? 0.25 * (1 - shadowDist / 250) : 0;
+    if(shadowAlpha > 0 && groundY < current.height + 50){
+      var shadowScaleX = Math.max(0.3, 0.9 - shadowDist * 0.002);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,' + shadowAlpha.toFixed(2) + ')';
+      ctx.beginPath();
+      ctx.ellipse(ball.x, groundY - 2, ball.r * shadowScaleX, 4, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Stun halo — sparkles spinning around the ball
+    if(ball.stunT > 0){
+      ctx.save();
+      ctx.translate(ball.x, ball.y);
+      var t = performance.now() / 200;
+      ctx.strokeStyle = 'rgba(255,235,120,0.7)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, ball.r + 8, 0, Math.PI*2);
+      ctx.stroke();
+      for(var sp = 0; sp < 6; sp++){
+        var sa = t + sp * (Math.PI*2 / 6);
+        var sx2 = Math.cos(sa) * (ball.r + 12);
+        var sy2 = Math.sin(sa) * (ball.r + 12);
+        drawStar(sx2, sy2, 4, '#fff176');
+      }
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.translate(ball.x, ball.y);
+    ctx.rotate(ball.rot);
+    var grad = ctx.createRadialGradient(-6, -6, 4, 0, 0, ball.r);
+    grad.addColorStop(0, '#ff7b6f');
+    grad.addColorStop(0.5, '#e53935');
+    grad.addColorStop(1, '#9b1c1c');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, ball.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#7a1212';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, ball.r - 6, -0.4, 0.4);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, ball.r - 6, Math.PI - 0.4, Math.PI + 0.4);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.arc(-7, -7, 5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(ball.x, ball.y);
+    var dir = ball.vx > 0.2 ? 1 : (ball.vx < -0.2 ? -1 : 0);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-5 + dir*2, -2, 4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(7 + dir*2, -2, 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.arc(-4 + dir*3, -1, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(8 + dir*3, -1, 2, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(1 + dir*2, 5, 4, 0.1, Math.PI - 0.1);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawStar(cx, cy, r, color){
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for(var i=0;i<5;i++){
+      var ang = -Math.PI/2 + i * (Math.PI*2/5);
+      var x = cx + Math.cos(ang) * r;
+      var y = cy + Math.sin(ang) * r;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      var ang2 = ang + Math.PI/5;
+      ctx.lineTo(cx + Math.cos(ang2) * r * 0.5, cy + Math.sin(ang2) * r * 0.5);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function roundRect(x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  // -------- Game loop --------
+  var last = performance.now();
+  function tick(now){
+    var dt = (now - last) / 16.67;
+    if(dt > 3) dt = 3;
+    last = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  // -------- Controls --------
+  function bindButton(el, onDown, onUp){
+    var pressed = false;
+    function down(e){ e.preventDefault(); pressed = true; onDown(); }
+    function up(e){ if(e) e.preventDefault(); if(pressed){ pressed = false; onUp(); } }
+    el.addEventListener('touchstart', down, {passive: false});
+    el.addEventListener('touchend', up, {passive: false});
+    el.addEventListener('touchcancel', up, {passive: false});
+    el.addEventListener('mousedown', down);
+    el.addEventListener('mouseup', up);
+    el.addEventListener('mouseleave', up);
+  }
+
+  bindButton(document.getElementById('leftBtn'),
+    function(){ keys.left = true; },
+    function(){ keys.left = false; });
+  bindButton(document.getElementById('rightBtn'),
+    function(){ keys.right = true; },
+    function(){ keys.right = false; });
+  bindButton(document.getElementById('jumpBtn'),
+    function(){ keys.jumpPressed = true; keys.jumpHeld = true; },
+    function(){ keys.jumpHeld = false; });
+
+  window.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
+    if(e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+    if(e.key === 'ArrowUp' || e.key === ' ' || e.key === 'w'){ keys.jumpPressed = true; keys.jumpHeld = true; e.preventDefault(); }
+  });
+  window.addEventListener('keyup', function(e){
+    if(e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
+    if(e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+    if(e.key === 'ArrowUp' || e.key === ' ' || e.key === 'w') keys.jumpHeld = false;
+  });
+
+  document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
+  // Allow scrolling within overlay scenes; only block touchmove on the game canvas
+  canvas.addEventListener('touchmove', function(e){ e.preventDefault(); }, {passive: false});
+
+  // -------- Menu / map / shop wiring --------
+  document.getElementById('menuPlayBtn').addEventListener('click', function(){
+    state.world = 0;
+    state.levelInWorld = 0;
+    enterLevel();
+  });
+  document.getElementById('menuMapBtn').addEventListener('click', function(){
+    setScene('world-map');
+  });
+  document.getElementById('menuShopBtn').addEventListener('click', function(){
+    setScene('shop');
+  });
+
+  document.getElementById('mapShopBtn').addEventListener('click', function(){
+    setScene('shop');
+  });
+  document.getElementById('mapBackBtn').addEventListener('click', function(){
+    setScene('menu');
+  });
+
+  // From the menu, reset scroll to top so first card (Sunny Hills) is visible
+  document.getElementById('menuMapBtn').addEventListener('click', function(){
+    setTimeout(function(){ worldMapEl.scrollTop = 0; updateScrollHint(); }, 0);
+  });
+  document.getElementById('shopBackBtn').addEventListener('click', function(){
+    setScene(state.scene === 'shop' ? 'world-map' : 'menu');
+  });
+
+  mapBtn.addEventListener('click', function(){
+    setScene('world-map');
+  });
+
+  // In-game shop overlay
+  shopBtnHud.addEventListener('click', function(){
+    if(state.shopOverlay) closeShopOverlay();
+    else openShopOverlay();
+  });
+  document.getElementById('shopOverlayCloseBtn').addEventListener('click', function(){
+    closeShopOverlay();
+  });
+  document.getElementById('shopOverlayXBtn').addEventListener('click', function(){
+    closeShopOverlay();
+  });
+
+  // Track scroll on the world map to update the "More worlds" hint
+  worldMapEl.addEventListener('scroll', updateScrollHint, {passive: true});
+  window.addEventListener('resize', updateScrollHint);
+
+  // Swipe-down gesture during play -> Rocket Lab section of the world map
+  // Captured globally so it works whether or not the kid is touching the canvas
+  var swipe = { active: false, sx: 0, sy: 0, st: 0 };
+  function isControlPad(target){
+    if(!target || !target.closest) return false;
+    return !!target.closest('#controls') || !!target.closest('#shopOverlay') || !!target.closest('#message') || !!target.closest('#hud');
+  }
+  document.addEventListener('touchstart', function(e){
+    if(state.scene !== 'level' && state.scene !== 'boss') return;
+    if(state.shopOverlay || state.paused) return;
+    if(e.touches.length !== 1) { swipe.active = false; return; }
+    if(isControlPad(e.target)) { swipe.active = false; return; }
+    swipe.active = true;
+    swipe.sx = e.touches[0].clientX;
+    swipe.sy = e.touches[0].clientY;
+    swipe.st = Date.now();
+  }, {passive: true});
+  document.addEventListener('touchend', function(e){
+    if(!swipe.active) return;
+    swipe.active = false;
+    if(state.scene !== 'level' && state.scene !== 'boss') return;
+    if(state.shopOverlay || state.paused) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - swipe.sx;
+    var dy = t.clientY - swipe.sy;
+    var dt2 = Date.now() - swipe.st;
+    // Down swipe: large vertical, mostly vertical, fairly quick
+    if(dy > 90 && Math.abs(dy) > Math.abs(dx) * 1.5 && dt2 < 700){
+      goToRocketLab();
+    }
+  }, {passive: true});
+
+  function goToRocketLab(){
+    setScene('world-map');
+    // Scroll to Rocket Lab card (world index 2)
+    setTimeout(function(){
+      var card = document.getElementById('worldCard2');
+      if(card && card.scrollIntoView){
+        card.scrollIntoView({behavior: 'smooth', block: 'start'});
+      } else {
+        worldMapEl.scrollTop = worldMapEl.scrollHeight;
+      }
+      updateScrollHint();
+    }, 30);
+    showToast('Rocket Lab!');
+  }
+
+  // Boot — start at menu
+  setScene('menu');
+  requestAnimationFrame(tick);
+
+})();
+</script>
+</body>
+</html>
