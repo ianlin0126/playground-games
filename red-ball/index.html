@@ -24,7 +24,7 @@
   #shopBtnHud:active { transform: scale(0.95); }
 
   /* In-game shop overlay (modal that floats above gameplay without changing scene) */
-  #shopOverlay { position: fixed; inset: 0; display: none; z-index: 30; background: rgba(0,0,0,0.55); align-items: flex-start; justify-content: center; overflow-y: auto; padding: 24px 16px 40px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+  #shopOverlay { position: fixed; inset: 0; display: none; z-index: 30; background: rgba(0,0,0,0.55); align-items: flex-start; justify-content: center; padding: 24px 16px 40px; touch-action: pan-y; }
   #shopOverlay.show { display: flex; }
   #shopOverlay .scene-inner { background: linear-gradient(#e8f5e9 0%, #fff9c4 50%, #ffe0b2 100%); border-radius: 28px; padding: 22px 18px 28px; width: 100%; max-width: 480px; box-shadow: 0 12px 36px rgba(0,0,0,0.35); max-height: 85vh; overflow-y: auto; -webkit-overflow-scrolling: touch; position: relative; }
   #shopOverlayXBtn { position: absolute; top: 12px; right: 12px; min-width: 44px; min-height: 44px; width: 44px; height: 44px; border: none; border-radius: 50%; background: rgba(0,0,0,0.12); color: #333; font-size: 22px; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
@@ -862,6 +862,10 @@
   function closeShopOverlay(){
     state.shopOverlay = false;
     shopOverlayEl.classList.remove('show');
+    keys.left = false;
+    keys.right = false;
+    keys.jumpHeld = false;
+    keys.jumpPressed = false;
   }
 
   function drawMenuBall(){
@@ -1242,6 +1246,7 @@
           if(e.invulnCycle <= 0){
             var isW3bossInvuln = state.world === 2;
             e.invulnT = isW3bossInvuln ? 1.4 : 1.0;
+            e.invulnStartT = performance.now();
             showToast('Watch out!');
           }
         }
@@ -1811,7 +1816,7 @@
     if(e.type === 'boss'){
       // Invulnerable flash: yellow pulsing ring + white tint overlay
       if(e.invulnT > 0){
-        var flashPhase = Math.sin(performance.now() / 80);
+        var flashPhase = Math.sin((performance.now() - (e.invulnStartT || 0)) / 80);
         if(flashPhase > 0){
           ctx.globalAlpha = 0.45 * flashPhase;
           ctx.fillStyle = '#fff9c4';
