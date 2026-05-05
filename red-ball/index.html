@@ -744,7 +744,8 @@
     onGround: false,
     rot: 0,
     jumpsLeft: 1,
-    stunT: 0
+    stunT: 0,
+    jumpRising: false
   };
 
   var keys = { left: false, right: false, jumpPressed: false, jumpHeld: false };
@@ -1157,18 +1158,27 @@
         ball.vy = -jumpVelocity();
         ball.onGround = false;
         ball.jumpsLeft = maxJumps() - 1;
+        ball.jumpRising = true;
       } else if(ball.jumpsLeft > 0){
         ball.vy = -jumpVelocity() * 0.92;
         ball.jumpsLeft -= 1;
+        ball.jumpRising = true;
       }
     }
     keys.jumpPressed = false;
 
-    // Variable-height jump: when the player releases the button while
-    // still rising, cut upward velocity short. Tap = small hop, hold =
-    // full jump.
-    if(!keys.jumpHeld && ball.vy < -4){
-      ball.vy = -4;
+    // Variable-height jump: only fires while rising from a player-
+    // initiated jump (tracked via ball.jumpRising). Without this guard,
+    // the cutoff also truncates non-jump upward velocities — most
+    // notably the bounce after stomping a boss / minion — and would
+    // make those bounces feel like an instant snap instead of an arc.
+    if(ball.jumpRising){
+      if(!keys.jumpHeld && ball.vy < -4){
+        ball.vy = -4;
+      }
+      if(ball.vy >= 0){
+        ball.jumpRising = false;
+      }
     }
 
     ball.vy += GRAVITY;
@@ -1219,6 +1229,7 @@
           ball.vy = 0;
           ball.onGround = true;
           ball.jumpsLeft = maxJumps();
+          ball.jumpRising = false;
           if(s2.vx !== undefined){
             ball.x += s2._lastDx || 0;
           }
@@ -1455,38 +1466,40 @@
       if(hitOccurred) return;
       if(!e.alive) return;
       if(rectsOverlap(ball.x - ball.r, ball.y - ball.r, ball.r*2, ball.r*2, e.x, e.y, e.size, e.size)){
-        // Classify the collision by closest-edge penetration: whichever
-        // face of the enemy has the smallest overlap with the ball is
-        // the side the ball came in through. If it's the top, the player
-        // stomped; otherwise it's a side/bottom hit and the player takes
-        // damage. This is robust to slow descents (vy near 0 just after
-        // the jump peak) which the old vy-threshold check was missing.
-        var ballL = ball.x - ball.r, ballR = ball.x + ball.r;
-        var ballT = ball.y - ball.r, ballB = ball.y + ball.r;
-        var penTop   = ballB - e.y;
-        var penBot   = (e.y + e.size) - ballT;
-        var penLeft  = ballR - e.x;
-        var penRight = (e.x + e.size) - ballL;
-        var minPen = Math.min(penTop, penBot, penLeft, penRight);
-        var fromTop = (minPen === penTop) && ball.vy >= -1; // not actively rising into the boss
+        // Stomp = ball was at-or-above the enemy's top last frame AND
+        // is not actively rising into it. Using the ball's previous
+        // bottom position (rather than the closest-edge penetration of
+        // the current frame) is more reliable when the ball penetrates
+        // a corner deeply on a fast fall — closest-edge gets fooled
+        // because penLeft can become smaller than penTop near corners.
+        var ballBottomPrev = ball.y + ball.r - ball.vy;
+        var fromTop = ball.vy >= -1 && ballBottomPrev <= e.y + 12;
         if(fromTop){
-          // Stomp away vector: bounce up + push horizontally away from
-          // the boss centre so the ball is repelled and can't immediately
-          // re-stomp. Stronger for bosses than minions.
+          // Bounce away: reverse the ball's existing horizontal momentum
+          // and add a base away-kick from the enemy centre. This keeps
+          // the player's prior input feeling natural (ball ricochets off,
+          // doesn't snap to a fixed velocity) while still ensuring it
+          // gets pushed away from the boss to break repeated re-stomps.
           var bossCx = e.x + e.size/2;
           var awaySign = (ball.x < bossCx) ? -1 : 1;
-          var bounceVy = (e.type === 'boss') ? -14 : -10;
-          var bounceVx = (e.type === 'boss') ? awaySign * 5.5 : ball.vx;
+          var bounceVy = (e.type === 'boss') ? -15 : -10;
+          var awayKick = (e.type === 'boss') ? 5 : 0;
+          ball.vy = bounceVy;
+          ball.vx = -ball.vx + awaySign * awayKick;
+          ball.jumpRising = false;
           if(e.type === 'boss' && e.invulnT > 0){
             // Boss is in fire-aura state: bounce off, no damage to boss.
-            ball.vy = bounceVy;
-            ball.vx = bounceVx;
             spawnSparkle(e.x + e.size/2, e.y);
             showToast('Not yet!');
           } else {
             e.hp -= 1;
-            ball.vy = bounceVy;
-            ball.vx = bounceVx;
+            // Post-hit invuln — brief window where the boss can't be
+            // damaged again even if the ball happens to land back on
+            // its head. Prevents stomp-spam.
+            if(e.type === 'boss'){
+              e.invulnT = Math.max(e.invulnT, 0.5);
+              e.invulnStartT = performance.now();
+            }
             if(e.hp <= 0){
               e.alive = false;
               spawnPoof(e.x + e.size/2, e.y + e.size/2);
@@ -1631,25 +1644,17 @@
     ctx.translate(-camera.x, -camera.y);
 
     current.pits.forEach(function(pit){
-      // Pits cliff off — the floor segments on either side already draw
-      // their cross-section walls; the pit itself is just empty space.
-      // Background shows through, with a soft black gradient overlay
-      // (light at top, dark at bottom) for depth, and a darker rim at
-      // the very top to sell the cliff lip.
+      // Pits cliff off — the floor segments on either side draw their
+      // own dirt cross-section walls. Inside the pit we let the bg show
+      // through under a vertical gradient: fully transparent at the top
+      // (so the bg is clear at the rim) and fully black at the bottom.
       var pitBottom = Math.max(current.height + 200, camera.y + H + 100);
       var pitH = pitBottom - pit.y;
       var grad = ctx.createLinearGradient(0, pit.y, 0, pit.y + pitH);
-      grad.addColorStop(0, 'rgba(0,0,0,0.30)');
-      grad.addColorStop(0.5, 'rgba(0,0,0,0.55)');
-      grad.addColorStop(1, 'rgba(0,0,0,0.85)');
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,1)');
       ctx.fillStyle = grad;
       ctx.fillRect(pit.x, pit.y, pit.w, pitH);
-      // Sharper rim shadow at the very top — pulls the eye to the lip.
-      var rim = ctx.createLinearGradient(0, pit.y, 0, pit.y + 28);
-      rim.addColorStop(0, 'rgba(0,0,0,0.55)');
-      rim.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = rim;
-      ctx.fillRect(pit.x, pit.y, pit.w, 28);
     });
 
     current.platforms.forEach(function(p){ drawPlatform(p); });
