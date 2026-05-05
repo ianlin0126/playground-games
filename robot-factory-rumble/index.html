@@ -75,7 +75,6 @@
   #ctrl-left  { left: 16px;  bottom: 16px; }
   #ctrl-right { left: 100px; bottom: 16px; }
   #ctrl-jump  { right: 16px; bottom: 16px; }
-  #ctrl-aim   { right: 16px; bottom: 100px; font-size: 26px; }
   .overlay {
     display: none;
     position: fixed; inset: 0;
@@ -123,7 +122,6 @@
 <div id="ctrl-left"  class="ctrl-btn">◄</div>
 <div id="ctrl-right" class="ctrl-btn">▶</div>
 <div id="ctrl-jump"  class="ctrl-btn">▲</div>
-<div id="ctrl-aim"   class="ctrl-btn">↑</div>
 
 <div id="banner"></div>
 
@@ -131,7 +129,7 @@
   <h1>🤖 Robot Factory Rumble</h1>
   <p class="overlay-sub">Run, shoot, dodge — defeat the Foreman-Bot 9000!</p>
   <button id="start-btn" class="big-btn cool" type="button">▶ Start!</button>
-  <p class="credits">◄ ▶ to move · ▲ to jump · ↑ to aim up</p>
+  <p class="credits">◄ ▶ to move · ▲ to jump · auto-aims at nearby enemies!</p>
 </div>
 
 <div id="win-overlay" class="overlay">
@@ -221,7 +219,6 @@ var input = {
   leftHeld: false,
   rightHeld: false,
   jumpHeld: false,
-  aimUp: false,
   jumpJustPressed: false,
 };
 
@@ -246,7 +243,6 @@ function bindBtn(id, key) {
 bindBtn('ctrl-left',  'leftHeld');
 bindBtn('ctrl-right', 'rightHeld');
 bindBtn('ctrl-jump',  'jumpHeld');
-bindBtn('ctrl-aim',   'aimUp');
 
 window.addEventListener('keydown', function(e) {
   if (e.code === 'ArrowLeft'  || e.code === 'KeyA') input.leftHeld = true;
@@ -255,20 +251,17 @@ window.addEventListener('keydown', function(e) {
     if (!input.jumpHeld) input.jumpJustPressed = true;
     input.jumpHeld = true;
   }
-  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.aimUp = true;
 });
 window.addEventListener('keyup', function(e) {
   if (e.code === 'ArrowLeft'  || e.code === 'KeyA') input.leftHeld = false;
   if (e.code === 'ArrowRight' || e.code === 'KeyD') input.rightHeld = false;
   if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') input.jumpHeld = false;
-  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.aimUp = false;
 });
 
 function clearInput() {
   input.leftHeld = false;
   input.rightHeld = false;
   input.jumpHeld = false;
-  input.aimUp = false;
   input.jumpJustPressed = false;
   document.querySelectorAll('.ctrl-btn').forEach(function(b) { b.classList.remove('pressed'); });
 }
@@ -280,7 +273,6 @@ var menuOverlay = document.getElementById('menu-overlay');
 var winOverlay  = document.getElementById('win-overlay');
 var startBtn    = document.getElementById('start-btn');
 var winagainBtn = document.getElementById('winagain-btn');
-var aimUpHintShown = false;
 
 function startGame() {
   scene = 'playing';
@@ -292,7 +284,6 @@ function startGame() {
   player.vx = 0;
   player.invuln = 0;
   player.facing = 1;
-  player.aimAngle = 0;
   shieldBubble = 0;
   weapon = 'foam';
   weaponEl.textContent = '⚡ Foam Blaster';
@@ -309,7 +300,6 @@ function startGame() {
   progressBar.style.display = '';
   shieldEl.style.display = 'none';
   shakeT = 0;
-  aimUpHintShown = false;
   setupLevelEnemies();
   setupLevelPickups();
   setupLevelCheckpoints();
@@ -324,17 +314,6 @@ function hideOverlays() {
 startBtn.addEventListener('click', startGame);
 winagainBtn.addEventListener('click', startGame);
 
-function maybeShowAimUpHint() {
-  if (aimUpHintShown) return;
-  for (var i = 0; i < enemies.length; i++) {
-    var e = enemies[i];
-    if (e.kind === 'copter' && e.alive && Math.abs(e.x - player.x) < W * 0.6) {
-      aimUpHintShown = true;
-      showBanner('↑ Press Aim Up to shoot up!', 2000);
-      return;
-    }
-  }
-}
 
 // ── Constants ──────────────────────────────────────────────────────────────
 var WALK_SPEED       = 180;     // px/s
@@ -359,7 +338,6 @@ var player = {
   facing: 1,
   invuln: 0,
   walkAnim: 0,
-  aimAngle: 0,
   anim: { current: 'player_walk', frame: 0, timer: 0 },
   shootPoseT: 0,
 };
@@ -371,7 +349,6 @@ function updatePlayer(dt) {
     if (input.leftHeld)  dir -= 1;
   }
   player.vx = dir * WALK_SPEED;
-  if (dir !== 0) player.facing = dir;   // remembered for projectile aim direction
 
   player.vy += GRAVITY * dt;
 
@@ -468,6 +445,15 @@ function updatePlayer(dt) {
     player.anim.timer = 0;
   } else {
     updateAnim(player, dt);
+  }
+
+  // Auto-aim facing: face the closest enemy target; fall back to movement direction.
+  var aimTarget = findAutoAimTarget();
+  if (aimTarget) {
+    var targetCx = aimTarget._isBoss ? aimTarget.x : aimTarget.x + (aimTarget.w || 80) * 0.5;
+    player.facing = (targetCx >= player.x + player.w * 0.5) ? 1 : -1;
+  } else if (Math.abs(player.vx) > 1) {
+    player.facing = (player.vx > 0) ? 1 : -1;
   }
 }
 
@@ -686,28 +672,68 @@ var weapon = 'foam';
 var weaponDuration = 0;
 var weaponShotsLeft = 0;
 
+function findAutoAimTarget() {
+  var best = null;
+  var bestDist2 = Infinity;
+  var MAX_RANGE = 600;
+  var cx = player.x + player.w * 0.5;
+  var cy = player.y - player.h * 0.5;
+
+  for (var i = 0; i < enemies.length; i++) {
+    var e = enemies[i];
+    if (!e || e.alive === false || e.dying) continue;
+    var dx = (e.x + e.w * 0.5) - cx;
+    var dy = (e.y - e.h * 0.5) - cy;
+    var d2 = dx * dx + dy * dy;
+    if (d2 > MAX_RANGE * MAX_RANGE) continue;
+    if (d2 < bestDist2) { bestDist2 = d2; best = e; }
+  }
+
+  if (typeof boss !== 'undefined' && boss && boss.active && !boss.defeated) {
+    // Compute the boss's rendered visual center using the same bob math as drawBoss(),
+    // so auto-aim targets where the boss actually appears on screen, not its hitbox floor.
+    var bossAmp = Math.min(130, (GROUND_Y - boss.h - 30) / 2);
+    var bossCenterTop = GROUND_Y - boss.h - 20 - bossAmp;
+    var bossBobY = Math.sin(boss.bobT * 1.2) * bossAmp;
+    var bossBy = (boss.entryT > 0)
+      ? bossCenterTop + (-200 + (1 - boss.entryT) * 200)
+      : bossCenterTop + bossBobY;
+    var BOSS_VISUAL_H = 140;
+    var bossVisualCenterX = boss.x;
+    var bossVisualCenterY = bossBy + boss.h - BOSS_VISUAL_H * 0.5;
+    var bdx = bossVisualCenterX - cx;
+    var bdy = bossVisualCenterY - cy;
+    var bd2 = bdx * bdx + bdy * bdy;
+    if (bd2 < MAX_RANGE * MAX_RANGE && bd2 < bestDist2) {
+      best = { x: bossVisualCenterX, y: bossVisualCenterY, w: 0, h: 0, _isBoss: true };
+    }
+  }
+
+  return best;
+}
+
 function fireFoam() {
-  player.shootPoseT = 0.10;  // 100ms recoil pose
-  var f = player.facing;
-  var ang = player.aimAngle;       // 0 = horizontal, π/2 = up
-  var cosA = Math.cos(ang), sinA = Math.sin(ang);
-  // Muzzle moves up + slightly inward as the aim rotates upward.
-  var muzzleX = (f > 0) ? (player.x + player.w * (1 - sinA * 0.3)) : (player.x + player.w * sinA * 0.3);
-  var muzzleY = player.y - player.h * (0.45 + sinA * 0.4);
-  var vx = FOAM_SPEED * f * cosA;
-  var vy = -FOAM_SPEED * sinA;
+  player.shootPoseT = 0.10;
+  var target = findAutoAimTarget();
+  var muzzleX = player.x + (player.facing > 0 ? player.w : 0);
+  var muzzleY = player.y - player.h * 0.45;
+  var vx, vy;
+  if (target) {
+    var tx = target._isBoss ? target.x : target.x + (target.w || 80) * 0.5;
+    var ty = target._isBoss ? target.y : target.y - (target.h || 80) * 0.5;
+    var dx = tx - muzzleX;
+    var dy = ty - muzzleY;
+    var d = Math.sqrt(dx * dx + dy * dy) || 1;
+    vx = (dx / d) * FOAM_SPEED;
+    vy = (dy / d) * FOAM_SPEED;
+  } else {
+    vx = player.facing * FOAM_SPEED;
+    vy = 0;
+  }
   projectiles.push({ x: muzzleX, y: muzzleY, vx: vx, vy: vy, life: 1.6, kind: 'foam' });
 }
 
 function fireWeapon() {
-  // Aim Up steps 30° per shot. Held → tilt up; released → tilt back down.
-  var step = Math.PI / 6;      // 30°
-  var maxAim = Math.PI / 2;    // 90°
-  if (input.aimUp) {
-    player.aimAngle = Math.min(maxAim, player.aimAngle + step);
-  } else {
-    player.aimAngle = Math.max(0, player.aimAngle - step);
-  }
   if (weapon === 'foam') {
     fireFoam();
     fireCooldown = FOAM_INTERVAL;
@@ -718,22 +744,22 @@ function fireWeapon() {
 }
 
 function fireSpark() {
-  player.shootPoseT = 0.10;  // 100ms recoil pose
-  var f = player.facing;
-  var ang = player.aimAngle;
-  var cosA = Math.cos(ang), sinA = Math.sin(ang);
-  var muzzleX = (f > 0) ? (player.x + player.w * (0.7 - sinA * 0.2)) : (player.x + player.w * (0.3 + sinA * 0.2));
-  var muzzleY = player.y - player.h * (0.5 + sinA * 0.35);
-  // Center direction in player.aimAngle facing direction.
-  var baseVx = FOAM_SPEED * f * cosA;
-  var baseVy = -FOAM_SPEED * sinA;
+  player.shootPoseT = 0.10;
+  var target = findAutoAimTarget();
+  var muzzleX = player.x + (player.facing > 0 ? player.w * 0.7 : player.w * 0.3);
+  var muzzleY = player.y - player.h * 0.5;
+  var baseAngle;
+  if (target) {
+    var tx = target._isBoss ? target.x : target.x + (target.w || 80) * 0.5;
+    var ty = target._isBoss ? target.y : target.y - (target.h || 80) * 0.5;
+    baseAngle = Math.atan2(ty - muzzleY, tx - muzzleX);
+  } else {
+    baseAngle = (player.facing > 0) ? 0 : Math.PI;
+  }
   var fanRad = SPARK_FAN_DEG * Math.PI / 360;
   for (var k = -1; k <= 1; k++) {
-    var rot = fanRad * k;
-    var c = Math.cos(rot), s = Math.sin(rot);
-    var vx = baseVx * c - baseVy * s;
-    var vy = baseVx * s + baseVy * c;
-    projectiles.push({ x: muzzleX, y: muzzleY, vx: vx, vy: vy, life: 1.6, kind: 'spark' });
+    var a = baseAngle + fanRad * k;
+    projectiles.push({ x: muzzleX, y: muzzleY, vx: Math.cos(a) * FOAM_SPEED, vy: Math.sin(a) * FOAM_SPEED, life: 1.6, kind: 'spark' });
   }
 }
 
@@ -1581,7 +1607,6 @@ function update(dt) {
   // Vehicle removed — shield row stays hidden (Shield Bubble still visible via the cyan ring around player).
   shieldEl.style.display = 'none';
 
-  maybeShowAimUpHint();
 }
 function draw() {
   ctx.fillStyle = '#2a2a2a';
