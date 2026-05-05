@@ -606,6 +606,12 @@ var level = {
     { x: 2050, w: 80 },
     { x: 2550, w: 70 },
     { x: 3200, w: 70 },
+    { x: 3650, w: 80 },
+    { x: 4150, w: 70 },
+    { x: 4700, w: 80 },
+    { x: 5180, w: 70 },
+    { x: 5700, w: 80 },
+    { x: 6130, w: 70 },
   ],
   platforms: [
     { x:  600, w: 140, top: -120, beltDir:  0 },
@@ -622,6 +628,12 @@ var level = {
     { x: 2300, w: 200, dir: -1 },
     { x: 2800, w: 200, dir:  1 },   // Segment C
     { x: 3400, w: 200, dir: -1 },   // Late Segment C, just before boss arena
+    { x: 3850, w: 150, dir:  1 },   // Segment D
+    { x: 4350, w: 150, dir: -1 },
+    { x: 4900, w: 200, dir:  1 },
+    { x: 5450, w: 150, dir: -1 },
+    { x: 5950, w: 150, dir:  1 },
+    { x: 6300, w: 100, dir:  1 },
   ],
 };
 function resolveLevelGeometry() {
@@ -941,9 +953,25 @@ function updateEnemies(dt) {
       if (e.wobbleT > 0) {
         e.wobbleT -= dt;
       } else {
-        e.x += e.vx * dt;
-        if (e.x <= e.patrolMin && e.vx < 0) { e.wobbleT = 0.3; e.vx = 60; }
-        if (e.x >= e.patrolMax && e.vx > 0) { e.wobbleT = 0.3; e.vx = -60; }
+        // Pit-edge detection: check the leading edge one step ahead
+        var leadEdge = e.x + (e.vx > 0 ? e.w : 0);
+        var nextLeadEdge = leadEdge + e.vx * dt;
+        var willFallIntoPit = false;
+        for (var pi = 0; pi < level.pits.length; pi++) {
+          var pit = level.pits[pi];
+          if (nextLeadEdge > pit.x && nextLeadEdge < pit.x + pit.w) {
+            willFallIntoPit = true;
+            break;
+          }
+        }
+        if (willFallIntoPit) {
+          e.wobbleT = 0.3;
+          e.vx = -e.vx;
+        } else {
+          e.x += e.vx * dt;
+          if (e.x <= e.patrolMin && e.vx < 0) { e.wobbleT = 0.3; e.vx = 60; }
+          if (e.x >= e.patrolMax && e.vx > 0) { e.wobbleT = 0.3; e.vx = -60; }
+        }
       }
       // Laser shot at player when nearby + on cadence
       e.shotT -= dt;
