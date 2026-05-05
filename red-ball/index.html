@@ -1096,32 +1096,31 @@
       }
     }
 
+    var prevBallY = ball.y;
     ball.y += ball.vy;
     ball.onGround = false;
     for(var j=0;j<solids.length;j++){
       var s2 = solids[j];
       if(circleRectCollide(ball.x, ball.y, ball.r, s2.x, s2.y, s2.w, s2.h)){
-        if(ball.vy >= 0){
-          // Snap onto the top surface: only if ball center is above the midpoint of the rect
-          // and ball is horizontally overlapping (within a small tolerance for edge corners)
-          var ballOverlapX = ball.x >= s2.x - 4 && ball.x <= s2.x + s2.w + 4;
-          if(ballOverlapX && ball.y - ball.r < s2.y + s2.h * 0.5){
-            ball.y = s2.y - ball.r;
-            ball.vy = 0;
-            ball.onGround = true;
-            ball.jumpsLeft = maxJumps();
-            if(s2.vx !== undefined){
-              ball.x += s2._lastDx || 0;
-            }
-          } else {
-            // Side push (ball hit the side of the rect while moving down)
-            if(ball.vx > 0){ ball.x = s2.x - ball.r; }
-            else { ball.x = s2.x + s2.w + ball.r; }
+        // Use previous y to determine which face the ball entered through.
+        // This prevents edge-overlap from triggering a side-push that teleports
+        // the ball across the platform.
+        if(prevBallY + ball.r <= s2.y + 1){
+          // Ball was above the platform last frame → land on top
+          ball.y = s2.y - ball.r;
+          ball.vy = 0;
+          ball.onGround = true;
+          ball.jumpsLeft = maxJumps();
+          if(s2.vx !== undefined){
+            ball.x += s2._lastDx || 0;
           }
-        } else if(ball.vy < 0){
+        } else if(prevBallY - ball.r >= s2.y + s2.h - 1){
+          // Ball was below the platform last frame → bonk head on bottom
           ball.y = s2.y + s2.h + ball.r;
           ball.vy = 0;
         }
+        // Otherwise: ball was already side-overlapping pre-step — let the
+        // x-collision pass handle it; don't push y.
       }
     }
 
@@ -1174,15 +1173,19 @@
           }
         }
       }
-      if(!groundFound || hitBlock){
-        e.dir *= -1;
-        var sm = (e.type === 'boss') ? 1.4 : (e.type === 'scorpion' ? 1.4 : 1);
-        e.vx = 0.6 * e.dir * sm;
-      } else {
-        e.x = nextX;
+      if(e.type !== 'boss'){
+        if(!groundFound || hitBlock){
+          e.dir *= -1;
+          var sm = (e.type === 'scorpion') ? 1.4 : 1;
+          e.vx = 0.6 * e.dir * sm;
+        } else {
+          e.x = nextX;
+        }
       }
-      if(e.x < 10){ e.x = 10; e.dir = 1; e.vx = Math.abs(e.vx); }
-      if(e.x + e.size > current.width - 10){ e.x = current.width - 10 - e.size; e.dir = -1; e.vx = -Math.abs(e.vx); }
+      if(e.type !== 'boss'){
+        if(e.x < 10){ e.x = 10; e.dir = 1; e.vx = Math.abs(e.vx); }
+        if(e.x + e.size > current.width - 10){ e.x = current.width - 10 - e.size; e.dir = -1; e.vx = -Math.abs(e.vx); }
+      }
 
       // Per-type behavior
       var dts = dt / 60; // approx seconds per frame
@@ -1250,8 +1253,14 @@
             showToast('Watch out!');
           }
         }
-        // Patrol: ensure boss vx is set to patrolSpeed in current direction
+        // Patrol: integrate vx into x with arena-bound reversal
         e.vx = e.patrolSpeed * e.dir;
+        var bossNextX = e.x + e.vx;
+        var arenaLeft = 50;
+        var arenaRight = current.width - 50 - e.size;
+        if(bossNextX < arenaLeft){ e.dir = 1; bossNextX = arenaLeft; }
+        if(bossNextX > arenaRight){ e.dir = -1; bossNextX = arenaRight; }
+        e.x = bossNextX;
 
         // Minion spawning (W1 boss)
         if(e.spawnsCubes){
