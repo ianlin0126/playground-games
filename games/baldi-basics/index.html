@@ -28,7 +28,7 @@
     text-shadow: 0 2px 6px rgba(0,0,0,0.85);
   }
   #nb-hud { color: #FFEB3B; }
-  #lives-hud { color: #FF1744; }
+  #lives-hud { color: #FF1744; max-width: 50%; word-break: break-word; }
   #diff-hud { color: #FFFFFF; font-size: 18px; opacity: 0.9; }
 
   /* Mini-map (top-right corner during play) */
@@ -40,14 +40,14 @@
     border-radius: 4px;
   }
 
-  /* Touch D-pad */
+  /* Touch D-pad — moved DOWN per kid request */
   #dpad {
-    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: 4px; left: 50%; transform: translateX(-50%);
     z-index: 4;
     display: grid;
     grid-template-columns: 64px 64px 64px;
-    grid-template-rows: 64px 64px 64px;
-    gap: 8px;
+    grid-template-rows: 60px 60px 60px;
+    gap: 6px;
   }
   .dbtn {
     background: rgba(20,20,40,0.55);
@@ -59,6 +59,7 @@
     touch-action: none;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    min-height: 44px; min-width: 44px;
   }
   .dbtn.pressed, .dbtn:active {
     background: rgba(255,235,59,0.5);
@@ -75,6 +76,87 @@
     color: rgba(255,235,59,0.6); font-size: 22px;
   }
 
+  /* Action buttons (Jump + Duck) on the left side, also low for thumbs */
+  #actions {
+    position: fixed; bottom: 60px; left: 10px;
+    z-index: 4;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .actbtn {
+    width: 68px; height: 60px;
+    background: rgba(40,20,60,0.55);
+    border: 3px solid #80DEEA;
+    color: #B2EBF2;
+    font-size: 14px; font-weight: bold;
+    border-radius: 16px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    line-height: 1.05;
+  }
+  .actbtn .ic { font-size: 24px; }
+  .actbtn.pressed, .actbtn:active {
+    background: rgba(128,222,234,0.45);
+    transform: scale(0.95);
+  }
+  #btn-give {
+    position: fixed; bottom: 60px; right: 10px;
+    z-index: 4;
+    width: 80px; height: 60px;
+    background: rgba(60,40,20,0.7);
+    border: 3px solid #FFD54F;
+    color: #FFE082;
+    font-size: 13px; font-weight: bold;
+    border-radius: 16px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    display: none;
+    align-items: center; justify-content: center; flex-direction: column;
+    line-height: 1.05;
+  }
+  #btn-give.show { display: flex; }
+  #btn-give .ic { font-size: 22px; }
+
+  /* Tap-to-rope minigame button */
+  #rope-tap-btn {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    z-index: 25;
+    width: 220px; height: 100px;
+    background: linear-gradient(90deg, #FF6090, #E91E63);
+    color: #fff;
+    font-size: 28px; font-weight: bold;
+    border: 4px solid #fff;
+    border-radius: 22px;
+    display: none;
+    align-items: center; justify-content: center;
+    box-shadow: 0 6px 24px rgba(233,30,99,0.6);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #rope-tap-btn.show { display: flex; }
+  #rope-tap-btn:active { transform: translateX(-50%) scale(0.95); }
+
+  /* Banner shown during character intro / event */
+  #event-banner {
+    position: fixed; top: 30%; left: 50%; transform: translateX(-50%);
+    z-index: 22;
+    background: rgba(0,0,0,0.85);
+    color: #FFEB3B;
+    padding: 18px 22px;
+    border: 3px solid #FFEB3B;
+    border-radius: 18px;
+    font-size: 26px; font-weight: bold;
+    text-align: center;
+    max-width: 86vw;
+    display: none;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+  }
+  #event-banner.show { display: block; }
+  #event-banner .sub { display: block; font-size: 18px; opacity: 0.95; margin-top: 6px; color: #fff; }
+
   /* Overlays */
   .overlay {
     display: none;
@@ -83,6 +165,7 @@
     z-index: 20;
     align-items: center; justify-content: center; flex-direction: column;
     text-align: center; padding: 24px;
+    overflow-y: auto;
   }
   .overlay.show { display: flex; }
   .overlay h1 {
@@ -94,9 +177,9 @@
   .overlay p { font-size: 22px; margin-bottom: 20px; opacity: 0.95; max-width: 460px; }
   .big-btn {
     width: 280px; max-width: 80vw;
-    padding: 18px 22px;
-    margin: 8px 0;
-    font-size: 24px; font-weight: bold;
+    padding: 16px 22px;
+    margin: 6px 0;
+    font-size: 22px; font-weight: bold;
     background: linear-gradient(90deg, #FFEB3B, #FFA726);
     color: #1a1a1a;
     border: none; border-radius: 28px;
@@ -104,11 +187,47 @@
     box-shadow: 0 6px 20px rgba(255,235,59,0.45);
     -webkit-tap-highlight-color: transparent;
     font-family: inherit;
-    min-height: 60px;
+    min-height: 56px;
   }
   .big-btn.cool { background: linear-gradient(90deg, #00BCD4, #2196F3); color: #fff; box-shadow: 0 6px 20px rgba(33,150,243,0.45); }
   .big-btn.hot  { background: linear-gradient(90deg, #FF6090, #E91E63); color: #fff; box-shadow: 0 6px 20px rgba(233,30,99,0.5); }
+  .big-btn.dark { background: linear-gradient(90deg, #6A1B9A, #311B92); color: #fff; box-shadow: 0 6px 20px rgba(106,27,154,0.5); }
+  .big-btn.expert { background: linear-gradient(90deg, #263238, #000000); color: #FF8A80; box-shadow: 0 6px 20px rgba(0,0,0,0.7); border: 2px solid #FF5252; }
   .big-btn:active { transform: scale(0.97); }
+
+  /* Body-count input row */
+  #count-row, #baldi-count-row {
+    display: flex; flex-direction: column; align-items: center;
+    margin: 8px 0 12px 0;
+  }
+  #count-label, #baldi-count-label {
+    font-size: 22px; color: #fff; margin-bottom: 8px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  }
+  #count-input, #baldi-count-input {
+    width: 110px; height: 60px;
+    font-size: 36px; font-weight: bold; text-align: center;
+    background: #FFEB3B; color: #1a1a1a;
+    border: 4px solid #FFA726; border-radius: 18px;
+    font-family: inherit;
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+  }
+  #baldi-count-input {
+    background: #FFAB91; border-color: #E64A19;
+  }
+  #count-input::-webkit-outer-spin-button,
+  #count-input::-webkit-inner-spin-button,
+  #baldi-count-input::-webkit-outer-spin-button,
+  #baldi-count-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  #count-help, #baldi-count-help { font-size: 14px; color: #B2DFDB; margin-top: 6px; }
+
+  /* Intro modal (meet-a-character) */
+  #intro-modal { background: rgba(20,0,40,0.95); }
+  #intro-modal h1 { font-size: 34px; }
+  #intro-emoji { font-size: 90px; margin-bottom: 8px; }
+  #intro-name { font-size: 32px; color: #FFEB3B; margin-bottom: 6px; }
+  #intro-desc { font-size: 20px; max-width: 460px; opacity: 0.95; }
 
   /* Math modal */
   #math-modal { background: rgba(0, 30, 50, 0.96); }
@@ -139,12 +258,13 @@
   .choice-btn:active { transform: scale(0.96); }
   .choice-btn.correct { background: #4CAF50; border-color: #80E27E; }
   .choice-btn.wrong   { background: #9E9E9E; border-color: #BDBDBD; }
+  .choice-btn.reveal  { background: #2196F3; border-color: #64B5F6; }
   #math-feedback {
     margin-top: 16px; font-size: 22px; min-height: 28px;
     color: #FFEB3B;
     text-shadow: 0 0 10px #FFEB3B;
   }
-  #menu .credits { margin-top: 18px; font-size: 14px; opacity: 0.7; color: #B2DFDB; }
+  #menu .credits { margin-top: 12px; font-size: 14px; opacity: 0.7; color: #B2DFDB; }
 </style>
 </head>
 <body>
@@ -166,13 +286,43 @@
   <div class="dbtn" id="dright" role="button" aria-label="Turn right">►<small>TURN</small></div>
 </div>
 
+<div id="actions">
+  <div class="actbtn" id="bjump" role="button" aria-label="Jump"><span class="ic">⤴</span><span>JUMP</span></div>
+  <div class="actbtn" id="bduck" role="button" aria-label="Duck"><span class="ic">⤵</span><span>DUCK</span></div>
+</div>
+
+<div id="btn-give" role="button" aria-label="Give toy"><span class="ic">🧸</span><span>GIVE TOY</span></div>
+
+<button id="rope-tap-btn" type="button">TAP! 0 / 8</button>
+
+<div id="event-banner"><span id="event-text">Hi!</span><span class="sub" id="event-sub"></span></div>
+
 <div id="menu" class="overlay show">
   <h1>📚 Baldi Basics 3D</h1>
-  <p>Walk through the school in first person.<br>Find notebooks, answer math!<br>One notebook is IMPOSSIBLE 😱</p>
-  <button class="big-btn cool" data-diff="easy" type="button">😀 Easy — 7 📓</button>
+  <p>Walk through the school in first person.<br>Find notebooks, answer math!<br>Meet new friends along the way 😱</p>
+  <div id="count-row">
+    <div id="count-label">How many friends in the school?</div>
+    <input id="count-input" type="number" min="1" max="12" value="5" inputmode="numeric">
+    <div id="count-help">(1 to 12 — type a number)</div>
+  </div>
+  <div id="baldi-count-row">
+    <div id="baldi-count-label">How many Baldis?</div>
+    <input id="baldi-count-input" type="number" min="1" max="100" value="1" inputmode="numeric">
+    <div id="baldi-count-help">(1 to 5 — type a number)</div>
+  </div>
+  <button class="big-btn cool" data-diff="easy" type="button">😀 Easy — 7 📓 (20 ❤️)</button>
   <button class="big-btn"      data-diff="medium" type="button">😐 Medium — 11 📓</button>
   <button class="big-btn hot"  data-diff="hard" type="button">😡 Hard — 15 📓</button>
-  <div class="credits">▲ Forward · ▼ Back · ◄ ► Turn</div>
+  <button class="big-btn dark" data-diff="difficult" type="button">😱 Difficult — 18 📓</button>
+  <button class="big-btn expert" data-diff="expert" type="button">🤯 Expert — 20 📓</button>
+  <div class="credits">▲ Forward · ▼ Back · ◄ ► Turn · Space Jump · Shift Duck</div>
+</div>
+
+<div id="intro-modal" class="overlay">
+  <div id="intro-emoji">👶</div>
+  <div id="intro-name">Playtime</div>
+  <p id="intro-desc">She loves jump rope!</p>
+  <button class="big-btn cool" id="intro-go" type="button">▶ Let's go!</button>
 </div>
 
 <div id="math-modal" class="overlay">
@@ -211,8 +361,9 @@ resize();
 window.addEventListener('resize', resize);
 
 // ── Map (school hallways) ──────────────────────────────────────────────────
-// 23×16 grid. '#' = locker wall, '.' = open hallway/classroom.
-var ARENA = [
+// 23×16 grid. '#' = locker wall, '.' = open hallway/classroom, 'S' = secret hallway
+// (only walkable on Easy mode). 'E' is the exit door tile (placed at runtime).
+var BASE_ARENA = [
   '#######################',
   '#.....................#',
   '#.###.....###.....###.#',
@@ -230,35 +381,136 @@ var ARENA = [
   '#.....................#',
   '#######################',
 ];
+// Easy-mode "creepy secret hallway" — a hidden corridor branching off bottom-right.
+// We carve it into a copy of the base arena. Wall tiles in the secret area are
+// flagged separately so we can render paint splatters on them.
+var ARENA = BASE_ARENA.slice();
+var SECRET_TILES = {};   // "c,r" -> true for tiles in the secret hallway (rendering)
+var SECRET_WALL_TILES = {}; // walls bordering the secret hallway (paint splatters)
+function buildSecretHallway() {
+  // Carve a small L-shaped passage from (21, 14) area into the wall.
+  // Modify only Easy-mode display: we keep BASE_ARENA so harder modes can use vanilla.
+  var rows = BASE_ARENA.slice();
+  // Open up a few previously-wall tiles for the secret hallway path.
+  var secretCells = [
+    [21, 14], // a starter step inside existing open
+    [21, 13],
+    [21, 12],
+    [21, 11],
+  ];
+  for (var i = 0; i < secretCells.length; i++) {
+    var c = secretCells[i][0], r = secretCells[i][1];
+    if (r >= 0 && r < rows.length && c >= 0 && c < rows[r].length) {
+      var line = rows[r];
+      rows[r] = line.substring(0, c) + 'S' + line.substring(c + 1);
+      SECRET_TILES[c + ',' + r] = true;
+    }
+  }
+  // Mark walls adjacent to secret tiles for paint-splatter rendering.
+  for (var key in SECRET_TILES) {
+    var parts = key.split(',');
+    var sc = parseInt(parts[0], 10), sr = parseInt(parts[1], 10);
+    var nbrs = [[sc-1,sr],[sc+1,sr],[sc,sr-1],[sc,sr+1]];
+    for (var n = 0; n < nbrs.length; n++) {
+      var nc = nbrs[n][0], nr = nbrs[n][1];
+      if (nr < 0 || nr >= rows.length || nc < 0 || nc >= rows[nr].length) continue;
+      if (rows[nr].charAt(nc) === '#') SECRET_WALL_TILES[nc + ',' + nr] = true;
+    }
+  }
+  return rows;
+}
+var EASY_ARENA = buildSecretHallway();
+
 var COLS = ARENA[0].length;
 var ROWS = ARENA.length;
 function isWallTile(c, r) {
   if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return true;
-  return ARENA[r].charAt(c) === '#';
+  var ch = ARENA[r].charAt(c);
+  return ch === '#';
+}
+function isExitTile(c, r) {
+  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
+  return ARENA[r].charAt(c) === 'E';
+}
+function isSecretWall(c, r) {
+  return !!SECRET_WALL_TILES[c + ',' + r];
 }
 
 // ── Game state ─────────────────────────────────────────────────────────────
 var DIFFS = {
-  easy:   { target:  7, baldiBaseSpeed: 1.4, baldiSpeedup: 0.30, lives: 3, qLevel: 1 },
-  medium: { target: 11, baldiBaseSpeed: 1.8, baldiSpeedup: 0.36, lives: 3, qLevel: 2 },
-  hard:   { target: 15, baldiBaseSpeed: 2.3, baldiSpeedup: 0.45, lives: 3, qLevel: 3 },
+  easy:      { target:  7, baldiBaseSpeed: 1.4, baldiSpeedup: 0.30, lives: 20, qLevel: 1, ceilingDrips: false, wallVents: false, walkThroughWalls: true,  secretHallway: true,  dimLight: false, flicker: false, blobs: false, mop: false, label: 'Easy' },
+  medium:    { target: 11, baldiBaseSpeed: 1.8, baldiSpeedup: 0.36, lives:  3, qLevel: 2, ceilingDrips: false, wallVents: false, walkThroughWalls: false, secretHallway: false, dimLight: false, flicker: false, blobs: false, mop: false, label: 'Medium' },
+  hard:      { target: 15, baldiBaseSpeed: 2.3, baldiSpeedup: 0.45, lives:  3, qLevel: 3, ceilingDrips: true,  wallVents: false, walkThroughWalls: false, secretHallway: false, dimLight: false, flicker: false, blobs: false, mop: false, label: 'Hard' },
+  difficult: { target: 18, baldiBaseSpeed: 2.6, baldiSpeedup: 0.50, lives:  3, qLevel: 3, ceilingDrips: true,  wallVents: true,  walkThroughWalls: false, secretHallway: false, dimLight: false, flicker: false, blobs: false, mop: false, label: 'Difficult' },
+  expert:    { target: 20, baldiBaseSpeed: 2.8, baldiSpeedup: 0.50, lives:  3, qLevel: 3, ceilingDrips: true,  wallVents: true,  walkThroughWalls: false, secretHallway: false, dimLight: true,  flicker: true,  blobs: true,  mop: true,  label: 'Expert' },
 };
-var DIFF_LABELS = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
 var difficulty = 'easy';
 var diff = DIFFS.easy;
 var notebooks = [];           // { x, y, collected, impossible }
 var collected = 0;
 var lives = 3;
-// Player & Baldi positions are in TILE units (e.g. x=1.5 = center of column 1)
-var player = { x: 1.5, y: 1.5, angle: 0, speed: 2.4, turnSpeed: 2.6, hitCooldown: 0 };
-var baldi  = { x: 0, y: 0, speed: 1.4, alive: false };
+var bodyCount = 5;            // how many NPC characters spawn
+var exitDoor = null;          // { x, y } once spawned
+// Player: x/y in tile units, pose = 'normal' | 'jump' | 'duck'
+var player = { x: 1.5, y: 1.5, angle: 0, speed: 2.4, turnSpeed: 2.6, hitCooldown: 0, pose: 'normal', jumpT: 0, duckT: 0, freezeT: 0, slowT: 0 };
+var baldis = []; // array of { x, y, speed, alive } — supports 1-5 Baldis based on menu input
+var baldiCount = 1; // how many Baldis to spawn (1-5, set from menu input)
 var input = { up: false, down: false, left: false, right: false };
 var scene = 'menu';
 var lastTime = 0;
 var pulseT = 0;
 var currentMathQ = null;
 var currentMathNotebook = null;
+
+// Characters (besides Baldi). Each has a position, met flag, ai-cooldown, and kind.
+// kinds: playtime, principal, bully, arts, prize, cloudy, sweep, beans
+var characters = [];
+var charKindsAll = ['playtime', 'principal', 'bully', 'arts', 'prize', 'cloudy', 'sweep', 'beans'];
+// kind: 'teacher' | 'friend' | 'bully' — drives halo color + role label so
+// the kid can tell at a glance who's an authority vs a peer.
+var CHAR_INFO = {
+  playtime:  { name: 'Playtime',         emoji: '👧', color: '#E91E63', kind: 'friend',  role: 'CLASSMATE', desc: "Let's play jump rope! Tap the big TAP button 8 times in time!" },
+  principal: { name: 'The Principal',    emoji: '🧑‍🏫', color: '#1565C0', kind: 'teacher', role: 'TEACHER',   desc: 'No running in the halls! He sends you to detention for 3 seconds.' },
+  bully:     { name: "It's a Bully",     emoji: '🧒', color: '#6D4C41', kind: 'bully',   role: 'BULLY',     desc: 'He blocks the hallway. Tap GIVE TOY to share a toy and pass!' },
+  arts:      { name: 'Arts and Crafters',emoji: '🦃', color: '#8E24AA', kind: 'friend',  role: 'CLASSMATE', desc: 'A sock-puppet wraps around you — your shoes feel slow for 5 seconds.' },
+  prize:     { name: '1st Prize',        emoji: '🤖', color: '#C0CA33', kind: 'friend',  role: 'CLASSMATE', desc: 'A homing robot bumps you and shoves you back!' },
+  cloudy:    { name: 'Cloudy Copter',    emoji: '☁️', color: '#90CAF9', kind: 'friend',  role: 'CLASSMATE', desc: 'He blows wind so hard you can\'t walk forward for a moment!' },
+  sweep:     { name: 'Gotta Sweep',      emoji: '🧹', color: '#388E3C', kind: 'friend',  role: 'CLASSMATE', desc: 'A big broom sweeps you down the hallway — wheee!' },
+  beans:     { name: 'Mrs. Pomp',        emoji: '🧑‍🍳', color: '#FFB74D', kind: 'teacher', role: 'TEACHER',   desc: 'She pops in to say hi — small bump and you bounce back!' },
+  mop:       { name: 'The Big Grumpy Mop', emoji: '🧽', color: '#9E9E9E', kind: 'teacher', role: 'TEACHER',   desc: 'A grumpy old mop lumbering around. Bumps you back if you get too close!' },
+};
+// Halo colors per kind — orange/red for authority, cyan for peers, amber for bully.
+var KIND_HALO = {
+  teacher: '#FF6F00',
+  friend:  '#00BCD4',
+  bully:   '#FFC107',
+};
+
+// Hazards
+var paintDrips = [];   // ceiling drips (Hard / Difficult). { x, y, fallT, splatT }
+var paintStreams = []; // wall vents (Difficult). { x, y, dir, t, height ('high'|'low'|'mid') }
+var ventEmitters = []; // { x, y, dir, t }
+var paintBlobs = [];   // bouncing paint blobs (Expert). { x, y, vx, vy, bobPhase, splashT }
+
+// Expert mode global lighting state
+var lightFlicker = 1.0;     // multiplier on wall brightness this frame
+var lightFlickerNextT = 0;  // when to re-roll the flicker value
+var blackoutT = 0;          // remaining time of a brief blackout
+var blackoutCooldownT = 0;  // time until next blackout can occur
+
+// Intro queue (characters waiting to be introduced when first met)
+var introQueue = [];
+var introActive = false;
+var introCharKind = null;
+
+// Active event (a character's special move plays out)
+var currentEvent = null; // { kind, charIdx, t, dur, ... }
+
+// Jump-rope minigame state
+var ropeTaps = 0;
+var ropeTarget = 8;
+var ropeBtn = document.getElementById('rope-tap-btn');
 
 // Raycaster
 var FOV = Math.PI / 3;
@@ -268,17 +520,49 @@ var COL_W = 4;                // pixels per ray strip — fewer rays for mobile 
 var zBuffer = [];
 
 // ── Reset / start ──────────────────────────────────────────────────────────
+function pickArena() {
+  if (diff.secretHallway) ARENA = EASY_ARENA;
+  else                    ARENA = BASE_ARENA.slice();
+  COLS = ARENA[0].length;
+  ROWS = ARENA.length;
+}
+
 function startGame(d) {
   difficulty = d;
   diff = DIFFS[d];
+  pickArena();
   collected = 0;
   lives = diff.lives;
-  baldi.speed = diff.baldiBaseSpeed;
-  baldi.alive = false;
+  baldis = [];
+  player.pose = 'normal'; player.jumpT = 0; player.duckT = 0; player.freezeT = 0; player.slowT = 0;
   scene = 'playing';
+  exitDoor = null;
+  currentEvent = null;
+  introQueue = []; introActive = false;
+  paintDrips = []; paintStreams = []; ventEmitters = []; paintBlobs = [];
+  lightFlicker = 1.0; lightFlickerNextT = 0; blackoutT = 0; blackoutCooldownT = 4;
+  // Read body-count input
+  var inp = document.getElementById('count-input');
+  var v = parseInt(inp.value, 10);
+  if (isNaN(v)) v = 5;
+  if (v < 1) v = 1; if (v > 12) v = 12;
+  bodyCount = v; inp.value = String(v);
+  // Read baldi-count input
+  var binp = document.getElementById('baldi-count-input');
+  var bv = parseInt(binp.value, 10);
+  if (isNaN(bv)) bv = 1;
+  if (bv < 1) bv = 1; if (bv > 5) bv = 5;
+  baldiCount = bv; binp.value = String(bv);
   spawnPlayerAt(1.5, 1.5, 0);
   spawnNotebooks();
+  spawnCharacters();
+  if (diff.wallVents) spawnVents();
+  if (diff.blobs) spawnPaintBlobs();
+  if (diff.mop) spawnGrumpyMop();
   hideAllOverlays();
+  hideEventBanner();
+  document.getElementById('btn-give').classList.remove('show');
+  ropeBtn.classList.remove('show');
   refreshHUD();
 }
 
@@ -305,40 +589,97 @@ function spawnPlayerAt(x, y, angle) {
 }
 
 function spawnBaldiFar() {
+  // Build a candidate pool: the 3 far corners first (most "Baldi-like" spawn spots),
+  // then additional perimeter / open cells far from the player. We need up to 5
+  // distinct spawn points, so the 3 hard-coded corners aren't enough — extend with
+  // any open hallway cell at least 6 tiles from the player, ranked by distance.
   var corners = [
     { c: COLS - 2, r: 1 },
     { c: 1,        r: ROWS - 2 },
     { c: COLS - 2, r: ROWS - 2 },
   ];
-  var best = corners[0], bestD = -Infinity;
-  for (var i = 0; i < corners.length; i++) {
-    var bx = corners[i].c + 0.5;
-    var by = corners[i].r + 0.5;
-    var d2 = (bx - player.x) * (bx - player.x) + (by - player.y) * (by - player.y);
-    if (d2 > bestD) { bestD = d2; best = corners[i]; }
+  var candidates = [];
+  for (var ci = 0; ci < corners.length; ci++) {
+    var cell0 = findOpenCellNear(corners[ci].c, corners[ci].r);
+    candidates.push({ c: cell0.c, r: cell0.r });
   }
-  var cell = findOpenCellNear(best.c, best.r);
-  baldi.x = cell.c + 0.5;
-  baldi.y = cell.r + 0.5;
-  baldi.alive = true;
+  // Add extra spread-out open cells for when baldiCount > 3.
+  if (baldiCount > corners.length) {
+    var extras = [];
+    for (var rr = 0; rr < ROWS; rr++) {
+      for (var cc = 0; cc < COLS; cc++) {
+        if (isWallTile(cc, rr)) continue;
+        var dx0 = (cc + 0.5) - player.x, dy0 = (rr + 0.5) - player.y;
+        var d20 = dx0 * dx0 + dy0 * dy0;
+        if (d20 < 6 * 6) continue; // must be at least 6 tiles from player
+        extras.push({ c: cc, r: rr, d: d20 });
+      }
+    }
+    extras.sort(function(a, b) { return b.d - a.d; }); // farthest first
+    for (var ei = 0; ei < extras.length; ei++) {
+      candidates.push({ c: extras[ei].c, r: extras[ei].r });
+    }
+  }
+  // Spawn baldiCount Baldis, picking distinct cells far from the player and
+  // far from one another so they fan out instead of clumping.
+  baldis = [];
+  var used = {};
+  for (var i = 0; i < baldiCount; i++) {
+    // Pick the candidate that maximizes distance from the player AND from
+    // already-placed Baldis, skipping any cell already used.
+    var best = null, bestScore = -Infinity;
+    for (var j = 0; j < candidates.length; j++) {
+      var key = candidates[j].c + ',' + candidates[j].r;
+      if (used[key]) continue;
+      var bx = candidates[j].c + 0.5, by = candidates[j].r + 0.5;
+      var distP = (bx - player.x) * (bx - player.x) + (by - player.y) * (by - player.y);
+      var distB = Infinity;
+      for (var k = 0; k < baldis.length; k++) {
+        var dxk = bx - baldis[k].x, dyk = by - baldis[k].y;
+        var dk = dxk * dxk + dyk * dyk;
+        if (dk < distB) distB = dk;
+      }
+      // Score: weight player-distance heavily, but also reward separation between Baldis.
+      var score = distP + (baldis.length > 0 ? distB * 0.5 : 0);
+      if (score > bestScore) { bestScore = score; best = candidates[j]; }
+    }
+    if (!best) {
+      // Fallback: any open cell at least 4 tiles from the player.
+      var fb = gatherOpenCells(4);
+      if (fb.length === 0) break;
+      best = fb[0];
+    }
+    used[best.c + ',' + best.r] = true;
+    baldis.push({
+      x: best.c + 0.5,
+      y: best.r + 0.5,
+      speed: diff.baldiBaseSpeed,
+      alive: true,
+    });
+  }
 }
 
-function spawnNotebooks() {
-  notebooks = [];
+function gatherOpenCells(minDistFromPlayer) {
   var openCells = [];
   for (var r = 0; r < ROWS; r++) {
     for (var c = 0; c < COLS; c++) {
       if (isWallTile(c, r)) continue;
-      // Avoid spawning right next to the player
       var dx = c - 1, dy = r - 1;
-      if (dx * dx + dy * dy < 9) continue;
+      if (dx * dx + dy * dy < minDistFromPlayer * minDistFromPlayer) continue;
       openCells.push({ c: c, r: r });
     }
   }
+  // Shuffle
   for (var i = openCells.length - 1; i > 0; i--) {
     var j = Math.floor(Math.random() * (i + 1));
     var tmp = openCells[i]; openCells[i] = openCells[j]; openCells[j] = tmp;
   }
+  return openCells;
+}
+
+function spawnNotebooks() {
+  notebooks = [];
+  var openCells = gatherOpenCells(3);
   for (var k = 0; k < diff.target && k < openCells.length; k++) {
     notebooks.push({
       x: openCells[k].c + 0.5,
@@ -347,11 +688,126 @@ function spawnNotebooks() {
       impossible: false,
     });
   }
-  // Pick ONE random notebook to be the impossible one
+  // Pick ONE random notebook to be the impossible one (visually identical now!)
   if (notebooks.length > 0) {
     var imp = Math.floor(Math.random() * notebooks.length);
     notebooks[imp].impossible = true;
   }
+}
+
+function spawnCharacters() {
+  characters = [];
+  var openCells = gatherOpenCells(4);
+  // Shuffle character kinds and pick first bodyCount
+  var pool = charKindsAll.slice();
+  for (var i = pool.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+  }
+  var n = Math.min(bodyCount, pool.length, openCells.length);
+  for (var k = 0; k < n; k++) {
+    characters.push({
+      kind: pool[k],
+      x: openCells[k].c + 0.5,
+      y: openCells[k].r + 0.5,
+      met: false,
+      cooldown: 1.5 + Math.random() * 2,
+      active: true,
+      bobPhase: Math.random() * Math.PI * 2,
+      vx: 0, vy: 0,
+    });
+  }
+}
+
+function spawnVents() {
+  ventEmitters = [];
+  // Place vents on a few wall tiles bordering open hallways.
+  var attempts = 0;
+  while (ventEmitters.length < 6 && attempts < 200) {
+    attempts++;
+    var c = Math.floor(Math.random() * COLS);
+    var r = Math.floor(Math.random() * ROWS);
+    if (!isWallTile(c, r)) continue;
+    // Find a neighbor that's open: that's the direction the vent shoots.
+    var nbrs = [[1,0],[-1,0],[0,1],[0,-1]];
+    var dir = null;
+    for (var i = 0; i < nbrs.length; i++) {
+      var nc = c + nbrs[i][0], nr = r + nbrs[i][1];
+      if (!isWallTile(nc, nr)) { dir = { dx: nbrs[i][0], dy: nbrs[i][1] }; break; }
+    }
+    if (!dir) continue;
+    ventEmitters.push({ c: c, r: r, dir: dir, t: Math.random() * 2 });
+  }
+}
+
+function spawnPaintBlobs() {
+  paintBlobs = [];
+  var openCells = gatherOpenCells(4);
+  var n = 3 + Math.floor(Math.random() * 3); // 3-5 blobs
+  for (var k = 0; k < n && k < openCells.length; k++) {
+    var ang = Math.random() * Math.PI * 2;
+    var sp = 0.8 + Math.random() * 0.4;
+    paintBlobs.push({
+      x: openCells[k].c + 0.5,
+      y: openCells[k].r + 0.5,
+      vx: Math.cos(ang) * sp,
+      vy: Math.sin(ang) * sp,
+      bobPhase: Math.random() * Math.PI * 2,
+      splashT: 0,
+    });
+  }
+}
+
+function spawnGrumpyMop() {
+  // Add the mop as an always-active character on Expert (independent of bodyCount).
+  var openCells = gatherOpenCells(5);
+  if (openCells.length === 0) return;
+  var pick = openCells[Math.floor(Math.random() * openCells.length)];
+  characters.push({
+    kind: 'mop',
+    x: pick.c + 0.5,
+    y: pick.r + 0.5,
+    met: false,
+    cooldown: 1.5,
+    active: true,
+    bobPhase: Math.random() * Math.PI * 2,
+    vx: 0, vy: 0,
+  });
+}
+
+function spawnExitDoor() {
+  // Pick a wall tile far from player whose neighbor is open — convert to 'E'.
+  var candidates = [];
+  for (var r = 1; r < ROWS - 1; r++) {
+    for (var c = 1; c < COLS - 1; c++) {
+      if (!isWallTile(c, r)) continue;
+      // Far from player
+      var dx = c - player.x, dy = r - player.y;
+      if (dx * dx + dy * dy < 25) continue;
+      // Has at least one open neighbor
+      if (isWallTile(c-1, r) && isWallTile(c+1, r) && isWallTile(c, r-1) && isWallTile(c, r+1)) continue;
+      candidates.push({ c: c, r: r });
+    }
+  }
+  if (candidates.length === 0) {
+    // Fall back: use first wall with open neighbor anywhere
+    for (var r2 = 1; r2 < ROWS - 1; r2++) {
+      for (var c2 = 1; c2 < COLS - 1; c2++) {
+        if (isWallTile(c2, r2) &&
+            (!isWallTile(c2-1,r2)||!isWallTile(c2+1,r2)||!isWallTile(c2,r2-1)||!isWallTile(c2,r2+1))) {
+          candidates.push({ c: c2, r: r2 });
+        }
+      }
+    }
+  }
+  if (candidates.length === 0) return;
+  var pick = candidates[Math.floor(Math.random() * candidates.length)];
+  // Replace the tile char with 'E'. Need to mutate ARENA (array of strings).
+  var line = ARENA[pick.r];
+  ARENA[pick.r] = line.substring(0, pick.c) + 'E' + line.substring(pick.c + 1);
+  exitDoor = { x: pick.c + 0.5, y: pick.r + 0.5 };
+  // Face the open side
+  showEventBanner('🚪 The exit appeared!', 'Find the glowing door to escape!', 2200);
 }
 
 // ── Math question generator ───────────────────────────────────────────────
@@ -406,7 +862,6 @@ function makeMathQuestion(level) {
 }
 
 function makeImpossibleQuestion() {
-  // A silly question with no real answer — every choice is "wrong"
   var qs = [
     { text: '♾️ + 🤔 = ?',     choices: ['🌈', '🦄', '☁️', '🔥'] },
     { text: '🐸 × 7 = ?',      choices: ['🍕', '🚀', '💎', '⭐'] },
@@ -423,22 +878,22 @@ function showMathQuestion(notebook) {
   currentMathNotebook = notebook;
   currentMathQ = notebook.impossible ? makeImpossibleQuestion() : makeMathQuestion(diff.qLevel);
   document.getElementById('math-q').textContent = currentMathQ.text;
-  document.getElementById('math-sub').textContent =
-    notebook.impossible ? '🤯 IMPOSSIBLE question — just pick one!' : 'Pick the right answer!';
+  // Same sub-text either way so the player can't tell which is impossible
+  document.getElementById('math-sub').textContent = 'Pick the right answer!';
   document.getElementById('math-feedback').textContent = '';
   var box = document.getElementById('math-choices');
   box.innerHTML = '';
   for (var i = 0; i < currentMathQ.choices.length; i++) {
-    var b = document.createElement('button');
-    b.className = 'choice-btn';
-    b.type = 'button';
-    b.textContent = currentMathQ.choices[i];
     (function(val) {
+      var b = document.createElement('button');
+      b.className = 'choice-btn';
+      b.type = 'button';
+      b.textContent = val;
       b.addEventListener('click', function() { onMathAnswer(val, b); });
+      box.appendChild(b);
     })(currentMathQ.choices[i]);
-    box.appendChild(b);
   }
-  releaseAllInput();   // drop any held D-pad keys while the modal is open
+  releaseAllInput();
   document.getElementById('math-modal').classList.add('show');
 }
 
@@ -452,23 +907,41 @@ function onMathAnswer(val, btn) {
     refreshHUD();
     setTimeout(function() {
       document.getElementById('math-modal').classList.remove('show');
-      if (collected >= diff.target) winGame();
-      else { scene = 'playing'; }
+      afterNotebookCollected();
     }, 700);
   } else {
     btn.classList.add('wrong');
+    // Reveal the correct answer in BLUE (.reveal) so the kid can learn —
+    // never re-color the tapped button green.
+    if (!currentMathQ.impossible) {
+      var allBtns = document.getElementById('math-choices').querySelectorAll('.choice-btn');
+      for (var i = 0; i < allBtns.length; i++) {
+        var cb = allBtns[i];
+        if (cb !== btn && cb.textContent === String(currentMathQ.answer)) {
+          cb.classList.add('reveal');
+        }
+      }
+    }
     document.getElementById('math-feedback').textContent = currentMathQ.impossible
-      ? '😱 That was an IMPOSSIBLE question! The teacher heard you!'
+      ? '😱 That was a tricky question! The teacher heard you!'
       : '😊 Almost! The answer was ' + currentMathQ.answer + '.';
-    if (!baldi.alive) spawnBaldiFar();
-    else baldi.speed += diff.baldiSpeedup;
+    if (baldis.length === 0) spawnBaldiFar();
+    else { for (var bi = 0; bi < baldis.length; bi++) baldis[bi].speed += diff.baldiSpeedup; }
     collected++;
     refreshHUD();
     setTimeout(function() {
       document.getElementById('math-modal').classList.remove('show');
-      if (collected >= diff.target) winGame();
-      else { scene = 'playing'; }
+      afterNotebookCollected();
     }, 1200);
+  }
+}
+
+function afterNotebookCollected() {
+  if (collected >= diff.target) {
+    if (!exitDoor) spawnExitDoor();
+    scene = 'playing';
+  } else {
+    scene = 'playing';
   }
 }
 
@@ -476,7 +949,7 @@ function onMathAnswer(val, btn) {
 function winGame() {
   scene = 'win';
   document.getElementById('win-msg').textContent =
-    'You collected all ' + diff.target + ' notebooks on ' + DIFF_LABELS[difficulty] + '! 🎉';
+    'You found the exit on ' + diff.label + '! 🎉';
   document.getElementById('win').classList.add('show');
 }
 
@@ -493,18 +966,210 @@ function loseLife() {
 }
 
 function hideAllOverlays() {
-  ['menu','math-modal','win','lose'].forEach(function(id) {
+  ['menu','math-modal','win','lose','intro-modal'].forEach(function(id) {
     document.getElementById(id).classList.remove('show');
   });
 }
 
 function refreshHUD() {
   document.getElementById('nb-hud').textContent = '📓 ' + collected + '/' + diff.target;
-  var hearts = '';
-  for (var i = 0; i < lives; i++) hearts += '❤️';
-  document.getElementById('lives-hud').textContent = hearts;
-  document.getElementById('diff-hud').textContent = DIFF_LABELS[difficulty];
+  // Use ❤️ x N notation when lives is large to avoid hud overflow
+  var hudEl = document.getElementById('lives-hud');
+  if (lives <= 5) {
+    var hearts = '';
+    for (var i = 0; i < lives; i++) hearts += '❤️';
+    hudEl.textContent = hearts;
+  } else {
+    hudEl.textContent = '❤️ × ' + lives;
+  }
+  document.getElementById('diff-hud').textContent = diff.label;
 }
+
+// ── Event banner helpers ──────────────────────────────────────────────────
+var eventBannerTimer = null;
+function showEventBanner(text, sub, ms) {
+  var el = document.getElementById('event-banner');
+  document.getElementById('event-text').textContent = text;
+  document.getElementById('event-sub').textContent = sub || '';
+  el.classList.add('show');
+  if (eventBannerTimer) { clearTimeout(eventBannerTimer); eventBannerTimer = null; }
+  if (ms) {
+    eventBannerTimer = setTimeout(function() {
+      el.classList.remove('show');
+      eventBannerTimer = null;
+    }, ms);
+  }
+}
+function hideEventBanner() {
+  var el = document.getElementById('event-banner');
+  el.classList.remove('show');
+  if (eventBannerTimer) { clearTimeout(eventBannerTimer); eventBannerTimer = null; }
+}
+
+// ── Intro modal ───────────────────────────────────────────────────────────
+function showIntro(kind) {
+  var info = CHAR_INFO[kind];
+  if (!info) return;
+  introActive = true;
+  introCharKind = kind;
+  scene = 'intro';
+  document.getElementById('intro-emoji').textContent = info.emoji;
+  var roleLabel = info.role ? ' — your ' + info.role + '!' : '!';
+  document.getElementById('intro-name').textContent = 'Meet ' + info.name + roleLabel;
+  // Color the name to match the category halo so colors + label reinforce.
+  var nameEl = document.getElementById('intro-name');
+  var halo = KIND_HALO[info.kind];
+  if (halo) nameEl.style.color = halo;
+  else nameEl.style.color = '';
+  document.getElementById('intro-desc').textContent = info.desc;
+  releaseAllInput();
+  document.getElementById('intro-modal').classList.add('show');
+}
+function dismissIntro() {
+  document.getElementById('intro-modal').classList.remove('show');
+  var kind = introCharKind;
+  introActive = false; introCharKind = null;
+  scene = 'playing';
+  // Immediately trigger the character's special move
+  if (kind) startCharacterEvent(kind);
+}
+
+// ── Character special moves ───────────────────────────────────────────────
+function startCharacterEvent(kind) {
+  if (currentEvent) return;
+  var info = CHAR_INFO[kind];
+  switch (kind) {
+    case 'playtime':
+      ropeTaps = 0;
+      ropeTarget = 8;
+      ropeBtn.textContent = 'TAP! ' + ropeTaps + ' / ' + ropeTarget;
+      ropeBtn.classList.add('show');
+      currentEvent = { kind: 'rope', t: 0, dur: 12 }; // 12s timeout
+      showEventBanner('🪢 Jump rope!', 'Tap the big button ' + ropeTarget + ' times!');
+      player.freezeT = 99;
+      break;
+    case 'principal':
+      currentEvent = { kind: 'detention', t: 0, dur: 3 };
+      showEventBanner('🚨 Detention!', 'No running in the halls! (3 seconds)', 3000);
+      player.freezeT = 3;
+      break;
+    case 'bully':
+      currentEvent = { kind: 'bully', t: 0, dur: 8 };
+      showEventBanner('🧒 Give me a toy!', 'Tap GIVE TOY to share one!');
+      document.getElementById('btn-give').classList.add('show');
+      player.freezeT = 99;
+      break;
+    case 'arts':
+      currentEvent = { kind: 'arts', t: 0, dur: 5 };
+      showEventBanner('🦃 Sock-puppet!', 'Slow shoes for 5 seconds!', 2200);
+      player.slowT = 5;
+      break;
+    case 'prize':
+      currentEvent = { kind: 'prize', t: 0, dur: 0.6 };
+      showEventBanner('🤖 Bonk!', '1st Prize bumped you back!', 1400);
+      // Knockback away from prize: find the active char, push player.
+      var idx = findActiveCharIdx('prize');
+      if (idx !== -1) {
+        var ch = characters[idx];
+        var dx = player.x - ch.x, dy = player.y - ch.y;
+        var L = Math.sqrt(dx*dx + dy*dy) || 1;
+        var kb = 0.9;
+        tryMoveBy(player, (dx/L)*kb, (dy/L)*kb, 0.20);
+      }
+      break;
+    case 'cloudy':
+      currentEvent = { kind: 'cloudy', t: 0, dur: 2.5 };
+      showEventBanner('☁️ Whoosh!', "You can't walk forward!", 2500);
+      break;
+    case 'sweep':
+      currentEvent = { kind: 'sweep', t: 0, dur: 2.0 };
+      showEventBanner('🧹 Gotta Sweep!', 'You\'re sliding down the hall!', 2000);
+      break;
+    case 'beans':
+      currentEvent = { kind: 'beans', t: 0, dur: 1.0 };
+      showEventBanner('🧑‍🍳 Hi there!', 'A friendly bump!', 1200);
+      player.freezeT = 1;
+      break;
+    case 'mop':
+      currentEvent = { kind: 'mop', t: 0, dur: 1.0 };
+      showEventBanner('🧽 Big Grumpy Mop!', 'A grumpy bump knocks you back!', 1200);
+      // Knock player back ~1.2 tiles, then freeze 1s.
+      var midx = findActiveCharIdx('mop');
+      if (midx !== -1) {
+        var mch = characters[midx];
+        var mdx = player.x - mch.x, mdy = player.y - mch.y;
+        var mL = Math.sqrt(mdx*mdx + mdy*mdy) || 1;
+        var mkb = 1.2;
+        tryMoveBy(player, (mdx/mL)*mkb, (mdy/mL)*mkb, 0.20);
+      }
+      player.freezeT = 1;
+      break;
+    default:
+      break;
+  }
+  // Mark the character that triggered as inactive (so they don't keep triggering).
+  // Exception: the Big Grumpy Mop stays active and lumbers around — re-triggerable
+  // (but with a generous proximity cooldown so it doesn't spam).
+  var cIdx = findActiveCharIdx(kind);
+  if (cIdx !== -1) {
+    if (kind === 'mop') {
+      characters[cIdx].cooldown = 4.0; // re-trigger window
+    } else {
+      characters[cIdx].active = false;
+    }
+  }
+}
+
+function findActiveCharIdx(kind) {
+  for (var i = 0; i < characters.length; i++) {
+    if (characters[i].kind === kind) return i;
+  }
+  return -1;
+}
+
+function endEvent() {
+  currentEvent = null;
+  player.freezeT = 0;
+  ropeBtn.classList.remove('show');
+  document.getElementById('btn-give').classList.remove('show');
+  hideEventBanner();
+}
+
+function updateEvent(dt) {
+  if (!currentEvent) return;
+  currentEvent.t += dt;
+  if (currentEvent.kind === 'rope') {
+    if (ropeTaps >= ropeTarget) {
+      showEventBanner('🎉 Great rope skills!', '', 1200);
+      endEvent();
+    } else if (currentEvent.t >= currentEvent.dur) {
+      // Time out — let the player go anyway with a friendly note
+      showEventBanner('😊 Nice try!', 'Playtime lets you go!', 1200);
+      endEvent();
+    }
+  } else if (currentEvent.kind === 'bully') {
+    if (currentEvent.t >= currentEvent.dur) {
+      showEventBanner('😊 Bully steps aside!', '', 1200);
+      endEvent();
+    }
+  } else if (currentEvent.t >= currentEvent.dur) {
+    endEvent();
+  }
+}
+
+function onRopeTap() {
+  if (!currentEvent || currentEvent.kind !== 'rope') return;
+  ropeTaps++;
+  ropeBtn.textContent = 'TAP! ' + ropeTaps + ' / ' + ropeTarget;
+}
+ropeBtn.addEventListener('click', onRopeTap);
+
+function onGiveToy() {
+  if (!currentEvent || currentEvent.kind !== 'bully') return;
+  showEventBanner('🧸 You shared a toy!', '', 1000);
+  endEvent();
+}
+document.getElementById('btn-give').addEventListener('click', onGiveToy);
 
 // ── Input ──────────────────────────────────────────────────────────────────
 function bindDpad(btnId, key) {
@@ -549,6 +1214,33 @@ bindDpad('ddown',  'down');
 bindDpad('dleft',  'left');
 bindDpad('dright', 'right');
 
+function tapAction(btnId, fn) {
+  var b = document.getElementById(btnId);
+  function go(e) {
+    e.preventDefault();
+    b.classList.add('pressed');
+    fn();
+    setTimeout(function() { b.classList.remove('pressed'); }, 120);
+  }
+  b.addEventListener('pointerdown', go, { passive: false });
+  b.addEventListener('touchstart',  go, { passive: false });
+}
+
+function doJump() {
+  if (scene !== 'playing') return;
+  if (player.jumpT > 0 || player.duckT > 0) return;
+  player.pose = 'jump';
+  player.jumpT = 0.55;   // ~0.55s in the air
+}
+function doDuck() {
+  if (scene !== 'playing') return;
+  if (player.jumpT > 0 || player.duckT > 0) return;
+  player.pose = 'duck';
+  player.duckT = 0.55;
+}
+tapAction('bjump', doJump);
+tapAction('bduck', doDuck);
+
 function releaseAllInput() {
   ['up','down','left','right'].forEach(function(k) { input[k] = false; });
   document.querySelectorAll('.dbtn').forEach(function(b) { b.classList.remove('pressed'); });
@@ -561,6 +1253,8 @@ window.addEventListener('keydown', function(e) {
   if (e.code === 'ArrowDown' || e.code === 'KeyS') input.down = true;
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = true;
   if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = true;
+  if (e.code === 'Space') { e.preventDefault(); doJump(); }
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') doDuck();
 });
 window.addEventListener('keyup', function(e) {
   if (e.code === 'ArrowUp' || e.code === 'KeyW') input.up = false;
@@ -575,6 +1269,32 @@ document.querySelectorAll('#menu .big-btn').forEach(function(b) {
     startGame(b.getAttribute('data-diff'));
   });
 });
+// Body-count input clamp
+document.getElementById('count-input').addEventListener('input', function() {
+  var v = parseInt(this.value, 10);
+  if (isNaN(v)) return;
+  if (v < 1) this.value = '1';
+  if (v > 12) this.value = '12';
+});
+document.getElementById('count-input').addEventListener('blur', function() {
+  var v = parseInt(this.value, 10);
+  if (isNaN(v) || v < 1) this.value = '1';
+  if (v > 12) this.value = '12';
+});
+// Baldi-count input clamp (1-100)
+document.getElementById('baldi-count-input').addEventListener('input', function() {
+  var v = parseInt(this.value, 10);
+  if (isNaN(v)) return;
+  if (v < 1) this.value = '1';
+  if (v > 100) this.value = '100';
+});
+document.getElementById('baldi-count-input').addEventListener('blur', function() {
+  var v = parseInt(this.value, 10);
+  if (isNaN(v) || v < 1) this.value = '1';
+  if (v > 100) this.value = '100';
+});
+
+document.getElementById('intro-go').addEventListener('click', dismissIntro);
 document.getElementById('win-again').addEventListener('click', function() { startGame(difficulty); });
 document.getElementById('win-menu').addEventListener('click', function() {
   scene = 'menu'; hideAllOverlays(); document.getElementById('menu').classList.add('show');
@@ -586,13 +1306,22 @@ document.getElementById('lose-menu').addEventListener('click', function() {
 
 // ── Movement (with axis-separate wall collision) ──────────────────────────
 function tryMoveBy(actor, dx, dy, radius) {
+  // Easy mode: walk through walls (still clamped to map bounds).
+  if (diff && diff.walkThroughWalls) {
+    actor.x += dx;
+    actor.y += dy;
+    if (actor.x < 0.5) actor.x = 0.5;
+    if (actor.y < 0.5) actor.y = 0.5;
+    if (actor.x > COLS - 0.5) actor.x = COLS - 0.5;
+    if (actor.y > ROWS - 0.5) actor.y = ROWS - 0.5;
+    return;
+  }
   var nx = actor.x + dx;
   if (!collidesAtPoint(nx, actor.y, radius)) actor.x = nx;
   var ny = actor.y + dy;
   if (!collidesAtPoint(actor.x, ny, radius)) actor.y = ny;
 }
 function collidesAtPoint(x, y, radius) {
-  // Sample a ring around the point — keep both player and Baldi off the locker corners
   var samples = [
     [x - radius, y         ],
     [x + radius, y         ],
@@ -606,43 +1335,297 @@ function collidesAtPoint(x, y, radius) {
 }
 
 function updatePlayerMovement(dt) {
+  // Pose timers
+  if (player.jumpT > 0) {
+    player.jumpT -= dt;
+    if (player.jumpT <= 0) { player.jumpT = 0; player.pose = 'normal'; }
+  }
+  if (player.duckT > 0) {
+    player.duckT -= dt;
+    if (player.duckT <= 0) { player.duckT = 0; player.pose = 'normal'; }
+  }
+  if (player.slowT > 0) player.slowT = Math.max(0, player.slowT - dt);
+  if (player.freezeT > 0) {
+    player.freezeT = Math.max(0, player.freezeT - dt);
+    return;
+  }
+
+  // Sweep event: continuous slide along player's facing
+  if (currentEvent && currentEvent.kind === 'sweep') {
+    var sdx = Math.cos(player.angle) * 3.6 * dt;
+    var sdy = Math.sin(player.angle) * 3.6 * dt;
+    tryMoveBy(player, sdx, sdy, 0.20);
+    return;
+  }
+
   if (input.left)  player.angle -= player.turnSpeed * dt;
   if (input.right) player.angle += player.turnSpeed * dt;
+
   var fwd = (input.up ? 1 : 0) - (input.down ? 1 : 0);
+  // Cloudy event: block forward movement
+  if (currentEvent && currentEvent.kind === 'cloudy' && fwd > 0) fwd = 0;
+
   if (fwd !== 0) {
-    var dx = Math.cos(player.angle) * player.speed * dt * fwd;
-    var dy = Math.sin(player.angle) * player.speed * dt * fwd;
+    var spd = player.speed;
+    if (player.slowT > 0) spd *= 0.45;
+    var dx = Math.cos(player.angle) * spd * dt * fwd;
+    var dy = Math.sin(player.angle) * spd * dt * fwd;
     tryMoveBy(player, dx, dy, 0.20);
   }
 }
 
 function updateBaldi(dt) {
-  if (!baldi.alive) return;
-  var dx = player.x - baldi.x;
-  var dy = player.y - baldi.y;
-  var dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist < 0.02) return;
-  var step = baldi.speed * dt;
-  // Greedy axis-aligned chase: prefer larger axis first, fall back to other
-  var primaryDx = 0, primaryDy = 0, secondaryDx = 0, secondaryDy = 0;
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    primaryDx = Math.sign(dx) * step; secondaryDy = Math.sign(dy) * step;
-  } else {
-    primaryDy = Math.sign(dy) * step; secondaryDx = Math.sign(dx) * step;
-  }
-  var radius = 0.25;
-  var bx = baldi.x + primaryDx, by = baldi.y + primaryDy;
-  if (!collidesAtPoint(bx, by, radius)) { baldi.x = bx; baldi.y = by; }
-  else {
-    var sx = baldi.x + secondaryDx, sy = baldi.y + secondaryDy;
-    if (!collidesAtPoint(sx, sy, radius)) { baldi.x = sx; baldi.y = sy; }
+  for (var bIdx = 0; bIdx < baldis.length; bIdx++) {
+    var baldi = baldis[bIdx];
+    if (!baldi.alive) continue;
+    var dx = player.x - baldi.x;
+    var dy = player.y - baldi.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 0.02) continue;
+    var step = baldi.speed * dt;
+    var primaryDx = 0, primaryDy = 0, secondaryDx = 0, secondaryDy = 0;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      primaryDx = Math.sign(dx) * step; secondaryDy = Math.sign(dy) * step;
+    } else {
+      primaryDy = Math.sign(dy) * step; secondaryDx = Math.sign(dx) * step;
+    }
+    var radius = 0.25;
+    var bx = baldi.x + primaryDx, by = baldi.y + primaryDy;
+    if (!collidesAtPoint(bx, by, radius)) { baldi.x = bx; baldi.y = by; }
     else {
-      var trySlide = [[step,0],[-step,0],[0,step],[0,-step]];
-      for (var i = 0; i < trySlide.length; i++) {
-        var tx = baldi.x + trySlide[i][0], ty = baldi.y + trySlide[i][1];
-        if (!collidesAtPoint(tx, ty, radius)) { baldi.x = tx; baldi.y = ty; break; }
+      var sx = baldi.x + secondaryDx, sy = baldi.y + secondaryDy;
+      if (!collidesAtPoint(sx, sy, radius)) { baldi.x = sx; baldi.y = sy; }
+      else {
+        var trySlide = [[step,0],[-step,0],[0,step],[0,-step]];
+        for (var i = 0; i < trySlide.length; i++) {
+          var tx = baldi.x + trySlide[i][0], ty = baldi.y + trySlide[i][1];
+          if (!collidesAtPoint(tx, ty, radius)) { baldi.x = tx; baldi.y = ty; break; }
+        }
       }
     }
+  }
+}
+
+function updateCharacters(dt) {
+  // 1st Prize is a homing robot — it slowly drifts toward the player.
+  // The Big Grumpy Mop slowly lumbers around the hallway with random direction
+  // changes; slower than Baldi but persistent.
+  for (var i = 0; i < characters.length; i++) {
+    var ch = characters[i];
+    if (!ch.active) continue;
+    if (ch.kind === 'prize') {
+      var dx = player.x - ch.x, dy = player.y - ch.y;
+      var L = Math.sqrt(dx*dx + dy*dy);
+      if (L > 0.1) {
+        var s = 0.55 * dt;
+        var nx = ch.x + (dx / L) * s;
+        var ny = ch.y + (dy / L) * s;
+        if (!collidesAtPoint(nx, ny, 0.25)) { ch.x = nx; ch.y = ny; }
+      }
+    } else if (ch.kind === 'mop') {
+      // Initialize a wander direction lazily
+      if (typeof ch.wanderDx !== 'number' || typeof ch.wanderTimer !== 'number') {
+        ch.wanderDx = Math.cos(Math.random() * Math.PI * 2);
+        ch.wanderDy = Math.sin(Math.random() * Math.PI * 2);
+        ch.wanderTimer = 1.5 + Math.random() * 1.5;
+      }
+      ch.wanderTimer -= dt;
+      if (ch.wanderTimer <= 0) {
+        // Pick new direction with slight bias toward the player
+        var pdx = player.x - ch.x, pdy = player.y - ch.y;
+        var pL = Math.sqrt(pdx*pdx + pdy*pdy) || 1;
+        var ang = Math.random() * Math.PI * 2;
+        var rdx = Math.cos(ang), rdy = Math.sin(ang);
+        var bias = 0.35;
+        ch.wanderDx = rdx * (1 - bias) + (pdx / pL) * bias;
+        ch.wanderDy = rdy * (1 - bias) + (pdy / pL) * bias;
+        var wL = Math.sqrt(ch.wanderDx*ch.wanderDx + ch.wanderDy*ch.wanderDy) || 1;
+        ch.wanderDx /= wL; ch.wanderDy /= wL;
+        ch.wanderTimer = 1.5 + Math.random() * 1.5;
+      }
+      var mopSp = 0.85 * dt; // slower than Baldi
+      var mnx = ch.x + ch.wanderDx * mopSp;
+      var mny = ch.y + ch.wanderDy * mopSp;
+      if (!collidesAtPoint(mnx, mny, 0.28)) { ch.x = mnx; ch.y = mny; }
+      else {
+        // Bounce: pick a new direction next frame
+        ch.wanderTimer = 0;
+      }
+      // Cooldown counts down so contact can re-trigger
+      if (ch.cooldown > 0) ch.cooldown -= dt;
+    }
+    ch.bobPhase += dt * 3;
+  }
+}
+
+// Trigger character interactions when player gets close
+function checkCharacterCollisions(dt) {
+  if (currentEvent || introActive) return;
+  for (var i = 0; i < characters.length; i++) {
+    var ch = characters[i];
+    if (!ch.active) continue;
+    // Mop re-triggers, but only after its cooldown elapses
+    if (ch.kind === 'mop' && ch.cooldown > 0 && ch.met) continue;
+    var dx = ch.x - player.x, dy = ch.y - player.y;
+    if (dx * dx + dy * dy < 0.7 * 0.7) {
+      if (!ch.met) {
+        ch.met = true;
+        showIntro(ch.kind);
+      } else {
+        startCharacterEvent(ch.kind);
+      }
+      return;
+    }
+  }
+}
+
+// ── Hazard updates ───────────────────────────────────────────────────────
+function updateHazards(dt) {
+  // Ceiling paint drips (Hard / Difficult)
+  if (diff.ceilingDrips) {
+    if (Math.random() < dt * 1.4) {
+      // Spawn near player at random open tile
+      var tries = 0;
+      while (tries < 8) {
+        tries++;
+        var c = Math.floor(player.x) + Math.floor(Math.random() * 7) - 3;
+        var r = Math.floor(player.y) + Math.floor(Math.random() * 7) - 3;
+        if (c <= 0 || c >= COLS - 1 || r <= 0 || r >= ROWS - 1) continue;
+        if (isWallTile(c, r)) continue;
+        paintDrips.push({ x: c + 0.5, y: r + 0.5, fallT: 0, splatT: 0, peak: 1.6 + Math.random()*0.5 });
+        break;
+      }
+    }
+    for (var i = paintDrips.length - 1; i >= 0; i--) {
+      var d = paintDrips[i];
+      if (d.splatT > 0) {
+        d.splatT -= dt;
+        if (d.splatT <= 0) paintDrips.splice(i, 1);
+      } else {
+        d.fallT += dt;
+        if (d.fallT >= d.peak) {
+          d.splatT = 1.5;
+          // Hit player if close AND not jumping (jumping makes you taller, drips
+          // hit your head; ducking makes you safer)
+          var pdx = d.x - player.x, pdy = d.y - player.y;
+          if (pdx*pdx + pdy*pdy < 0.45 * 0.45) {
+            if (player.duckT > 0) {
+              // Safe — ducked under
+            } else if (player.hitCooldown <= 0) {
+              loseLife();
+              player.hitCooldown = 1.4;
+              return;
+            }
+          }
+        }
+      }
+    }
+  }
+  // Wall vents shooting paint streams (Difficult only)
+  if (diff.wallVents) {
+    for (var v = 0; v < ventEmitters.length; v++) {
+      var e = ventEmitters[v];
+      e.t -= dt;
+      if (e.t <= 0) {
+        e.t = 1.6 + Math.random() * 1.4;
+        // Emit a stream particle from this vent
+        // Choose height: high (jump to dodge), low (duck to dodge), or mid (must dodge sideways)
+        var heights = ['high', 'low', 'mid'];
+        var h = heights[Math.floor(Math.random() * heights.length)];
+        paintStreams.push({
+          x: e.c + 0.5, y: e.r + 0.5,
+          dir: { dx: e.dir.dx, dy: e.dir.dy },
+          t: 0, life: 1.8, height: h, speed: 2.4
+        });
+      }
+    }
+    for (var s = paintStreams.length - 1; s >= 0; s--) {
+      var ps = paintStreams[s];
+      ps.t += dt;
+      ps.x += ps.dir.dx * ps.speed * dt;
+      ps.y += ps.dir.dy * ps.speed * dt;
+      // Hit detection
+      var sdx = ps.x - player.x, sdy = ps.y - player.y;
+      if (sdx*sdx + sdy*sdy < 0.45 * 0.45) {
+        // Player can dodge by jumping (over low streams) or ducking (under high)
+        var safe = false;
+        if (ps.height === 'low' && player.jumpT > 0) safe = true;
+        if (ps.height === 'high' && player.duckT > 0) safe = true;
+        if (!safe && player.hitCooldown <= 0) {
+          loseLife();
+          player.hitCooldown = 1.4;
+          paintStreams.splice(s, 1);
+          return;
+        }
+      }
+      if (ps.t >= ps.life || isWallTile(Math.floor(ps.x), Math.floor(ps.y))) {
+        paintStreams.splice(s, 1);
+      }
+    }
+  }
+  // Bouncing paint blobs (Expert only)
+  if (diff.blobs) {
+    for (var bi = 0; bi < paintBlobs.length; bi++) {
+      var blob = paintBlobs[bi];
+      blob.bobPhase += dt * 5;
+      if (blob.splashT > 0) {
+        blob.splashT = Math.max(0, blob.splashT - dt);
+        continue;
+      }
+      // Slight homing bias toward player (gentle, so they roam)
+      var bdx = player.x - blob.x, bdy = player.y - blob.y;
+      var bL = Math.sqrt(bdx*bdx + bdy*bdy) || 1;
+      var homing = 0.6;
+      blob.vx += (bdx / bL) * homing * dt;
+      blob.vy += (bdy / bL) * homing * dt;
+      // Cap speed
+      var vL = Math.sqrt(blob.vx*blob.vx + blob.vy*blob.vy);
+      var maxV = 1.4;
+      if (vL > maxV) { blob.vx = (blob.vx / vL) * maxV; blob.vy = (blob.vy / vL) * maxV; }
+      // Move with axis-separate wall bounce
+      var nbx = blob.x + blob.vx * dt;
+      if (!collidesAtPoint(nbx, blob.y, 0.18)) blob.x = nbx;
+      else blob.vx = -blob.vx * 0.85;
+      var nby = blob.y + blob.vy * dt;
+      if (!collidesAtPoint(blob.x, nby, 0.18)) blob.y = nby;
+      else blob.vy = -blob.vy * 0.85;
+      // Random nudge so they look bouncy
+      if (Math.random() < dt * 0.8) {
+        blob.vx += (Math.random() - 0.5) * 0.6;
+        blob.vy += (Math.random() - 0.5) * 0.6;
+      }
+      // Contact with player: 1.5s freeze + paint splash; no life lost.
+      var pdx2 = blob.x - player.x, pdy2 = blob.y - player.y;
+      if (pdx2*pdx2 + pdy2*pdy2 < 0.40 * 0.40) {
+        if (player.freezeT < 1.5) player.freezeT = 1.5;
+        blob.splashT = 0.8;
+        // Bounce blob away from player
+        var awayL = Math.sqrt(pdx2*pdx2 + pdy2*pdy2) || 1;
+        blob.vx = (pdx2 / awayL) * 1.2;
+        blob.vy = (pdy2 / awayL) * 1.2;
+        showEventBanner('🎨 Splash!', "A paint blob bumped you — hold still!", 1200);
+      }
+    }
+  }
+  // Expert flickering lights + occasional brief blackouts
+  if (diff.flicker) {
+    lightFlickerNextT -= dt;
+    if (lightFlickerNextT <= 0) {
+      lightFlicker = 0.7 + Math.random() * 0.3;
+      lightFlickerNextT = 0.08 + Math.random() * 0.04;
+    }
+    if (blackoutT > 0) {
+      blackoutT = Math.max(0, blackoutT - dt);
+    } else {
+      blackoutCooldownT -= dt;
+      if (blackoutCooldownT <= 0) {
+        blackoutT = 0.15;
+        blackoutCooldownT = 5 + Math.random() * 2;
+      }
+    }
+  } else {
+    lightFlicker = 1.0;
+    blackoutT = 0;
   }
 }
 
@@ -654,7 +1637,11 @@ function update(dt) {
   updatePlayerMovement(dt);
   if (player.hitCooldown > 0) player.hitCooldown = Math.max(0, player.hitCooldown - dt);
 
-  // Notebook pickup (any notebook within reach)
+  updateEvent(dt);
+  updateCharacters(dt);
+  updateHazards(dt);
+
+  // Notebook pickup
   for (var i = 0; i < notebooks.length; i++) {
     var n = notebooks[i];
     if (n.collected) continue;
@@ -666,17 +1653,32 @@ function update(dt) {
     }
   }
 
+  // Exit door check
+  if (exitDoor) {
+    var edx = exitDoor.x - player.x, edy = exitDoor.y - player.y;
+    if (edx*edx + edy*edy < 0.65 * 0.65) {
+      winGame();
+      return;
+    }
+  }
+
+  // Character proximity
+  checkCharacterCollisions(dt);
+
   updateBaldi(dt);
 
-  if (baldi.alive && player.hitCooldown <= 0) {
-    var bdx = baldi.x - player.x, bdy = baldi.y - player.y;
-    if (bdx * bdx + bdy * bdy < 0.55 * 0.55) loseLife();
+  if (player.hitCooldown <= 0) {
+    for (var bci = 0; bci < baldis.length; bci++) {
+      var bb = baldis[bci];
+      if (!bb.alive) continue;
+      var bdx = bb.x - player.x, bdy = bb.y - player.y;
+      if (bdx * bdx + bdy * bdy < 0.55 * 0.55) { loseLife(); break; }
+    }
   }
 }
 
 // ── Raycaster render ──────────────────────────────────────────────────────
 function castRay(rayAngle) {
-  // DDA algorithm
   var sin = Math.sin(rayAngle);
   var cos = Math.cos(rayAngle);
   var mapX = Math.floor(player.x);
@@ -689,6 +1691,7 @@ function castRay(rayAngle) {
   if (sin < 0) { stepY = -1; sideDistY = (player.y - mapY) * deltaDistY; }
   else         { stepY =  1; sideDistY = (mapY + 1 - player.y) * deltaDistY; }
   var hit = false, side = 0;
+  var hitKind = '#'; // '#' wall, 'E' exit, 'V' vent
   var iter = 0;
   while (!hit && iter < 64) {
     if (sideDistX < sideDistY) {
@@ -702,88 +1705,249 @@ function castRay(rayAngle) {
     }
     iter++;
     if (mapX < 0 || mapY < 0 || mapX >= COLS || mapY >= ROWS) break;
-    if (ARENA[mapY].charAt(mapX) === '#') hit = true;
+    var ch = ARENA[mapY].charAt(mapX);
+    if (ch === '#' || ch === 'E') { hit = true; hitKind = ch; }
   }
   var perpDist;
   if (side === 0) perpDist = (sideDistX - deltaDistX);
   else            perpDist = (sideDistY - deltaDistY);
   if (perpDist < 0.01) perpDist = 0.01;
-  // Wall hit X (for column index — texture column would use this)
   var wallHitX;
   if (side === 0) wallHitX = player.y + perpDist * sin;
   else            wallHitX = player.x + perpDist * cos;
   wallHitX -= Math.floor(wallHitX);
-  return { dist: perpDist, side: side, mapX: mapX, mapY: mapY, hitX: wallHitX };
+  return { dist: perpDist, side: side, mapX: mapX, mapY: mapY, hitX: wallHitX, kind: hitKind };
 }
 
 function drawScene() {
-  // Sky / ceiling (white-ish school ceiling)
+  // Expert-mode lighting bias: dim floor/ceiling ~40% darker
+  var dim = diff.dimLight;
+  // Ceiling
   var ceilGrad = ctx.createLinearGradient(0, 0, 0, H / 2);
-  ceilGrad.addColorStop(0, '#3A3A3A');
-  ceilGrad.addColorStop(1, '#7A7A7A');
+  if (dim) {
+    ceilGrad.addColorStop(0, '#1A1A20');
+    ceilGrad.addColorStop(1, '#3A3A45');
+  } else {
+    ceilGrad.addColorStop(0, '#3A3A3A');
+    ceilGrad.addColorStop(1, '#7A7A7A');
+  }
   ctx.fillStyle = ceilGrad;
   ctx.fillRect(0, 0, W, H / 2);
-  // Floor (brown checker hint)
+  // Floor
   var floorGrad = ctx.createLinearGradient(0, H / 2, 0, H);
-  floorGrad.addColorStop(0, '#5D3A1A');
-  floorGrad.addColorStop(1, '#A36B3F');
+  if (dim) {
+    floorGrad.addColorStop(0, '#2A1A0A');
+    floorGrad.addColorStop(1, '#4A3018');
+  } else {
+    floorGrad.addColorStop(0, '#5D3A1A');
+    floorGrad.addColorStop(1, '#A36B3F');
+  }
   ctx.fillStyle = floorGrad;
   ctx.fillRect(0, H / 2, W, H / 2);
 
-  // Walls — fire one ray per COL_W column, store distance in zBuffer
+  // Walls
   var numRays = Math.ceil(W / COL_W);
   zBuffer.length = numRays;
   for (var i = 0; i < numRays; i++) {
     var rayAngle = player.angle - HALF_FOV + (i / numRays) * FOV;
     var r = castRay(rayAngle);
-    // Fish-eye correction
     var corrected = r.dist * Math.cos(rayAngle - player.angle);
     zBuffer[i] = corrected;
-    // Wall column height (projection)
     var lineH = Math.min(H * 1.4, (H / corrected) * 0.95);
     var startY = (H - lineH) / 2;
-    // Locker color: red lockers, with vertical seams every ~0.16 of tile width
+
+    if (r.kind === 'E') {
+      // Exit door — bright glowing rectangle
+      var pulse = 0.6 + 0.4 * Math.sin(pulseT * 5);
+      var fadeE = Math.max(0.45, 1 - corrected / MAX_DEPTH);
+      ctx.fillStyle = 'rgb(' + Math.round(80 * fadeE) + ',' + Math.round(220 * fadeE * pulse) + ',' + Math.round(120 * fadeE * pulse) + ')';
+      ctx.fillRect(i * COL_W, startY, COL_W + 1, lineH);
+      // Yellow trim
+      ctx.fillStyle = 'rgba(255,235,59,' + (0.85 * fadeE) + ')';
+      ctx.fillRect(i * COL_W, startY, COL_W + 1, Math.max(3, lineH * 0.08));
+      ctx.fillRect(i * COL_W, startY + lineH - Math.max(3, lineH * 0.08), COL_W + 1, Math.max(3, lineH * 0.08));
+      // EXIT text-suggesting bar
+      ctx.fillStyle = 'rgba(255,255,255,' + (0.9 * fadeE) + ')';
+      ctx.fillRect(i * COL_W, startY + lineH * 0.45, COL_W + 1, Math.max(2, lineH * 0.06));
+      continue;
+    }
+
     var hitX = r.hitX;
     var seam = (hitX % 0.16) < 0.02 || ((hitX + 0.08) % 0.16) < 0.02;
     var baseR = 200, baseG = 35, baseB = 40;
-    if (r.side === 1) { baseR -= 35; baseG -= 10; baseB -= 8; }   // shade NS faces
-    // Distance fade
+    if (r.side === 1) { baseR -= 35; baseG -= 10; baseB -= 8; }
     var fade = Math.max(0.25, 1 - corrected / MAX_DEPTH);
-    var rr = Math.round(baseR * fade);
-    var gg = Math.round(baseG * fade);
-    var bb = Math.round(baseB * fade);
+    // Expert: bias all wall colors darker (~60% of normal) and apply per-frame flicker
+    var lightMul = 1.0;
+    if (dim) lightMul *= 0.60;
+    if (diff.flicker) lightMul *= lightFlicker;
+    var rr = Math.round(baseR * fade * lightMul);
+    var gg = Math.round(baseG * fade * lightMul);
+    var bb = Math.round(baseB * fade * lightMul);
     if (seam) { rr = Math.round(rr * 0.55); gg = Math.round(gg * 0.55); bb = Math.round(bb * 0.55); }
     ctx.fillStyle = 'rgb(' + rr + ',' + gg + ',' + bb + ')';
     ctx.fillRect(i * COL_W, startY, COL_W + 1, lineH);
-    // Top trim (black band so lockers look flat-topped)
+
+    // Trim + skirting
     ctx.fillStyle = 'rgba(0,0,0,' + (0.55 * fade) + ')';
     ctx.fillRect(i * COL_W, startY, COL_W + 1, Math.max(2, lineH * 0.06));
-    // Bottom skirting
     ctx.fillStyle = 'rgba(0,0,0,' + (0.4 * fade) + ')';
     ctx.fillRect(i * COL_W, startY + lineH - Math.max(2, lineH * 0.04), COL_W + 1, Math.max(2, lineH * 0.04));
-    // Locker handle (small bright pip near middle on the locker face — only every 0.16)
     if (Math.abs((hitX % 0.16) - 0.08) < 0.02 && lineH > 60) {
       ctx.fillStyle = 'rgba(255,235,59,' + (0.7 * fade) + ')';
       ctx.fillRect(i * COL_W, startY + lineH * 0.5, COL_W + 1, 3);
+    }
+
+    // Secret-hallway paint splatter decorations on those wall tiles
+    if (isSecretWall(r.mapX, r.mapY)) {
+      // Pink/red paint splatter pattern using hash of (mapX,mapY,hitX)
+      var seed = (r.mapX * 7 + r.mapY * 13);
+      var splotch1Y = ((seed * 91) % 100) / 100;
+      var splotch2Y = ((seed * 37 + 17) % 100) / 100;
+      var splotch1X = ((hitX * 17 + seed) % 1);
+      if (splotch1X > 0.3 && splotch1X < 0.7) {
+        ctx.fillStyle = 'rgba(255,80,120,' + (0.65 * fade) + ')';
+        ctx.fillRect(i * COL_W, startY + lineH * splotch1Y, COL_W + 1, Math.max(3, lineH * 0.10));
+      }
+      var splotch2X = ((hitX * 23 + seed * 5) % 1);
+      if (splotch2X > 0.4 && splotch2X < 0.6) {
+        ctx.fillStyle = 'rgba(220,40,60,' + (0.55 * fade) + ')';
+        ctx.fillRect(i * COL_W, startY + lineH * splotch2Y, COL_W + 1, Math.max(2, lineH * 0.06));
+      }
+    }
+
+    // Paint vents on Difficult — small grate on certain wall tiles
+    if (diff.wallVents) {
+      for (var ve = 0; ve < ventEmitters.length; ve++) {
+        var em = ventEmitters[ve];
+        if (em.c === r.mapX && em.r === r.mapY) {
+          // Gray grate near middle of wall
+          ctx.fillStyle = 'rgba(180,180,180,' + (0.85 * fade) + ')';
+          ctx.fillRect(i * COL_W, startY + lineH * 0.40, COL_W + 1, lineH * 0.20);
+          // Dark grille bars
+          ctx.fillStyle = 'rgba(20,20,20,' + (0.85 * fade) + ')';
+          ctx.fillRect(i * COL_W, startY + lineH * 0.43, COL_W + 1, 2);
+          ctx.fillRect(i * COL_W, startY + lineH * 0.50, COL_W + 1, 2);
+          ctx.fillRect(i * COL_W, startY + lineH * 0.57, COL_W + 1, 2);
+          break;
+        }
+      }
+    }
+  }
+
+  // Ceiling paint drips (Hard / Difficult) — drawn as overlay sprites in 2D screen space
+  if (diff.ceilingDrips) drawPaintDrips();
+
+  // Wall vent paint streams — drawn as flying sprites
+  if (diff.wallVents) drawPaintStreams();
+}
+
+function drawPaintDrips() {
+  // Project each drip to screen space and draw a falling red/pink streak.
+  var cosA = Math.cos(player.angle), sinA = Math.sin(player.angle);
+  var numRays = Math.ceil(W / COL_W);
+  for (var i = 0; i < paintDrips.length; i++) {
+    var d = paintDrips[i];
+    var rx = d.x - player.x, ry = d.y - player.y;
+    var camX =  cosA * rx + sinA * ry;
+    var camY = -sinA * rx + cosA * ry;
+    if (camX < 0.05) continue;
+    var screenX = (W / 2) * (1 + camY / camX);
+    var fullH = (H / camX) * 0.95;
+    var topY = (H - fullH) / 2;
+    var floorY = topY + fullH;
+    var ceilingY = topY;
+    // While falling, draw a red streak from ceiling down
+    if (d.splatT <= 0) {
+      var p = Math.min(1, d.fallT / d.peak);
+      var dropY = ceilingY + (floorY - ceilingY) * 0.55 * p;
+      var dropW = Math.max(2, fullH * 0.04);
+      // z-test
+      var col = Math.floor(screenX / COL_W);
+      if (col >= 0 && col < numRays && zBuffer[col] && camX > zBuffer[col] + 0.05) continue;
+      ctx.fillStyle = '#E91E63';
+      ctx.fillRect(screenX - dropW/2, ceilingY, dropW, dropY - ceilingY);
+      // Drop head
+      ctx.fillStyle = '#FF4081';
+      ctx.fillRect(screenX - dropW, dropY - dropW, dropW * 2, dropW * 2);
+    } else {
+      // Splat puddle on floor
+      var pw = Math.max(6, fullH * 0.18);
+      var ph = Math.max(2, fullH * 0.05);
+      var splatY = topY + (floorY - topY) * 0.92;
+      var col2 = Math.floor(screenX / COL_W);
+      if (col2 >= 0 && col2 < numRays && zBuffer[col2] && camX > zBuffer[col2] + 0.05) continue;
+      ctx.fillStyle = 'rgba(233,30,99,0.85)';
+      ctx.fillRect(screenX - pw/2, splatY, pw, ph);
+      ctx.fillStyle = 'rgba(255,64,129,0.85)';
+      ctx.fillRect(screenX - pw/3, splatY - 2, pw * 0.66, ph * 0.6);
+    }
+  }
+}
+
+function drawPaintStreams() {
+  var cosA = Math.cos(player.angle), sinA = Math.sin(player.angle);
+  var numRays = Math.ceil(W / COL_W);
+  for (var i = 0; i < paintStreams.length; i++) {
+    var ps = paintStreams[i];
+    var rx = ps.x - player.x, ry = ps.y - player.y;
+    var camX =  cosA * rx + sinA * ry;
+    var camY = -sinA * rx + cosA * ry;
+    if (camX < 0.05) continue;
+    var screenX = (W / 2) * (1 + camY / camX);
+    var fullH = (H / camX) * 0.95;
+    var topY = (H - fullH) / 2;
+    var midY = topY + fullH * 0.5;
+    var hY;
+    if (ps.height === 'high') hY = topY + fullH * 0.30;
+    else if (ps.height === 'low') hY = topY + fullH * 0.75;
+    else hY = midY;
+    var size = Math.max(6, fullH * 0.15);
+    var col = Math.floor(screenX / COL_W);
+    if (col >= 0 && col < numRays && zBuffer[col] && camX > zBuffer[col] + 0.05) continue;
+    // Body
+    ctx.fillStyle = '#E91E63';
+    ctx.fillRect(screenX - size/2, hY - size/2, size, size);
+    // Highlight
+    ctx.fillStyle = '#FF80AB';
+    ctx.fillRect(screenX - size/4, hY - size/4, size/2, size/2);
+    // Label hint (so kids know which way to dodge)
+    if (size > 30) {
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold ' + Math.round(size * 0.55) + 'px Arial';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      var sym = ps.height === 'high' ? '⤵' : ps.height === 'low' ? '⤴' : '↔';
+      ctx.fillText(sym, screenX, hY);
     }
   }
 }
 
 function drawSprites() {
-  // Collect visible sprites with distance
   var sprites = [];
   for (var i = 0; i < notebooks.length; i++) {
     var n = notebooks[i];
     if (n.collected) continue;
     sprites.push({ x: n.x, y: n.y, kind: 'notebook', impossible: n.impossible, dist: 0 });
   }
-  if (baldi.alive) sprites.push({ x: baldi.x, y: baldi.y, kind: 'baldi', dist: 0 });
-  // Compute distance² to player
+  for (var bsi = 0; bsi < baldis.length; bsi++) {
+    if (!baldis[bsi].alive) continue;
+    sprites.push({ x: baldis[bsi].x, y: baldis[bsi].y, kind: 'baldi', dist: 0 });
+  }
+  for (var c = 0; c < characters.length; c++) {
+    if (!characters[c].active) continue;
+    sprites.push({ x: characters[c].x, y: characters[c].y, kind: 'char', charKind: characters[c].kind, dist: 0 });
+  }
+  // Expert: paint blobs as bouncing sphere sprites
+  if (diff.blobs) {
+    for (var bb2 = 0; bb2 < paintBlobs.length; bb2++) {
+      var bl = paintBlobs[bb2];
+      sprites.push({ x: bl.x, y: bl.y, kind: 'blob', bobPhase: bl.bobPhase, splashT: bl.splashT, dist: 0 });
+    }
+  }
   for (var s = 0; s < sprites.length; s++) {
     var dxs = sprites[s].x - player.x, dys = sprites[s].y - player.y;
     sprites[s].dist = dxs * dxs + dys * dys;
   }
-  // Sort far → near so near sprites overdraw
   sprites.sort(function(a, b) { return b.dist - a.dist; });
 
   var cosA = Math.cos(player.angle), sinA = Math.sin(player.angle);
@@ -791,37 +1955,73 @@ function drawSprites() {
   for (var k = 0; k < sprites.length; k++) {
     var sp = sprites[k];
     var rx = sp.x - player.x, ry = sp.y - player.y;
-    // Transform into camera space: forward = +z, right = +x
-    var camX =  cosA * rx + sinA * ry;     // forward (depth)
-    var camY = -sinA * rx + cosA * ry;     // sideways
-    if (camX < 0.05) continue;             // behind player (or extremely close)
+    var camX =  cosA * rx + sinA * ry;
+    var camY = -sinA * rx + cosA * ry;
+    if (camX < 0.05) continue;
     var screenX = (W / 2) * (1 + camY / camX);
-    var spriteH = (H / camX) * (sp.kind === 'baldi' ? 0.95 : 0.55);
-    var spriteW = spriteH * (sp.kind === 'baldi' ? 0.65 : 0.55);
-    var sy = (H - spriteH) / 2 + (sp.kind === 'notebook' ? spriteH * 0.25 : 0);
+    var heightFactor = 0.55;
+    if (sp.kind === 'baldi') heightFactor = 0.95;
+    else if (sp.kind === 'char') heightFactor = 0.85;
+    else if (sp.kind === 'blob') heightFactor = 0.32;
+    var spriteH = (H / camX) * heightFactor;
+    var spriteW = spriteH * (sp.kind === 'baldi' ? 0.65 : (sp.kind === 'char' ? 0.6 : (sp.kind === 'blob' ? 1.0 : 0.55)));
+    var sy = (H - spriteH) / 2 + (sp.kind === 'notebook' ? spriteH * 0.25 : (sp.kind === 'blob' ? spriteH * 1.20 : 0));
     var sx = screenX - spriteW / 2;
-    // z-test against wall buffer per column
     var startCol = Math.max(0, Math.floor(sx / COL_W));
     var endCol   = Math.min(numRays - 1, Math.ceil((sx + spriteW) / COL_W));
     for (var col = startCol; col <= endCol; col++) {
-      if (zBuffer[col] && camX > zBuffer[col] + 0.05) continue;   // wall in front
+      if (zBuffer[col] && camX > zBuffer[col] + 0.05) continue;
       var slice = COL_W;
       var x0 = col * COL_W;
-      // Draw the slice of the sprite
       if (sp.kind === 'notebook') drawNotebookSlice(x0, slice, sx, spriteW, sy, spriteH, sp.impossible);
-      else                          drawBaldiSlice(x0, slice, sx, spriteW, sy, spriteH);
+      else if (sp.kind === 'baldi') drawBaldiSlice(x0, slice, sx, spriteW, sy, spriteH);
+      else if (sp.kind === 'blob')  drawBlobSlice(x0, slice, sx, spriteW, sy, spriteH, sp.bobPhase, sp.splashT);
+      else                          drawCharSlice(x0, slice, sx, spriteW, sy, spriteH, sp.charKind);
     }
   }
+}
+
+// Bouncing paint blob — a dark-red rounded sphere with a highlight; flashes white
+// briefly during a splash (player just got bumped).
+function drawBlobSlice(x0, slice, spriteX, spriteW, spriteY, spriteH, bobPhase, splashT) {
+  var local = (x0 + slice / 2 - spriteX) / spriteW;
+  if (local < 0 || local > 1) return;
+  // Vertical bob so the blobs feel bouncy
+  var bob = Math.sin(bobPhase) * (spriteH * 0.20);
+  // Rounded-ish ellipse via per-column height
+  var t = (local - 0.5) * 2; // -1 .. 1
+  var curve = Math.sqrt(Math.max(0, 1 - t * t));
+  var midY = spriteY + bob + spriteH * 0.5;
+  var halfH = (spriteH * 0.5) * curve;
+  var top = midY - halfH;
+  var bot = midY + halfH;
+  if (bot - top < 1) return;
+  // Body — dark red / maroon
+  var splash = splashT > 0 ? Math.min(1, splashT / 0.8) : 0;
+  var bodyR = Math.round(120 + splash * 100);
+  var bodyG = Math.round(20 + splash * 60);
+  var bodyB = Math.round(30 + splash * 60);
+  ctx.fillStyle = 'rgb(' + bodyR + ',' + bodyG + ',' + bodyB + ')';
+  ctx.fillRect(x0, top, slice, bot - top);
+  // Highlight band
+  if (local > 0.30 && local < 0.55) {
+    ctx.fillStyle = 'rgba(255,170,170,' + (0.6 - splash * 0.3) + ')';
+    ctx.fillRect(x0, top + (bot - top) * 0.20, slice, Math.max(2, halfH * 0.30));
+  }
+  // Outline
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(x0, top, slice, 1);
+  ctx.fillRect(x0, bot - 1, slice, 1);
 }
 
 function drawNotebookSlice(x0, slice, spriteX, spriteW, spriteY, spriteH, impossible) {
   var local = (x0 + slice / 2 - spriteX) / spriteW;
   if (local < 0 || local > 1) return;
   var bob = Math.sin(pulseT * 4 + spriteX * 0.01) * (spriteH * 0.05);
-  // Yellow background
-  ctx.fillStyle = impossible ? '#E91E63' : '#FFD54F';
+  // Visually identical: always plain yellow notebook (no pink, no '?' marker)
+  ctx.fillStyle = '#FFD54F';
   ctx.fillRect(x0, spriteY + bob, slice, spriteH);
-  // Spiral binding on left ~10%
+  // Spiral binding on left
   if (local < 0.16) {
     ctx.fillStyle = '#1A1A1A';
     var rings = 5;
@@ -831,7 +2031,7 @@ function drawNotebookSlice(x0, slice, spriteX, spriteW, spriteY, spriteH, imposs
     }
   }
   // Top orange title bar
-  ctx.fillStyle = impossible ? '#FFEB3B' : '#FF7043';
+  ctx.fillStyle = '#FF7043';
   ctx.fillRect(x0, spriteY + bob, slice, spriteH * 0.12);
   // White paper lines
   if (local > 0.18 && local < 0.92) {
@@ -840,46 +2040,31 @@ function drawNotebookSlice(x0, slice, spriteX, spriteW, spriteY, spriteH, imposs
       ctx.fillRect(x0, spriteY + bob + spriteH * (0.32 + li * 0.14), slice, 1);
     }
   }
-  // Outline (faint)
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.fillRect(x0, spriteY + bob, slice, 1);
   ctx.fillRect(x0, spriteY + bob + spriteH - 1, slice, 1);
-  // Impossible marker
-  if (impossible) {
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold ' + Math.max(10, spriteH * 0.18) + 'px Arial';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    if (local > 0.4 && local < 0.6) {
-      ctx.fillText('?', x0 + slice / 2, spriteY + bob + spriteH * 0.55);
-    }
-  }
 }
 
 function drawBaldiSlice(x0, slice, spriteX, spriteW, spriteY, spriteH) {
   var local = (x0 + slice / 2 - spriteX) / spriteW;
   if (local < 0 || local > 1) return;
-  // Vertical zones: head (top 35%), bow tie (35-45%), body (45-100%)
   var headTop = spriteY;
   var headBot = spriteY + spriteH * 0.45;
   var bodyTop = headBot;
   var bodyBot = spriteY + spriteH;
-  // Body — green suit with arms hint at sides
   var inBodyHoriz = local > 0.10 && local < 0.90;
   if (inBodyHoriz) {
     ctx.fillStyle = '#2E7D32';
     ctx.fillRect(x0, bodyTop, slice, bodyBot - bodyTop);
   }
-  // Head — peach circle approx (rectangle hint)
   var headHorizMin = 0.20, headHorizMax = 0.80;
   if (local > headHorizMin && local < headHorizMax) {
-    // Approximate ellipse top via a curved offset
     var t = (local - headHorizMin) / (headHorizMax - headHorizMin);
-    var curve = Math.sin(t * Math.PI);   // 0..1..0
+    var curve = Math.sin(t * Math.PI);
     var top = headTop + (1 - curve) * (headBot - headTop) * 0.25;
     var bot = headBot - (1 - curve) * (headBot - headTop) * 0.05;
     ctx.fillStyle = '#FFCC80';
     ctx.fillRect(x0, top, slice, bot - top);
-    // Eyes (small dark pips at fixed local positions)
     if (Math.abs(local - 0.36) < 0.04) {
       ctx.fillStyle = '#1A1A1A';
       ctx.fillRect(x0, top + (bot - top) * 0.45, slice, Math.max(2, spriteH * 0.04));
@@ -888,7 +2073,6 @@ function drawBaldiSlice(x0, slice, spriteX, spriteW, spriteY, spriteH) {
       ctx.fillStyle = '#1A1A1A';
       ctx.fillRect(x0, top + (bot - top) * 0.45, slice, Math.max(2, spriteH * 0.04));
     }
-    // Smile (curve from 0.40..0.60)
     if (local > 0.40 && local < 0.60) {
       var u = (local - 0.40) / 0.20;
       var smileY = top + (bot - top) * (0.70 + Math.sin(u * Math.PI) * 0.06);
@@ -896,44 +2080,198 @@ function drawBaldiSlice(x0, slice, spriteX, spriteW, spriteY, spriteH) {
       ctx.fillRect(x0, smileY, slice, Math.max(2, spriteH * 0.025));
     }
   }
-  // Bow tie (yellow band at neck)
   if (local > 0.30 && local < 0.70) {
     ctx.fillStyle = '#FFEB3B';
     ctx.fillRect(x0, bodyTop, slice, spriteH * 0.06);
   }
-  // Arms (darker green sleeves on outer sides of body)
   if ((local > 0.05 && local < 0.18) || (local > 0.82 && local < 0.95)) {
     ctx.fillStyle = '#1B5E20';
     ctx.fillRect(x0, bodyTop + spriteH * 0.08, slice, spriteH * 0.40);
   }
 }
 
-// ── Mini-map (so the kid doesn't get lost) ─────────────────────────────────
+// Generic character sprite — colored body + emoji-ish symbol on top.
+// Each character kind gets a distinct primary color and a band (hat / accessory).
+function drawCharSlice(x0, slice, spriteX, spriteW, spriteY, spriteH, kind) {
+  var local = (x0 + slice / 2 - spriteX) / spriteW;
+  if (local < 0 || local > 1) return;
+  var headTop = spriteY;
+  var headBot = spriteY + spriteH * 0.40;
+  var bodyTop = headBot;
+  var bodyBot = spriteY + spriteH;
+  var info = CHAR_INFO[kind] || { color: '#888' };
+  var color = info.color;
+
+  // Body
+  if (local > 0.15 && local < 0.85) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x0, bodyTop, slice, bodyBot - bodyTop);
+  }
+  // Head
+  if (local > 0.25 && local < 0.75) {
+    var t = (local - 0.25) / 0.50;
+    var curve = Math.sin(t * Math.PI);
+    var top = headTop + (1 - curve) * (headBot - headTop) * 0.30;
+    var bot = headBot - (1 - curve) * (headBot - headTop) * 0.05;
+    // Per-kind head color
+    var headColor = '#FFCC80';
+    if (kind === 'prize') headColor = '#9E9E9E';
+    if (kind === 'cloudy') headColor = '#E1F5FE';
+    if (kind === 'sweep') headColor = '#A1887F';
+    ctx.fillStyle = headColor;
+    ctx.fillRect(x0, top, slice, bot - top);
+    // Eyes
+    if (Math.abs(local - 0.38) < 0.04 || Math.abs(local - 0.62) < 0.04) {
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(x0, top + (bot - top) * 0.50, slice, Math.max(2, spriteH * 0.035));
+    }
+    // Smile
+    if (local > 0.42 && local < 0.58) {
+      var u = (local - 0.42) / 0.16;
+      var smileY = top + (bot - top) * (0.78 + Math.sin(u * Math.PI) * 0.04);
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(x0, smileY, slice, Math.max(2, spriteH * 0.02));
+    }
+  }
+  // Per-kind accessory
+  if (kind === 'principal' && local > 0.30 && local < 0.70) {
+    // Necktie
+    ctx.fillStyle = '#FF1744';
+    ctx.fillRect(x0, bodyTop + spriteH * 0.04, slice, spriteH * 0.18);
+  }
+  if (kind === 'playtime' && local > 0.20 && local < 0.80) {
+    // Big pink bow on head
+    ctx.fillStyle = '#F06292';
+    ctx.fillRect(x0, headTop, slice, spriteH * 0.06);
+  }
+  if (kind === 'sweep' && local > 0.05 && local < 0.95) {
+    // Yellow broom band along bottom
+    ctx.fillStyle = '#FFEB3B';
+    ctx.fillRect(x0, bodyBot - spriteH * 0.08, slice, spriteH * 0.08);
+  }
+  if (kind === 'prize') {
+    // Antenna on top
+    if (Math.abs(local - 0.5) < 0.04) {
+      ctx.fillStyle = '#FFEB3B';
+      ctx.fillRect(x0, headTop - spriteH * 0.05, slice, spriteH * 0.05);
+    }
+  }
+  if (kind === 'cloudy' && local > 0.10 && local < 0.90) {
+    // Fluffy white edge on top of body
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(x0, bodyTop, slice, spriteH * 0.08);
+  }
+  if (kind === 'bully' && local > 0.30 && local < 0.70) {
+    // Striped shirt
+    ctx.fillStyle = '#FFEB3B';
+    ctx.fillRect(x0, bodyTop + spriteH * 0.18, slice, spriteH * 0.05);
+    ctx.fillRect(x0, bodyTop + spriteH * 0.30, slice, spriteH * 0.05);
+  }
+  if (kind === 'arts' && local > 0.30 && local < 0.70) {
+    // Sock-puppet pink stripe
+    ctx.fillStyle = '#FF80AB';
+    ctx.fillRect(x0, bodyTop + spriteH * 0.10, slice, spriteH * 0.10);
+  }
+  if (kind === 'beans' && local > 0.30 && local < 0.70) {
+    // Chef hat top hint
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(x0, headTop - spriteH * 0.04, slice, spriteH * 0.04);
+  }
+  if (kind === 'mop') {
+    // Re-paint the mop with its own visuals on top of the generic body/head:
+    // - tan vertical handle (slim, centered) running top-to-bottom of body
+    // - gray fluffy mop head as the head area
+    // - painted-on grumpy frown
+    // Tan handle (slim center vertical band)
+    if (local > 0.46 && local < 0.54) {
+      ctx.fillStyle = '#C49A6C';
+      ctx.fillRect(x0, headBot, slice, bodyBot - headBot);
+    }
+    // Gray mop head — wider than handle, occupies head area
+    if (local > 0.18 && local < 0.82) {
+      ctx.fillStyle = '#9E9E9E';
+      ctx.fillRect(x0, headTop + spriteH * 0.05, slice, headBot - headTop - spriteH * 0.05);
+      // Fringe strands at the bottom of the mop head
+      var strandSeed = Math.floor(local * 14);
+      var strandLen = ((strandSeed * 31) % 100) / 100;
+      var strandY = headBot - spriteH * 0.02;
+      ctx.fillStyle = '#757575';
+      ctx.fillRect(x0, strandY, slice, spriteH * (0.04 + strandLen * 0.08));
+    }
+    // Eyes on mop head
+    if (Math.abs(local - 0.38) < 0.04 || Math.abs(local - 0.62) < 0.04) {
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(x0, headTop + (headBot - headTop) * 0.45, slice, Math.max(2, spriteH * 0.04));
+    }
+    // Grumpy frown — inverted smile (curve flipped)
+    if (local > 0.40 && local < 0.60) {
+      var um = (local - 0.40) / 0.20;
+      var frownY = headTop + (headBot - headTop) * (0.78 - Math.sin(um * Math.PI) * 0.06);
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(x0, frownY, slice, Math.max(2, spriteH * 0.025));
+    }
+  }
+  // Outline
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(x0, spriteY, slice, 1);
+  ctx.fillRect(x0, spriteY + spriteH - 1, slice, 1);
+  // Category halo — orange for teachers, cyan for friends, amber for bully.
+  // Drawn as a 3-px ring around the sprite footprint so the category is
+  // readable at gameplay distance without overpowering the sprite.
+  var haloColor = KIND_HALO[info.kind];
+  if (haloColor && local >= 0 && local <= 1) {
+    ctx.fillStyle = haloColor;
+    var ringPx = Math.max(3, Math.floor(spriteH * 0.025));
+    // Top + bottom ring
+    ctx.fillRect(x0, spriteY, slice, ringPx);
+    ctx.fillRect(x0, spriteY + spriteH - ringPx, slice, ringPx);
+    // Left + right edges (only on the outermost slices of the sprite)
+    if (local < 0.04 || local > 0.96) {
+      ctx.fillRect(x0, spriteY, slice, spriteH);
+    }
+  }
+}
+
+// ── Mini-map ─────────────────────────────────────────────────────────────
 function drawMinimap() {
-  if (scene !== 'playing') return;
-  var s = 5;       // pixels per tile
+  if (scene !== 'playing' && scene !== 'math' && scene !== 'intro') return;
+  var s = 5;
   miniCanvas.width = COLS * s;
   miniCanvas.height = ROWS * s;
-  // Walls + floor
   for (var r = 0; r < ROWS; r++) {
     for (var c = 0; c < COLS; c++) {
-      mctx.fillStyle = isWallTile(c, r) ? '#1E3A5F' : 'rgba(255,255,255,0.10)';
+      var ch = ARENA[r].charAt(c);
+      if (ch === '#') mctx.fillStyle = '#1E3A5F';
+      else if (ch === 'E') mctx.fillStyle = '#80E27E';
+      else mctx.fillStyle = SECRET_TILES[c+','+r] && diff.secretHallway ? 'rgba(255,80,120,0.18)' : 'rgba(255,255,255,0.10)';
       mctx.fillRect(c * s, r * s, s, s);
     }
   }
-  // Notebooks
   for (var i = 0; i < notebooks.length; i++) {
     var n = notebooks[i];
     if (n.collected) continue;
-    mctx.fillStyle = n.impossible ? '#E91E63' : '#FFEB3B';
+    // Same color so the impossible one is hidden
+    mctx.fillStyle = '#FFEB3B';
     mctx.fillRect(n.x * s - 2, n.y * s - 2, 4, 4);
   }
-  // Baldi
-  if (baldi.alive) {
-    mctx.fillStyle = '#FFCC80';
-    mctx.fillRect(baldi.x * s - 2, baldi.y * s - 2, 4, 4);
+  // Characters — dot color reflects category (teacher / friend / bully)
+  // so the kid can scan the map and tell who's an authority at a glance.
+  for (var k = 0; k < characters.length; k++) {
+    if (!characters[k].active) continue;
+    var info = CHAR_INFO[characters[k].kind];
+    var dotColor = (info && KIND_HALO[info.kind]) || (info && info.color) || '#fff';
+    mctx.fillStyle = dotColor;
+    mctx.fillRect(characters[k].x * s - 2, characters[k].y * s - 2, 4, 4);
   }
-  // Player + facing
+  for (var bmi = 0; bmi < baldis.length; bmi++) {
+    if (!baldis[bmi].alive) continue;
+    mctx.fillStyle = '#FFCC80';
+    mctx.fillRect(baldis[bmi].x * s - 2, baldis[bmi].y * s - 2, 4, 4);
+  }
+  if (exitDoor) {
+    mctx.fillStyle = '#80E27E';
+    mctx.fillRect(exitDoor.x * s - 3, exitDoor.y * s - 3, 6, 6);
+  }
   mctx.fillStyle = '#42A5F5';
   mctx.fillRect(player.x * s - 2, player.y * s - 2, 4, 4);
   mctx.strokeStyle = '#42A5F5';
@@ -951,12 +2289,31 @@ function draw() {
     ctx.fillRect(0, 0, W, H);
     return;
   }
+  // Camera shift for jump/duck — bob the horizon
+  var horizonShift = 0;
+  if (player.jumpT > 0) {
+    var jp = 1 - Math.abs(player.jumpT - 0.275) / 0.275; // peak 0.275s
+    horizonShift = -H * 0.10 * jp;
+  } else if (player.duckT > 0) {
+    var dp = 1 - Math.abs(player.duckT - 0.275) / 0.275;
+    horizonShift = H * 0.10 * dp;
+  }
+  if (horizonShift !== 0) {
+    ctx.save();
+    ctx.translate(0, horizonShift);
+  }
   drawScene();
   drawSprites();
+  if (horizonShift !== 0) ctx.restore();
   drawMinimap();
-  // Hit-cooldown red flash
   if (player.hitCooldown > 0.7) {
     ctx.fillStyle = 'rgba(255,23,68,' + ((player.hitCooldown - 0.7) * 0.8) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+  // Expert: brief blackout overlay (lights out for ~150ms every ~6s)
+  if (diff.flicker && blackoutT > 0) {
+    var bk = Math.min(1, blackoutT / 0.15) * 0.92;
+    ctx.fillStyle = 'rgba(0,0,0,' + bk + ')';
     ctx.fillRect(0, 0, W, H);
   }
 }
