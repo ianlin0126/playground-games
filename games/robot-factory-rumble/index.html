@@ -1,0 +1,1826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🤖 Robot Factory Rumble</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; }
+  body {
+    background: #1a1a1a;
+    overflow: hidden;
+    touch-action: none;
+    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    color: #fff;
+  }
+  canvas { display: block; cursor: pointer; image-rendering: pixelated; }
+  #hud {
+    position: fixed; top: 8px; left: 12px; right: 12px;
+    z-index: 5; pointer-events: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto;
+    align-items: start;
+    gap: 4px 12px;
+    font-size: 22px; font-weight: bold;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.85);
+  }
+  #hearts-row    { grid-column: 1; grid-row: 1; color: #FF1744; }
+  #shield-row    { grid-column: 1; grid-row: 2; color: #00E5FF; font-size: 18px; }
+  #weapon-label  { grid-column: 2; grid-row: 1; text-align: center; color: #FFEB3B; font-size: 18px; }
+  #progress-bar  { grid-column: 3; grid-row: 1; justify-self: end;
+                   width: 140px; height: 12px; border: 2px solid rgba(255,255,255,0.5);
+                   border-radius: 6px; background: rgba(0,0,0,0.4); overflow: hidden; }
+  #progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #4CAF50, #FFEB3B);
+                   transition: width 0.2s; }
+  #boss-hp-row { grid-column: 3; grid-row: 1; justify-self: end; }
+  #boss-hp-bg { width: 140px; height: 12px; background: rgba(0,0,0,0.4);
+                border: 2px solid rgba(255,255,255,0.5); border-radius: 6px; overflow: hidden; }
+  #boss-hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #FF5252, #FF1744);
+                  transition: width 0.25s; }
+  #banner {
+    position: fixed; bottom: 30px; left: 50%;
+    transform: translate(-50%, 0) scale(0.9);
+    z-index: 30; pointer-events: none;
+    background: rgba(0, 0, 0, 0.45);
+    color: #FFEB3B; padding: 5px 12px; border-radius: 12px;
+    font-size: 14px; font-weight: bold;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+    opacity: 0;
+    white-space: nowrap;
+    transition: opacity 0.2s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  #banner.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  .ctrl-btn {
+    position: fixed; z-index: 4;
+    width: 72px; height: 72px;
+    background: rgba(20,20,40,0.55);
+    border: 3px solid #FFEB3B;
+    color: #FFEB3B;
+    border-radius: 16px;
+    font-size: 30px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    cursor: pointer;
+    user-select: none; -webkit-user-select: none;
+  }
+  .ctrl-btn.pressed, .ctrl-btn:active {
+    background: rgba(255,235,59,0.5);
+    transform: scale(0.95);
+  }
+  #ctrl-left  { left: 16px;  bottom: 16px; }
+  #ctrl-right { left: 100px; bottom: 16px; }
+  #ctrl-jump  { right: 16px; bottom: 16px; }
+  .overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(15,15,30,0.94);
+    z-index: 40;
+    align-items: center; justify-content: center; flex-direction: column;
+    text-align: center; padding: 24px;
+  }
+  .overlay.show { display: flex; }
+  .overlay h1 {
+    font-size: 38px; margin-bottom: 10px;
+    color: #FFEB3B;
+    text-shadow: 0 0 18px #FFEB3B, 0 4px 8px rgba(0,0,0,0.5);
+  }
+  .overlay-sub { font-size: 22px; margin-bottom: 22px; color: #B2DFDB; max-width: 460px; }
+  .big-btn {
+    width: 280px; max-width: 80vw;
+    padding: 18px 22px; margin: 8px 0;
+    font-size: 22px; font-weight: bold;
+    background: linear-gradient(90deg, #FFEB3B, #FFA726);
+    color: #1A1A1A;
+    border: none; border-radius: 28px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(255,235,59,0.45);
+    font-family: inherit;
+    min-height: 60px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .big-btn.cool { background: linear-gradient(90deg, #00BCD4, #2196F3); color: #fff; }
+  .big-btn:active { transform: scale(0.97); }
+  .credits { margin-top: 18px; font-size: 14px; opacity: 0.7; color: #B2DFDB; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="hearts-row">♥♥♥♥♥</div>
+  <div id="shield-row" style="display:none">▢▢▢▢</div>
+  <div id="weapon-label">⚡ Foam Blaster</div>
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+  <div id="boss-hp-row" style="display:none"><div id="boss-hp-bg"><div id="boss-hp-fill"></div></div></div>
+</div>
+
+<div id="ctrl-left"  class="ctrl-btn">◄</div>
+<div id="ctrl-right" class="ctrl-btn">▶</div>
+<div id="ctrl-jump"  class="ctrl-btn">▲</div>
+
+<div id="banner"></div>
+
+<div id="menu-overlay" class="overlay show">
+  <h1>🤖 Robot Factory Rumble</h1>
+  <p class="overlay-sub">Run, shoot, dodge — defeat the Foreman-Bot 9000!</p>
+  <button id="start-btn" class="big-btn cool" type="button">▶ Start!</button>
+  <p class="credits">◄ ▶ to move · ▲ to jump · auto-aims at nearby enemies!</p>
+</div>
+
+<div id="win-overlay" class="overlay">
+  <h1>🎉 Sector Cleared!</h1>
+  <p class="overlay-sub">You powered down the Foreman-Bot 9000!</p>
+  <button id="winagain-btn" class="big-btn cool" type="button">▶ Play Again</button>
+</div>
+
+<script>
+// ── Setup ──────────────────────────────────────────────────────────────────
+var canvas = document.getElementById('c');
+var ctx = canvas.getContext('2d');
+var W, H;
+
+// ===== Phase 2 asset state =====
+var atlas = null;
+var spriteMap = null;
+var assetsReady = false;
+var assetsErrored = false;
+
+// Parallax factory backdrop — drawn behind everything; pits show it through
+// a transparent-at-rim → black-at-bottom gradient (red-ball pit treatment).
+var bgFactory = new Image();
+bgFactory.src = './assets/bg-factory.png';
+
+function loadAssets() {
+  var atlasImg = new Image();
+  var atlasPromise = new Promise(function (resolve, reject) {
+    atlasImg.onload = function () { resolve(atlasImg); };
+    atlasImg.onerror = function () { reject(new Error('atlas load failed')); };
+  });
+  atlasImg.src = './assets/robot-factory-rumble-atlas.png';
+
+  var mapPromise = fetch('./sprite-map.json').then(function (r) {
+    if (!r.ok) throw new Error('sprite-map fetch failed: ' + r.status);
+    return r.json();
+  });
+
+  return Promise.all([atlasPromise, mapPromise]).then(function (results) {
+    atlas = results[0];
+    spriteMap = results[1].sprites;
+    assetsReady = true;
+  }).catch(function (err) {
+    assetsErrored = true;
+    console.error('[RFR Phase 2] asset load error:', err);
+  });
+}
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  FLOOR_Y = H * 0.7;
+}
+var FLOOR_Y = 0;        // resolved by resize()
+resize();
+window.addEventListener('resize', resize);
+
+// ── Game state ─────────────────────────────────────────────────────────────
+var scene = 'menu';     // 'menu' | 'playing' | 'respawn' | 'win'
+var hp = 5;             // player hearts (0..5)
+var maxHp = 5;
+var levelLength = 7490; // pre-boss ~6440 px + 1050 boss arena
+
+var heartsEl   = document.getElementById('hearts-row');
+var shieldEl   = document.getElementById('shield-row');
+var weaponEl   = document.getElementById('weapon-label');
+var progressBar = document.getElementById('progress-bar');
+var progressEl = document.getElementById('progress-fill');
+var bossRow    = document.getElementById('boss-hp-row');
+var bossFill   = document.getElementById('boss-hp-fill');
+var bannerEl   = document.getElementById('banner');
+var bannerHideTimer = null;
+
+function refreshHud() {
+  var s = '';
+  for (var i = 0; i < hp; i++) s += '♥';
+  for (var j = hp; j < maxHp; j++) s += '♡';
+  heartsEl.textContent = s;
+}
+
+function showBanner(text, ms) {
+  bannerEl.textContent = text;
+  bannerEl.classList.add('show');
+  if (bannerHideTimer) clearTimeout(bannerHideTimer);
+  bannerHideTimer = setTimeout(function() { bannerEl.classList.remove('show'); }, ms || 1400);
+}
+
+refreshHud();
+
+// ── Input ──────────────────────────────────────────────────────────────────
+var input = {
+  leftHeld: false,
+  rightHeld: false,
+  jumpHeld: false,
+  jumpJustPressed: false,
+};
+
+function bindBtn(id, key) {
+  var btn = document.getElementById(id);
+  function press(e) {
+    if (e) e.preventDefault();
+    btn.classList.add('pressed');
+    if (key === 'jumpHeld' && !input.jumpHeld) input.jumpJustPressed = true;
+    input[key] = true;
+  }
+  function release(e) {
+    if (e) e.preventDefault();
+    btn.classList.remove('pressed');
+    input[key] = false;
+  }
+  btn.addEventListener('pointerdown',   press,   { passive: false });
+  btn.addEventListener('pointerup',     release, { passive: false });
+  btn.addEventListener('pointercancel', release, { passive: false });
+  btn.addEventListener('lostpointercapture', release);
+}
+bindBtn('ctrl-left',  'leftHeld');
+bindBtn('ctrl-right', 'rightHeld');
+bindBtn('ctrl-jump',  'jumpHeld');
+
+window.addEventListener('keydown', function(e) {
+  if (e.code === 'ArrowLeft'  || e.code === 'KeyA') input.leftHeld = true;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.rightHeld = true;
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+    if (!input.jumpHeld) input.jumpJustPressed = true;
+    input.jumpHeld = true;
+  }
+});
+window.addEventListener('keyup', function(e) {
+  if (e.code === 'ArrowLeft'  || e.code === 'KeyA') input.leftHeld = false;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.rightHeld = false;
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') input.jumpHeld = false;
+});
+
+function clearInput() {
+  input.leftHeld = false;
+  input.rightHeld = false;
+  input.jumpHeld = false;
+  input.jumpJustPressed = false;
+  document.querySelectorAll('.ctrl-btn').forEach(function(b) { b.classList.remove('pressed'); });
+}
+document.addEventListener('visibilitychange', function() { if (document.hidden) clearInput(); });
+window.addEventListener('blur', clearInput);
+
+// ── Menu / Win overlay wiring ──────────────────────────────────────────────
+var menuOverlay = document.getElementById('menu-overlay');
+var winOverlay  = document.getElementById('win-overlay');
+var startBtn    = document.getElementById('start-btn');
+var winagainBtn = document.getElementById('winagain-btn');
+
+function startGame() {
+  scene = 'playing';
+  hp = maxHp;
+  refreshHud();
+  player.x = 80;
+  player.y = GROUND_Y;
+  player.vy = 0;
+  player.vx = 0;
+  player.invuln = 0;
+  player.facing = 1;
+  shieldBubble = 0;
+  weapon = 'foam';
+  weaponEl.textContent = '⚡ Foam Blaster';
+  weaponDuration = 0;
+  weaponShotsLeft = 0;
+  enemies = [];
+  bolts = [];
+  projectiles = [];
+  pickups = [];
+  checkpoints = [];
+  lastCheckpoint = { x: 80, y: GROUND_Y };
+  boss = { active: false, x: 0, y: 0, w: 80, h: 80, phase: 1, hp: 70, hpMaxP1: 70, hpMaxP2: 91, attackT: 1.6, currentAttack: null, hitFlash: 0, invuln: 0, defeated: false, bobT: 0, minionT: 5, minionSpawnT: 4, entryT: 0 };
+  bossRow.style.display = 'none';
+  progressBar.style.display = '';
+  shieldEl.style.display = 'none';
+  shakeT = 0;
+  setupLevelEnemies();
+  setupLevelPickups();
+  setupLevelCheckpoints();
+  hideOverlays();
+}
+
+function hideOverlays() {
+  menuOverlay.classList.remove('show');
+  winOverlay.classList.remove('show');
+}
+
+startBtn.addEventListener('click', startGame);
+winagainBtn.addEventListener('click', startGame);
+
+
+// ── Constants ──────────────────────────────────────────────────────────────
+var WALK_SPEED       = 180;     // px/s
+var GRAVITY          = 1800;    // px/s²
+var JUMP_IMPULSE     = -700;    // px/s
+var JUMP_HOLD_MAX    = 0.20;    // s
+var JUMP_HOLD_CUTOFF = 0.45;
+var COYOTE_TIME      = 0.08;    // s
+// FLOOR_Y is declared up at resize() so the first updatePlayer() sees it correctly.
+var INVULN_TIME      = 1.2;     // s after hit
+
+// ── Player ─────────────────────────────────────────────────────────────────
+var player = {
+  x: 80, y: FLOOR_Y,
+  vx: 0, vy: 0,
+  w: 36, h: 44,
+  hbW: 28, hbH: 36,
+  onGround: true,
+  coyote: 0,
+  jumpHoldT: 0,
+  jumping: false,
+  facing: 1,
+  invuln: 0,
+  walkAnim: 0,
+  anim: { current: 'player_walk', frame: 0, timer: 0 },
+  shootPoseT: 0,
+};
+
+function updatePlayer(dt) {
+  var dir = 0;
+  if (scene === 'playing') {
+    if (input.rightHeld) dir += 1;
+    if (input.leftHeld)  dir -= 1;
+  }
+  player.vx = dir * WALK_SPEED;
+
+  player.vy += GRAVITY * dt;
+
+  if (input.jumpJustPressed && (player.onGround || player.coyote > 0) && scene === 'playing') {
+    player.vy = JUMP_IMPULSE;
+    player.onGround = false;
+    player.coyote = 0;
+    player.jumping = true;
+    player.jumpHoldT = 0;
+  }
+  input.jumpJustPressed = false;
+
+  if (player.jumping) {
+    player.jumpHoldT += dt;
+    if (!input.jumpHeld && player.vy < 0 && player.jumpHoldT < JUMP_HOLD_MAX) {
+      player.vy *= JUMP_HOLD_CUTOFF;
+      player.jumping = false;
+    }
+    if (player.jumpHoldT >= JUMP_HOLD_MAX) player.jumping = false;
+  }
+
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+  if (player.x < 0) player.x = 0;
+
+  // Lock to boss arena while the fight is active
+  if (boss.active && !boss.defeated) {
+    if (player.x < BOSS_ARENA_LEFT) player.x = BOSS_ARENA_LEFT;
+    if (player.x > BOSS_ARENA_RIGHT - player.w) player.x = BOSS_ARENA_RIGHT - player.w;
+  }
+
+  var standY = resolveStandY(player.x + player.w * 0.5, player.y);
+  var beltMod = 0;
+  // Raised-platform belts
+  for (var pli = 0; pli < level.platforms.length; pli++) {
+    var pl = level.platforms[pli];
+    if (player.x + player.w * 0.5 >= pl.x && player.x + player.w * 0.5 <= pl.x + pl.w
+        && Math.abs(player.y - (GROUND_Y + pl.top)) < 1) {
+      beltMod = pl.beltDir * 80;
+    }
+  }
+  // Floor belts (when on ground)
+  if (Math.abs(player.y - GROUND_Y) < 1 && level.floorBelts) {
+    for (var fi = 0; fi < level.floorBelts.length; fi++) {
+      var fb = level.floorBelts[fi];
+      if (player.x + player.w * 0.5 >= fb.x && player.x + player.w * 0.5 <= fb.x + fb.w) {
+        beltMod = fb.dir * 80;
+        break;
+      }
+    }
+  }
+  player.x += beltMod * dt;
+
+  if (standY === Infinity) {
+    // Over a pit — keep falling until we trigger the pit-fall threshold.
+    player.onGround = false;
+    if (player.coyote > 0) player.coyote -= dt;
+    if (player.y > H + 60) onPitFall();
+  } else if (player.y >= standY) {
+    player.y = standY;
+    player.vy = 0;
+    if (!player.onGround) {
+      player.onGround = true;
+      player.coyote = COYOTE_TIME;
+    }
+  } else {
+    player.onGround = false;
+    if (player.coyote > 0) player.coyote -= dt;
+  }
+
+  if (player.onGround && Math.abs(player.vx) > 0) {
+    player.walkAnim += dt * 2.5;
+    if (player.walkAnim >= 1) player.walkAnim -= 1;
+  } else {
+    player.walkAnim = 0;
+  }
+
+  if (player.invuln > 0) player.invuln -= dt;
+
+  // Phase 2 animation state machine
+  player.shootPoseT -= dt;
+  if (player.shootPoseT < 0) player.shootPoseT = 0;
+  if (!player.onGround) {
+    setAnim(player, 'player_jump');
+  } else if (player.shootPoseT > 0) {
+    setAnim(player, 'player_shoot');
+  } else {
+    setAnim(player, 'player_walk');
+  }
+  // Walk animation freezes on frame 0 when not horizontally moving;
+  // other animations always advance.
+  if (player.anim.current === 'player_walk' && Math.abs(player.vx) < 1) {
+    player.anim.frame = 0;
+    player.anim.timer = 0;
+  } else {
+    updateAnim(player, dt);
+  }
+
+  // Auto-aim facing: face the closest enemy target; fall back to movement direction.
+  var aimTarget = findAutoAimTarget();
+  if (aimTarget) {
+    var targetCx = aimTarget._isBoss ? aimTarget.x : aimTarget.x + (aimTarget.w || 80) * 0.5;
+    player.facing = (targetCx >= player.x + player.w * 0.5) ? 1 : -1;
+  } else if (Math.abs(player.vx) > 1) {
+    player.facing = (player.vx > 0) ? 1 : -1;
+  }
+}
+
+var PLAYER_VISUAL_W = 60;
+var PLAYER_VISUAL_H = 72;
+
+function drawPlayer() {
+  if (player.invuln > 0 && Math.floor(player.invuln * 30) % 2 === 0) return;
+
+  var spriteName = currentSpriteOf(player);
+  if (spriteName) {
+    var visualPx = player.x + (player.w - PLAYER_VISUAL_W) / 2;
+    var visualPy = player.y - PLAYER_VISUAL_H;
+    drawSprite(spriteName, visualPx, visualPy, PLAYER_VISUAL_W, PLAYER_VISUAL_H, player.facing < 0);
+  }
+
+  // Shield bubble overlay (kept procedurally — it's a glow effect, not a character)
+  if (shieldBubble > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.35 + 0.25 * Math.sin(Date.now() / 100);
+    ctx.strokeStyle = '#00E5FF';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(player.x + player.w / 2, player.y - player.h / 2, PLAYER_VISUAL_W * 0.85, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+}
+
+function drawSprite(name, dx, dy, dw, dh, flipped, stretch) {
+  if (!atlas || !spriteMap) return;
+  var s = spriteMap[name];
+  if (!s) return;
+  var rw, rh, rdx, rdy;
+  if (stretch) {
+    // Bypass letterbox — fill destination exactly (used for boss so all frames render same size)
+    rw = dw; rh = dh; rdx = dx; rdy = dy;
+  } else {
+    // Aspect-preserving letterbox: fit sprite inside (dw, dh), anchored to bottom
+    var sa = s.w / s.h;
+    var da = dw / dh;
+    if (sa > da) { rw = dw; rh = dw / sa; }
+    else         { rh = dh; rw = dh * sa; }
+    rdx = dx + (dw - rw) / 2;
+    rdy = dy + (dh - rh);   // anchor to bottom of hitbox (feet on ground)
+  }
+  if (flipped) {
+    ctx.save();
+    ctx.translate(rdx + rw, rdy);
+    ctx.scale(-1, 1);
+    ctx.drawImage(atlas, s.x, s.y, s.w, s.h, 0, 0, rw, rh);
+    ctx.restore();
+  } else {
+    ctx.drawImage(atlas, s.x, s.y, s.w, s.h, rdx, rdy, rw, rh);
+  }
+}
+
+var ANIMS = {
+  player_walk:    { frames: ['player_walk_0','player_walk_1','player_walk_2','player_walk_3'], fps: 8, loop: true },
+  player_jump:    { frames: ['player_jump'],     fps: 1, loop: false },
+  player_shoot:   { frames: ['player_shoot'],    fps: 1, loop: false },
+  walker_walk:    { frames: ['walker_walk_0','walker_walk_1'], fps: 4, loop: true },
+  walker_ko:      { frames: ['walker_ko'],       fps: 1, loop: false },
+  copter_hover:   { frames: ['copter_hover_0','copter_hover_1'], fps: 5, loop: true },
+  copter_ko:      { frames: ['copter_ko'],       fps: 1, loop: false },
+  bolt_hop:       { frames: ['bolt_squash','bolt_stretch'], fps: 0, loop: false },
+  bolt_ko:        { frames: ['bolt_ko'],         fps: 1, loop: false },
+  boss_idle:      { frames: ['boss_idle'],       fps: 1, loop: false },
+  boss_claw:      { frames: ['boss_claw'],       fps: 1, loop: false },
+  boss_volley:    { frames: ['boss_volley'],     fps: 1, loop: false },
+  boss_stomp:     { frames: ['boss_stomp'],      fps: 1, loop: false },
+  gear_minion:    { frames: ['gear_filler'],     fps: 1, loop: false }
+};
+
+function setAnim(entity, animName) {
+  if (!entity.anim) entity.anim = { current: animName, frame: 0, timer: 0 };
+  if (entity.anim.current === animName) return;
+  entity.anim.current = animName;
+  entity.anim.frame = 0;
+  entity.anim.timer = 0;
+}
+
+function updateAnim(entity, dt) {
+  if (!entity.anim) return;
+  var anim = ANIMS[entity.anim.current];
+  if (!anim || anim.fps === 0) return;
+  entity.anim.timer += dt * 1000;
+  var frameMs = 1000 / anim.fps;
+  while (entity.anim.timer >= frameMs) {
+    entity.anim.timer -= frameMs;
+    entity.anim.frame++;
+    if (entity.anim.frame >= anim.frames.length) {
+      entity.anim.frame = anim.loop ? 0 : anim.frames.length - 1;
+    }
+  }
+}
+
+function currentSpriteOf(entity) {
+  if (!entity.anim) return null;
+  var anim = ANIMS[entity.anim.current];
+  if (!anim) return null;
+  return anim.frames[entity.anim.frame];
+}
+
+// ── Camera + level ─────────────────────────────────────────────────────────
+var camera = { x: 0 };
+function updateCamera() {
+  var targetCamX = player.x - W * 0.5;
+  if (boss.active && !boss.defeated) {
+    // Follow the player but clamp to arena bounds so we never show outside it.
+    var minCamArena = BOSS_ARENA_LEFT;
+    var maxCamArena = BOSS_ARENA_RIGHT - W;
+    if (maxCamArena < minCamArena) maxCamArena = minCamArena;   // arena narrower than viewport
+    if (targetCamX < minCamArena) targetCamX = minCamArena;
+    if (targetCamX > maxCamArena) targetCamX = maxCamArena;
+  } else {
+    if (targetCamX < 0) targetCamX = 0;
+    if (targetCamX > levelLength - W) targetCamX = Math.max(0, levelLength - W);
+  }
+  camera.x = targetCamX;
+}
+
+var FLOOR_HEIGHT = 80;
+var GROUND_Y = 0;       // canvas-y of the ground top; resolved on first draw
+var PLATFORM_HEIGHT = 14;
+var level = {
+  segments: [
+    { name: 'A', x0: 0,    x1: 1100 },
+    { name: 'B', x0: 1100, x1: 2700 },
+    { name: 'C', x0: 2700, x1: 3770 },
+    { name: 'D', x0: 3770, x1: 4270 },   // boss arena (Fix 2 narrows this)
+  ],
+  pits: [
+    { x:  450, w: 70 },
+    { x:  900, w: 70 },
+    { x: 1450, w: 80 },
+    { x: 2050, w: 80 },
+    { x: 2550, w: 70 },
+    { x: 3200, w: 70 },
+    { x: 3650, w: 80 },
+    { x: 4150, w: 70 },
+    { x: 4700, w: 80 },
+    { x: 5180, w: 70 },
+    { x: 5700, w: 80 },
+    { x: 6130, w: 70 },
+  ],
+  platforms: [
+    { x:  600, w: 140, top: -120, beltDir:  0 },
+    { x: 1100, w: 140, top: -150, beltDir:  1 },
+    { x: 1650, w: 140, top: -120, beltDir: -1 },
+    { x: 2200, w: 140, top: -180, beltDir:  1 },
+    { x: 2750, w: 140, top: -120, beltDir:  0 },
+    { x: 3350, w: 140, top: -150, beltDir: -1 },
+  ],
+  floorBelts: [
+    { x:  600, w: 200, dir:  1 },   // Segment A
+    { x: 1300, w: 150, dir:  1 },   // truncated to avoid pit at x=1450
+    { x: 1700, w: 200, dir: -1 },   // Mid Segment B
+    { x: 2300, w: 200, dir: -1 },
+    { x: 2800, w: 200, dir:  1 },   // Segment C
+    { x: 3400, w: 200, dir: -1 },   // Late Segment C, just before boss arena
+    { x: 3850, w: 150, dir:  1 },   // Segment D
+    { x: 4350, w: 150, dir: -1 },
+    { x: 4900, w: 200, dir:  1 },
+    { x: 5450, w: 150, dir: -1 },
+    { x: 5950, w: 150, dir:  1 },
+    { x: 6300, w: 100, dir:  1 },
+  ],
+};
+function resolveLevelGeometry() {
+  GROUND_Y = H - FLOOR_HEIGHT;
+  FLOOR_Y  = GROUND_Y;
+}
+
+function resolveStandY(px, playerY) {
+  var candidates = [];
+  var overPit = false;
+  for (var i = 0; i < level.pits.length; i++) {
+    var p = level.pits[i];
+    if (px >= p.x && px <= p.x + p.w) { overPit = true; break; }
+  }
+  if (!overPit) candidates.push(GROUND_Y);
+  for (var k = 0; k < level.platforms.length; k++) {
+    var pl = level.platforms[k];
+    if (px >= pl.x && px <= pl.x + pl.w) {
+      var top = GROUND_Y + pl.top;
+      // One-way platform: only stand on it if approaching from above
+      // (or already standing within 1px of it).
+      if (playerY <= top + 4) candidates.push(top);
+    }
+  }
+  if (candidates.length === 0) return Infinity;
+  var ystand = Infinity;
+  for (var c = 0; c < candidates.length; c++) if (candidates[c] < ystand) ystand = candidates[c];
+  return ystand;
+}
+
+function onPitFall() {
+  hp -= 1;
+  refreshHud();
+  if (hp <= 0) { onPlayerOut(); return; }
+  player.x = lastCheckpoint.x;
+  player.y = GROUND_Y;
+  player.vy = 0;
+  player.invuln = 1.5;
+}
+
+// ── Projectiles ────────────────────────────────────────────────────────────
+var projectiles = [];      // { x, y, vx, vy, life, kind }
+var fireCooldown = 0;
+var FOAM_INTERVAL = 0.33;
+var FOAM_SPEED    = 600;
+var FOAM_RADIUS   = 6;
+var weapon = 'foam';
+var weaponDuration = 0;
+var weaponShotsLeft = 0;
+
+function findAutoAimTarget() {
+  var best = null;
+  var bestDist2 = Infinity;
+  var MAX_RANGE = 600;
+  var cx = player.x + player.w * 0.5;
+  var cy = player.y - player.h * 0.5;
+
+  for (var i = 0; i < enemies.length; i++) {
+    var e = enemies[i];
+    if (!e || e.alive === false || e.dying) continue;
+    var dx = (e.x + e.w * 0.5) - cx;
+    var dy = (e.y - e.h * 0.5) - cy;
+    var d2 = dx * dx + dy * dy;
+    if (d2 > MAX_RANGE * MAX_RANGE) continue;
+    if (d2 < bestDist2) { bestDist2 = d2; best = e; }
+  }
+
+  if (typeof boss !== 'undefined' && boss && boss.active && !boss.defeated) {
+    // Compute the boss's rendered visual center using the same bob math as drawBoss(),
+    // so auto-aim targets where the boss actually appears on screen, not its hitbox floor.
+    var bossAmp = Math.min(130, (GROUND_Y - boss.h - 30) / 2);
+    var bossCenterTop = GROUND_Y - boss.h - 20 - bossAmp;
+    var bossBobY = Math.sin(boss.bobT * 1.2) * bossAmp;
+    var bossBy = (boss.entryT > 0)
+      ? bossCenterTop + (-200 + (1 - boss.entryT) * 200)
+      : bossCenterTop + bossBobY;
+    var BOSS_VISUAL_H = 140;
+    var bossVisualCenterX = boss.x;
+    var bossVisualCenterY = bossBy + boss.h - BOSS_VISUAL_H * 0.5;
+    var bdx = bossVisualCenterX - cx;
+    var bdy = bossVisualCenterY - cy;
+    var bd2 = bdx * bdx + bdy * bdy;
+    if (bd2 < MAX_RANGE * MAX_RANGE && bd2 < bestDist2) {
+      best = { x: bossVisualCenterX, y: bossVisualCenterY, w: 0, h: 0, _isBoss: true };
+    }
+  }
+
+  return best;
+}
+
+function fireFoam() {
+  player.shootPoseT = 0.10;
+  var target = findAutoAimTarget();
+  var muzzleX = player.x + (player.facing > 0 ? player.w : 0);
+  var muzzleY = player.y - player.h * 0.45;
+  var vx, vy;
+  if (target) {
+    var tx = target._isBoss ? target.x : target.x + (target.w || 80) * 0.5;
+    var ty = target._isBoss ? target.y : target.y - (target.h || 80) * 0.5;
+    var dx = tx - muzzleX;
+    var dy = ty - muzzleY;
+    var d = Math.sqrt(dx * dx + dy * dy) || 1;
+    vx = (dx / d) * FOAM_SPEED;
+    vy = (dy / d) * FOAM_SPEED;
+  } else {
+    vx = player.facing * FOAM_SPEED;
+    vy = 0;
+  }
+  projectiles.push({ x: muzzleX, y: muzzleY, vx: vx, vy: vy, life: 1.6, kind: 'foam' });
+}
+
+function fireWeapon() {
+  if (weapon === 'foam') {
+    fireFoam();
+    fireCooldown = FOAM_INTERVAL;
+  } else if (weapon === 'spark') {
+    fireSpark();
+    fireCooldown = SPARK_INTERVAL;
+  }
+}
+
+function fireSpark() {
+  player.shootPoseT = 0.10;
+  var target = findAutoAimTarget();
+  var muzzleX = player.x + (player.facing > 0 ? player.w * 0.7 : player.w * 0.3);
+  var muzzleY = player.y - player.h * 0.5;
+  var baseAngle;
+  if (target) {
+    var tx = target._isBoss ? target.x : target.x + (target.w || 80) * 0.5;
+    var ty = target._isBoss ? target.y : target.y - (target.h || 80) * 0.5;
+    baseAngle = Math.atan2(ty - muzzleY, tx - muzzleX);
+  } else {
+    baseAngle = (player.facing > 0) ? 0 : Math.PI;
+  }
+  var fanRad = SPARK_FAN_DEG * Math.PI / 360;
+  for (var k = -1; k <= 1; k++) {
+    var a = baseAngle + fanRad * k;
+    projectiles.push({ x: muzzleX, y: muzzleY, vx: Math.cos(a) * FOAM_SPEED, vy: Math.sin(a) * FOAM_SPEED, life: 1.6, kind: 'spark' });
+  }
+}
+
+function updateProjectiles(dt) {
+  if (scene === 'playing') {
+    fireCooldown -= dt;
+    if (fireCooldown <= 0) fireWeapon();
+  }
+  for (var i = projectiles.length - 1; i >= 0; i--) {
+    var p = projectiles[i];
+    // Boss projectiles are stepped by updateBossHazards; skip here to avoid double-step.
+    if (p.kind === 'boss-claw' || p.kind === 'boss-bolt' || p.kind === 'boss-stomp') continue;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    if (p.life <= 0 || p.x < camera.x - 50 || p.x > camera.x + W + 50 || p.y > H + 50) {
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
+function drawProjectiles() {
+  for (var i = 0; i < projectiles.length; i++) {
+    var p = projectiles[i];
+    if (p.kind === 'foam') {
+      ctx.fillStyle = 'rgba(0,229,255,0.35)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, FOAM_RADIUS * 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, FOAM_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (p.kind === 'enemy-blob') {
+      ctx.fillStyle = '#F06292';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (p.kind === 'enemy-laser') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(Math.atan2(p.vy, p.vx));
+      ctx.fillStyle = '#FF1744';
+      ctx.fillRect(-8, -2, 16, 4);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(-3, -1, 6, 2);
+      ctx.restore();
+    } else if (p.kind === 'spark') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(Math.atan2(p.vy, p.vx));
+      ctx.fillStyle = '#FFEB3B';
+      ctx.beginPath();
+      for (var sp = 0; sp < 5; sp++) {
+        var a = (sp / 5) * Math.PI * 2 - Math.PI / 2;
+        var rOut = sp % 2 === 0 ? 6 : 3;
+        ctx.lineTo(Math.cos(a) * rOut, Math.sin(a) * rOut);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+// ── Enemies ────────────────────────────────────────────────────────────────
+var enemies = [];     // { kind, x, y, vx, hp, w, h, alive, ... per-kind fields }
+var bolts   = [];     // K.O. bolt-burst particles: { x, y, vx, vy, life }
+
+function spawnEnemy(kind, x) {
+  var e;
+  if (kind === 'walker') {
+    e = {
+      kind: 'walker', x: x, y: GROUND_Y, w: 32, h: 40,
+      vx: -60, hp: 3, alive: true,
+      patrolMin: x - 80, patrolMax: x + 80,
+      wobbleT: 0,
+      contactCool: 0,
+      shotT: 2.0 + Math.random() * 2.0,
+    };
+    // Phase 2 — initial animation state per enemy kind
+    e.anim = { current: 'walker_walk', frame: 0, timer: 0 };
+    enemies.push(e);
+  } else if (kind === 'copter') {
+    e = {
+      kind: 'copter', x: x, y: GROUND_Y - 160, w: 28, h: 24,
+      hp: 3, alive: true,
+      bobT: Math.random() * 6.28,
+      dropT: 1.0,
+      contactCool: 0,
+    };
+    // Phase 2 — initial animation state per enemy kind
+    e.anim = { current: 'copter_hover', frame: 0, timer: 0 };
+    enemies.push(e);
+  } else if (kind === 'bolt') {
+    e = {
+      kind: 'bolt', x: x, y: GROUND_Y, w: 24, h: 30,
+      hp: 3, alive: true,
+      hopT: 0,
+      hopDir: -1,
+      hopCount: 0,
+      homeY: GROUND_Y,
+      squashY: 0,
+      contactCool: 0,
+    };
+    // Phase 2 — initial animation state per enemy kind
+    e.anim = { current: 'bolt_hop', frame: 0, timer: 0 };
+    enemies.push(e);
+  } else if (kind === 'minion') {
+    var minion = {
+      kind: 'minion', x: x, y: GROUND_Y, w: 22, h: 28,
+      vx: 0, hp: 3, alive: true,
+      hopT: 0,
+      hopDir: -1,         // start hopping toward the player (left of right-edge spawn)
+      hopCount: 0,
+      homeY: GROUND_Y,
+      squashY: 0,
+      shotT: 1.5 + Math.random() * 1.0,
+      contactCool: 0,
+      rotateAngle: 0,
+      anim: { current: 'gear_minion', frame: 0, timer: 0 },
+    };
+    enemies.push(minion);
+  }
+}
+
+function setupLevelEnemies() {
+  // Segment A (0–1300)
+  spawnEnemy('walker',  550);
+  spawnEnemy('walker',  900);
+  spawnEnemy('copter', 1200);
+  // Segment B (1300–2700)
+  spawnEnemy('bolt',   1550);
+  spawnEnemy('bolt',   1850);
+  spawnEnemy('walker', 2100);
+  spawnEnemy('walker', 2600);
+  // Segment C (2700–4400)
+  spawnEnemy('copter', 3300);
+  spawnEnemy('bolt',   3750);
+  spawnEnemy('copter', 4050);
+  spawnEnemy('bolt',   4300);
+  // Segment D (4400–6440)
+  spawnEnemy('walker', 4600);
+  spawnEnemy('copter', 4850);
+  spawnEnemy('bolt',   5100);
+  spawnEnemy('walker', 5350);
+  spawnEnemy('copter', 5600);
+  spawnEnemy('walker', 5900);
+  spawnEnemy('bolt',   6050);
+  spawnEnemy('copter', 6200);
+  spawnEnemy('walker', 6350);
+}
+
+function updateEnemies(dt) {
+  for (var i = enemies.length - 1; i >= 0; i--) {
+    var e = enemies[i];
+    // Falling aerial enemy: apply gravity until floor impact, then switch to KO anim
+    if (e.dying) {
+      e.vy = (e.vy || 0) + GRAVITY * dt;
+      e.y += e.vy * dt;
+      if (e.y >= GROUND_Y) {
+        e.y = GROUND_Y;
+        e.dying = false;
+        e.alive = false;
+        setAnim(e, e.kind + '_ko');
+        e.koTimer = 0.4;
+        spawnBoltBurst(e.x, e.y - e.h * 0.5);
+      }
+      continue;
+    }
+    if (!e.alive) {
+      e.koTimer = (e.koTimer || 0) - dt;
+      if (e.koTimer <= 0) { enemies.splice(i, 1); }
+      continue;
+    }
+    if (e.contactCool > 0) e.contactCool -= dt;
+
+    if (e.kind === 'walker') {
+      if (e.wobbleT > 0) {
+        e.wobbleT -= dt;
+      } else {
+        // Pit-edge detection: check the leading edge one step ahead
+        var leadEdge = e.x + (e.vx > 0 ? e.w : 0);
+        var nextLeadEdge = leadEdge + e.vx * dt;
+        var willFallIntoPit = false;
+        for (var pi = 0; pi < level.pits.length; pi++) {
+          var pit = level.pits[pi];
+          if (nextLeadEdge > pit.x && nextLeadEdge < pit.x + pit.w) {
+            willFallIntoPit = true;
+            break;
+          }
+        }
+        if (willFallIntoPit) {
+          e.wobbleT = 0.3;
+          e.vx = -e.vx;
+        } else {
+          e.x += e.vx * dt;
+          if (e.x <= e.patrolMin && e.vx < 0) { e.wobbleT = 0.3; e.vx = 60; }
+          if (e.x >= e.patrolMax && e.vx > 0) { e.wobbleT = 0.3; e.vx = -60; }
+        }
+      }
+      // Laser shot at player when nearby + on cadence
+      e.shotT -= dt;
+      if (e.shotT <= 0 && Math.abs(player.x - e.x) < 360) {
+        var lx = e.x, ly = e.y - e.h * 0.5;
+        var ldx = (player.x + player.w * 0.5) - lx;
+        var ldy = (player.y - player.hbH * 0.5) - ly;
+        var ldist = Math.max(40, Math.sqrt(ldx * ldx + ldy * ldy));
+        var laserSpeed = 270;     // was 360 — kid-friendly slowdown
+        projectiles.push({
+          x: lx, y: ly,
+          vx: (ldx / ldist) * laserSpeed,
+          vy: (ldy / ldist) * laserSpeed,
+          life: 2.2, kind: 'enemy-laser',
+        });
+        e.shotT = 3.5 + Math.random() * 1.5;
+      }
+    } else if (e.kind === 'copter') {
+      e.bobT += dt * 4;
+      e.y = (GROUND_Y - 160) + Math.sin(e.bobT) * 6;
+      e.dropT -= dt;
+      if (e.dropT <= 0) {
+        // Aim toward the player at fire time.
+        var dx = (player.x + player.w * 0.5) - e.x;
+        var dy = (player.y - player.h * 0.5) - e.y;
+        var dist = Math.max(40, Math.sqrt(dx * dx + dy * dy));
+        var blobSpeed = 210;      // was 280 — kid-friendly slowdown
+        projectiles.push({
+          x: e.x, y: e.y,
+          vx: (dx / dist) * blobSpeed,
+          vy: (dy / dist) * blobSpeed,
+          life: 3, kind: 'enemy-blob',
+        });
+        e.dropT = 1.6;  // a touch faster cadence
+      }
+    } else if (e.kind === 'bolt') {
+      e.hopT += dt;
+      if (e.hopT < 1.0) {
+        var prevT = e.hopT - dt;
+        var t = e.hopT;
+        e.x += e.hopDir * 100 * dt;
+        var peakOffset = 200 * 4 * t * (1 - t);
+        e.y = e.homeY - peakOffset;
+        e.squashY = -peakOffset / 200;
+        // Fire one shot at peak (when crossing t=0.5)
+        if (prevT < 0.5 && t >= 0.5 && Math.abs(player.x - e.x) < 320) {
+          var dx2 = (player.x + player.w * 0.5) - e.x;
+          var dy2 = (player.y - player.hbH * 0.5) - e.y;
+          var d2 = Math.max(40, Math.sqrt(dx2 * dx2 + dy2 * dy2));
+          projectiles.push({
+            x: e.x, y: e.y,
+            vx: (dx2 / d2) * 240, vy: (dy2 / d2) * 240,
+            life: 2.0, kind: 'enemy-laser',
+          });
+        }
+      } else if (e.hopT < 1.5) {
+        // Resting on the ground
+        e.y = e.homeY;
+        e.squashY = 1;
+      } else {
+        e.hopT = 0;
+        e.hopCount += 1;
+        if (e.hopCount >= 4) { e.hopCount = 0; e.hopDir *= -1; }
+        e.squashY = 0;
+      }
+    } else if (e.kind === 'minion') {
+      e.rotateAngle = (e.rotateAngle || 0) + dt * 2;
+      e.hopT += dt;
+      if (e.hopT < 1.0) {
+        var t = e.hopT;
+        // Home toward player horizontally each hop
+        var towardPlayerSign = (player.x < e.x ? -1 : 1);
+        e.hopDir = towardPlayerSign;
+        e.x += e.hopDir * 110 * dt;
+        var peakOffset = 220 * 4 * t * (1 - t);
+        e.y = e.homeY - peakOffset;
+        e.squashY = -peakOffset / 220;
+      } else if (e.hopT < 1.4) {
+        e.y = e.homeY;
+        e.squashY = 1;
+      } else {
+        e.hopT = 0;
+        e.hopCount += 1;
+        e.squashY = 0;
+      }
+    }
+
+    // Player-contact damage
+    if (rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
+                     e.x - e.w / 2, e.y - e.h, e.w, e.h)
+        && player.invuln <= 0 && shieldBubble <= 0) {
+      hurtPlayer(1, e.x);
+    }
+
+    // Projectile-vs-enemy
+    for (var j = projectiles.length - 1; j >= 0; j--) {
+      var p = projectiles[j];
+      if (p.kind !== 'foam' && p.kind !== 'spark') continue;
+      if (p.x > e.x - e.w / 2 && p.x < e.x + e.w / 2
+          && p.y > e.y - e.h && p.y < e.y) {
+        e.hp -= 1;
+        projectiles.splice(j, 1);
+        if (e.hp <= 0) {
+          if ((e.kind === 'copter' || e.kind === 'bolt') && e.y < GROUND_Y - 4) {
+            // Aerial enemy falls under gravity to the floor, then plays KO anim
+            e.dying = true;
+            e.vy = 0;
+            e.vx = 0;
+          } else {
+            e.alive = false;
+            spawnBoltBurst(e.x, e.y - e.h * 0.5);
+            if (e.kind === 'walker') setAnim(e, 'walker_ko');
+            else setAnim(e, e.kind + '_ko');
+            e.koTimer = 0.4;
+          }
+          break;
+        }
+      }
+    }
+
+    // Advance animation for alive enemies
+    if (e.alive) {
+      if (e.kind === 'bolt') {
+        e.anim.current = 'bolt_hop';
+        // Stretch frame (1) on the way up (hopT < 0.5); squash frame (0) falling or resting
+        e.anim.frame = (e.hopT < 0.5) ? 1 : 0;
+      } else if (e.anim) {
+        updateAnim(e, dt);
+      }
+    }
+  }
+}
+
+function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+function spawnBoltBurst(x, y) {
+  for (var i = 0; i < 5; i++) {
+    var a = (i / 5) * Math.PI * 2 + Math.random() * 0.4;
+    bolts.push({ x: x, y: y, vx: Math.cos(a) * 200, vy: Math.sin(a) * 200, life: 0.4 });
+  }
+}
+
+function updateBolts(dt) {
+  for (var i = bolts.length - 1; i >= 0; i--) {
+    var b = bolts[i];
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.vy += GRAVITY * 0.3 * dt;
+    b.life -= dt;
+    if (b.life <= 0) bolts.splice(i, 1);
+  }
+}
+
+function updateEnemyProjectiles(dt) {
+  for (var i = projectiles.length - 1; i >= 0; i--) {
+    var p = projectiles[i];
+    if (p.kind !== 'enemy-blob' && p.kind !== 'enemy-laser') continue;
+    if (p.x > player.x && p.x < player.x + player.w
+        && p.y > player.y - player.h && p.y < player.y
+        && player.invuln <= 0 && shieldBubble <= 0) {
+      hurtPlayer(1, p.x);
+      projectiles.splice(i, 1);
+    } else if (p.y > GROUND_Y) {
+      // Hit floor — splat
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
+var WALKER_VISUAL_W = 52, WALKER_VISUAL_H = 72;
+var BOLT_VISUAL_W = 48, BOLT_VISUAL_H = 72;
+var MINION_VISUAL_W = 60, MINION_VISUAL_H = 72;
+
+function drawEnemies() {
+  for (var i = 0; i < enemies.length; i++) {
+    var e = enemies[i];
+    if (!e) continue;
+    // Skip fully despawned (alive=false and koTimer expired)
+    if (e.alive === false && (e.koTimer || 0) <= 0) continue;
+    // Minion renders as a spinning gear sprite at a larger visual size
+    if (e.kind === 'minion') {
+      var visualMx = e.x + (e.w - MINION_VISUAL_W) / 2;
+      var visualMy = e.y - MINION_VISUAL_H;
+      ctx.save();
+      ctx.translate(visualMx + MINION_VISUAL_W / 2, visualMy + MINION_VISUAL_H / 2);
+      ctx.rotate(e.rotateAngle || 0);
+      drawSprite('gear_filler', -MINION_VISUAL_W / 2, -MINION_VISUAL_H / 2, MINION_VISUAL_W, MINION_VISUAL_H, false);
+      ctx.restore();
+      continue;
+    }
+    var spriteName = currentSpriteOf(e);
+    if (!spriteName) continue;
+    var flipped = (e.vx || 0) < 0;
+    if (e.kind === 'copter') {
+      // Copter sprites are portrait (160×242) but hitbox is landscape (28×24).
+      // Render at a taller visual box so the cupcake shape is legible.
+      var COPTER_VW = 48, COPTER_VH = 72;
+      var vex = e.x + e.w / 2 - COPTER_VW / 2;
+      var vey = e.y - COPTER_VH;
+      drawSprite(spriteName, vex, vey, COPTER_VW, COPTER_VH, flipped);
+    } else if (e.kind === 'walker') {
+      var vwx = e.x - e.w / 2 + (e.w - WALKER_VISUAL_W) / 2;
+      var vwy = e.y - WALKER_VISUAL_H;
+      drawSprite(spriteName, vwx, vwy, WALKER_VISUAL_W, WALKER_VISUAL_H, flipped);
+    } else if (e.kind === 'bolt') {
+      var vbx = e.x - e.w / 2 + (e.w - BOLT_VISUAL_W) / 2;
+      var vby = e.y - BOLT_VISUAL_H;
+      drawSprite(spriteName, vbx, vby, BOLT_VISUAL_W, BOLT_VISUAL_H, flipped);
+    } else {
+      var ex = e.x, ey = e.y - e.h;
+      drawSprite(spriteName, ex, ey, e.w, e.h, flipped);
+    }
+  }
+}
+
+function drawBolts() {
+  for (var i = 0; i < bolts.length; i++) {
+    var b = bolts[i];
+    ctx.fillStyle = '#9E9E9E';
+    ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+  }
+}
+
+function hurtPlayer(amount, fromX) {
+  hp -= amount;
+  refreshHud();
+  player.invuln = INVULN_TIME;
+  player.vx = (player.x < fromX ? -1 : 1) * 200;
+  player.vy = -350;
+  if (hp <= 0) onPlayerOut();
+}
+
+function onPlayerOut() {
+  hp = maxHp;
+  refreshHud();
+  player.x = lastCheckpoint.x;
+  player.y = GROUND_Y;
+  player.vy = 0;
+  player.invuln = 1.5;
+  showBanner('Try again, you\'ve got this!', 1500);
+}
+
+// ── Power-ups ──────────────────────────────────────────────────────────────
+var pickups = [];        // { kind, x, y, alive }
+var shieldBubble = 0;    // s remaining of shield-bubble invuln
+var SPARK_INTERVAL = 0.30;
+var SPARK_FAN_DEG = 30;
+var SPARK_DURATION = 12;
+var SPARK_SHOT_LIMIT = 40;
+
+function spawnPickup(kind, x, y) {
+  pickups.push({ kind: kind, x: x, y: y === undefined ? GROUND_Y - 20 : y, alive: true });
+}
+
+function setupLevelPickups() {
+  spawnPickup('spark', 1900);    // moved from x=600 to mid-level
+  spawnPickup('shield', 1700);
+  spawnPickup('heart',  2400);
+  spawnPickup('shield', 3100);
+  spawnPickup('heart',  3700);
+}
+
+function updatePickups(dt) {
+  for (var i = pickups.length - 1; i >= 0; i--) {
+    var pk = pickups[i];
+    if (!pk.alive) { pickups.splice(i, 1); continue; }
+    if (rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
+                     pk.x - 20, pk.y - 40, 40, 40)) {
+      pk.alive = false;
+      onPickup(pk.kind);
+    }
+  }
+  if (shieldBubble > 0) shieldBubble -= dt;
+  // Spark is persistent now — no duration / shot decrement. HUD label set on pickup.
+}
+
+function onPickup(kind) {
+  if (kind === 'spark') {
+    weapon = 'spark';
+    weaponEl.textContent = '⚡ Spark Spread';
+    showBanner('⚡ Spark Spread!', 1500);
+  } else if (kind === 'shield') {
+    shieldBubble = 6;
+    showBanner('🛡 Shield Bubble!', 1500);
+  } else if (kind === 'heart') {
+    if (hp < maxHp) hp += 1;
+    refreshHud();
+    showBanner('+1 Heart!', 1500);
+  }
+}
+
+function drawPickups() {
+  for (var i = 0; i < pickups.length; i++) {
+    var pk = pickups[i];
+    if (!pk.alive) continue;
+    var bob = Math.sin(Date.now() / 300 + pk.x * 0.01) * 6;
+    var pulse = 0.45 + 0.35 * Math.sin(Date.now() / 200);
+    var color = pk.kind === 'spark' ? '#FFEB3B' : pk.kind === 'shield' ? '#00E5FF' : '#FF1744';
+    var label = pk.kind === 'spark' ? '⚡' : pk.kind === 'shield' ? '🛡' : '♥';
+    var size = 40;       // was 24 — bigger so the kid sees them
+    var cx = pk.x, cy = pk.y - size / 2 + bob;
+    // Pulsing glow halo
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Solid crate
+    ctx.fillStyle = color;
+    ctx.fillRect(cx - size / 2, cy - size / 2, size, size);
+    ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 3;
+    ctx.strokeRect(cx - size / 2, cy - size / 2, size, size);
+    // Big icon glyph
+    ctx.fillStyle = '#1A1A1A';
+    ctx.font = 'bold 22px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, cx, cy + 1);
+  }
+}
+
+// ── Checkpoints ────────────────────────────────────────────────────────────
+var checkpoints = [];        // { x, y, name, touched }
+var lastCheckpoint = { x: 80, y: 0 };   // y resolved on first frame
+
+function setupLevelCheckpoints() {
+  checkpoints.push({ x: 1100, y: 0, name: '1', touched: false });
+  checkpoints.push({ x: 2700, y: 0, name: '2', touched: false });
+  checkpoints.push({ x: 3700, y: 0, name: '3', touched: false });
+}
+
+function updateCheckpoints(dt) {
+  for (var i = 0; i < checkpoints.length; i++) {
+    var c = checkpoints[i];
+    if (c.touched) continue;
+    if (rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
+                     c.x - 24, GROUND_Y - 24, 48, 24)) {
+      c.touched = true;
+      lastCheckpoint = { x: c.x, y: GROUND_Y };
+      showBanner('🛟 Saved!', 1200);
+    }
+  }
+}
+
+function drawCheckpoints() {
+  for (var i = 0; i < checkpoints.length; i++) {
+    var c = checkpoints[i];
+    var pulse = 0.4 + 0.5 * (0.5 + 0.5 * Math.sin(Date.now() / 500));
+    ctx.fillStyle = c.touched ? 'rgba(76,175,80,' + pulse + ')' : 'rgba(0,229,255,' + pulse + ')';
+    ctx.beginPath();
+    ctx.arc(c.x, GROUND_Y - 12, 24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = c.touched ? '#4CAF50' : '#00E5FF';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(c.x, GROUND_Y - 12, 24, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+// ── Boss ───────────────────────────────────────────────────────────────────
+var boss = {
+  active: false,
+  x: 0, y: 0,                    // resolved in activateBoss / startGame to BOSS_ARENA_LEFT + 200
+  w: 80, h: 80,
+  phase: 1,
+  hp: 70,
+  hpMaxP1: 70,
+  hpMaxP2: 91,
+  attackT: 1.6,
+  currentAttack: null,
+  hitFlash: 0,
+  invuln: 0,
+  defeated: false,
+  bobT: 0,
+  minionT: 5,
+  minionSpawnT: 4,                // phase 2 minion-from-right cadence
+  entryT: 0,
+};
+var BOSS_TRIGGER_X = 7090;        // ~400px from level end; arena bounds set dynamically at activation
+var BOSS_ARENA_LEFT  = 7090;       // overridden in activateBoss()
+var BOSS_ARENA_RIGHT = 7490;       // overridden in activateBoss()
+
+function activateBoss() {
+  if (boss.active) return;
+  boss.active = true;
+  // Lock the arena to the current screen so the camera doesn't jump.
+  // Pre-compute camera target NOW so left edge = camera.x (no scroll jump).
+  BOSS_ARENA_LEFT  = camera.x;
+  BOSS_ARENA_RIGHT = camera.x + W;
+  // Don't let the arena extend past the world's right edge.
+  if (BOSS_ARENA_RIGHT > levelLength) {
+    BOSS_ARENA_RIGHT = levelLength;
+    BOSS_ARENA_LEFT  = levelLength - W;
+  }
+  boss.x = BOSS_ARENA_RIGHT - boss.w * 0.6 - 20;
+  boss.y = -200;       // start above the screen — fly-down intro
+  boss.entryT = 1.0;   // 1 second fly-down animation
+  boss.attackT = 2.0;  // first attack delayed until intro completes
+  boss.hp = boss.hpMaxP1;
+  boss.phase = 1;
+  boss.anim = { current: 'boss_idle', frame: 0, timer: 0 };
+  bossRow.style.display = 'block';
+  progressBar.style.display = 'none';
+  showBanner('🤖 FOREMAN-BOT 9000', 1500);
+}
+
+function updateBoss(dt) {
+  if (!boss.active) {
+    // Spawn boss the moment the camera reaches its right limit (frame stops moving).
+    var camLockX = levelLength - W * 0.5;
+    if (!boss.defeated && player.x >= camLockX) activateBoss();
+    return;
+  }
+  // Fly-in intro: lerp boss.y from -200 (above screen) down to 0 over 1s.
+  if (boss.entryT > 0) {
+    boss.entryT -= dt;
+    if (boss.entryT < 0) boss.entryT = 0;
+    return;   // skip attacks/bob during intro
+  }
+  if (boss.hitFlash > 0) boss.hitFlash -= dt;
+  if (boss.invuln > 0) boss.invuln -= dt;
+  boss.bobT = (boss.bobT || 0) + dt;
+  // Boss is anchored at the right edge of the arena; only y-bob varies.
+  boss.x = BOSS_ARENA_RIGHT - boss.w * 0.6 - 20;
+  // Always orient the boss toward the player so the "front" sensor faces them.
+  boss.facing = (player.x + player.w * 0.5 < boss.x) ? -1 : 1;
+
+  // Update HP bar fill
+  var maxHpForPhase = boss.phase === 1 ? boss.hpMaxP1 : boss.hpMaxP2;
+  bossFill.style.width = Math.max(0, (boss.hp / maxHpForPhase) * 100) + '%';
+
+  // Phase 2: summon jumping minion bots from the right edge of the arena
+  if (boss.phase === 2 && boss.invuln <= 0) {
+    boss.minionSpawnT = (boss.minionSpawnT == null ? 4 : boss.minionSpawnT) - dt;
+    if (boss.minionSpawnT <= 0) {
+      spawnEnemy('minion', BOSS_ARENA_RIGHT - 40);
+      boss.minionSpawnT = 4.0;
+    }
+  }
+
+  // Attack rotation
+  if (boss.invuln <= 0 && boss.currentAttack === null) {
+    boss.attackT -= dt;
+    if (boss.attackT <= 0) {
+      var roll = Math.random();
+      // Single aimed shot — fires more often so the kid stays on the move.
+      if (boss.phase === 1) {
+        boss.currentAttack = { kind: 'volley', t: 0, life: 0.5 };
+      } else {
+        boss.currentAttack = { kind: 'volley', t: 0, life: 0.4 };
+      }
+      boss.attackT = boss.phase === 1 ? 0.7 : 0.5;
+    }
+  }
+
+  // Boss always renders as idle regardless of active attack
+  setAnim(boss, 'boss_idle');
+
+  // Run current attack
+  if (boss.currentAttack) {
+    var a = boss.currentAttack;
+    a.t += dt;
+    if (a.kind === 'volley') {
+      if (a.t > 0.2 && !a.fired) {
+        a.fired = true;
+        var ampSpawn = Math.min(130, (GROUND_Y - boss.h - 30) / 2);
+        var bobNow2 = Math.sin(boss.bobT * 1.2) * ampSpawn;
+        var sX = boss.x;
+        var sY = (GROUND_Y - boss.h - 20 - ampSpawn) + boss.h * 0.5 + bobNow2;
+        var pdx = (player.x + player.w * 0.5) - sX;
+        var pdy = (player.y - player.hbH * 0.5) - sY;
+        var pd = Math.max(40, Math.sqrt(pdx * pdx + pdy * pdy));
+        var boltSpeed = 320;
+        // Single aimed bolt — easier to dodge, fired more often.
+        projectiles.push({
+          x: sX, y: sY,
+          vx: (pdx / pd) * boltSpeed,
+          vy: (pdy / pd) * boltSpeed,
+          life: 2.0, kind: 'boss-bolt',
+        });
+      }
+    }
+    if (a.t >= a.life) {
+      boss.currentAttack = null;
+    }
+  }
+
+  // Player projectiles vs boss
+  for (var j = projectiles.length - 1; j >= 0; j--) {
+    var p = projectiles[j];
+    if (p.kind !== 'foam' && p.kind !== 'spark') continue;
+    if (boss.invuln > 0 || boss.entryT > 0) continue;
+    var ampHit = Math.min(130, (GROUND_Y - boss.h - 30) / 2);
+    var bobYHit = Math.sin(boss.bobT * 1.2) * ampHit;
+    var bossTopY = (GROUND_Y - boss.h - 20 - ampHit) + bobYHit;
+    if (rectsOverlap(p.x - 6, p.y - 6, 12, 12, boss.x - boss.w / 2, bossTopY, boss.w, boss.h)) {
+      boss.hp -= 1;
+      boss.hitFlash = 0.15;
+      projectiles.splice(j, 1);
+    }
+  }
+
+  // Phase transition / defeat — run every frame regardless of damage source.
+  if (boss.invuln <= 0) {
+    if (boss.hp <= 0 && boss.phase === 1) {
+      boss.phase = 2;
+      boss.hp = boss.hpMaxP2;
+      boss.invuln = 1.0;
+      triggerShake(6, 1.0);
+      showBanner('⚡ Phase 2!', 1500);
+      // Heart spawns IN FRONT of the boss so the kid can grab it safely (Fix 8).
+      spawnPickup('heart', boss.x - 200, GROUND_Y - 20);
+    } else if (boss.hp <= 0 && boss.phase === 2) {
+      onBossDefeated();
+    }
+  }
+}
+
+function onBossDefeated() {
+  boss.active = false;
+  boss.defeated = true;
+  bossRow.style.display = 'none';
+  progressBar.style.display = '';
+  scene = 'win';
+  showBanner('🎉 Sector Cleared!', 2000);
+  setTimeout(function() { winOverlay.classList.add('show'); }, 1500);
+}
+
+function updateBossHazards(dt) {
+  for (var i = projectiles.length - 1; i >= 0; i--) {
+    var p = projectiles[i];
+    if (p.kind !== 'boss-claw' && p.kind !== 'boss-bolt' && p.kind !== 'boss-stomp') continue;
+    if (p.grav) p.vy += GRAVITY * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    if (p.life <= 0) { projectiles.splice(i, 1); continue; }
+    // Hit player
+    if (player.invuln <= 0 && shieldBubble <= 0 &&
+        rectsOverlap(player.x, player.y - player.hbH, player.hbW, player.hbH,
+                     p.x - 12, p.y - 12, 24, 24)) {
+      var dmg = p.kind === 'boss-stomp' ? 2 : 1;
+      hurtPlayer(dmg, p.x);
+    }
+  }
+}
+
+function drawBoss() {
+  if (!boss.active) return;
+  var bossAmp = Math.min(130, (GROUND_Y - boss.h - 30) / 2);
+  var bossCenterTop = GROUND_Y - boss.h - 20 - bossAmp;
+  var bobY = Math.sin(boss.bobT * 1.2) * bossAmp;
+  var bx = boss.x - boss.w / 2;
+  var by = bossCenterTop + bobY;
+  // Intro fly-down: ease in from above
+  if (boss.entryT > 0) {
+    var introProg = 1 - boss.entryT;
+    var introY = -200 + introProg * 200;
+    by = bossCenterTop + introY;
+  }
+
+  // Render boss sprite at a larger visual size than the 80×80 hitbox.
+  // Boss sprites are wide (177-213px) and short (136-137px) — a landscape shape.
+  // 120×140 gives the boss an imposing screen presence while letterboxing preserves aspect.
+  var BOSS_VISUAL_W = 120;
+  var BOSS_VISUAL_H = 140;
+  var visualBx = boss.x - BOSS_VISUAL_W / 2;
+  // Bottom-anchor: visual bottom aligns with hitbox bottom (by + boss.h)
+  var visualBy = by + boss.h - BOSS_VISUAL_H;
+
+  var spriteName = (boss.phase === 2) ? 'boss_volley' : 'boss_idle';
+
+  // Two rocket flame plumes, one under each foot (drawn first so they appear behind the body)
+  var leftFootX  = visualBx + BOSS_VISUAL_W * 0.30;
+  var rightFootX = visualBx + BOSS_VISUAL_W * 0.70;
+  var flameTop = visualBy + BOSS_VISUAL_H - 6;
+  [leftFootX, rightFootX].forEach(function(fx, i) {
+    var localFlicker = Math.sin(Date.now() / 60 + i * 1.7) * 3;
+    var fh = 22 + localFlicker;
+    ctx.save();
+    // Outer orange flame
+    var grad1 = ctx.createLinearGradient(fx, flameTop, fx, flameTop + fh);
+    grad1.addColorStop(0, '#FFB300');
+    grad1.addColorStop(0.6, '#FF6F00');
+    grad1.addColorStop(1, 'rgba(244,67,54,0)');
+    ctx.fillStyle = grad1;
+    ctx.beginPath();
+    ctx.ellipse(fx, flameTop + fh / 2, 13, fh / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Inner yellow core
+    var grad2 = ctx.createLinearGradient(fx, flameTop, fx, flameTop + fh * 0.7);
+    grad2.addColorStop(0, '#FFEB3B');
+    grad2.addColorStop(1, 'rgba(255,235,59,0)');
+    ctx.fillStyle = grad2;
+    ctx.beginPath();
+    ctx.ellipse(fx, flameTop + fh / 3, 6, fh / 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  drawSprite(spriteName, visualBx, visualBy, BOSS_VISUAL_W, BOSS_VISUAL_H, true, true);
+
+}
+
+function drawBossProjectiles() {
+  for (var i = 0; i < projectiles.length; i++) {
+    var p = projectiles[i];
+    if (p.kind === 'boss-claw') {
+      ctx.fillStyle = '#FFEB3B';
+      ctx.fillRect(p.x - 12, p.y - 6, 24, 12);
+      ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
+      ctx.strokeRect(p.x - 12, p.y - 6, 24, 12);
+    } else if (p.kind === 'boss-bolt') {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#FF1744'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.stroke();
+    } else if (p.kind === 'boss-stomp') {
+      ctx.fillStyle = '#FFEB3B';
+      ctx.fillRect(p.x - 30, p.y, 60, 16);
+      ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2;
+      ctx.strokeRect(p.x - 30, p.y, 60, 16);
+    }
+  }
+}
+
+// ── Camera shake (boss phase transition + boss death effects) ──────────────
+var shakeT = 0, shakeMag = 0;
+function triggerShake(mag, time) { shakeMag = mag; shakeT = time; }
+function getShakeOffset() {
+  if (shakeT <= 0) return { x: 0, y: 0 };
+  return { x: (Math.random() - 0.5) * shakeMag, y: (Math.random() - 0.5) * shakeMag };
+}
+
+// ── Loop ───────────────────────────────────────────────────────────────────
+var lastTime = 0;
+function loop(now) {
+  if (!assetsReady) {
+    if (W > 0 && H > 0) drawLoadingSplash();
+    requestAnimationFrame(loop);
+    return;
+  }
+  var dt = lastTime ? (now - lastTime) / 1000 : 1 / 60;
+  if (dt > 0.05) dt = 0.05;
+  lastTime = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+function update(dt) {
+  resolveLevelGeometry();
+  // Freeze entity updates outside of active gameplay.
+  if (scene !== 'playing') {
+    if (shakeT > 0) shakeT -= dt;
+    return;
+  }
+  updateBoss(dt);
+  updateBossHazards(dt);
+  updatePlayer(dt);
+  updateProjectiles(dt);
+  updateEnemyProjectiles(dt);
+  updateEnemies(dt);
+  updatePickups(dt);
+  updateCheckpoints(dt);
+  updateBolts(dt);
+  if (shakeT > 0) shakeT -= dt;
+
+  // Vehicle removed — shield row stays hidden (Shield Bubble still visible via the cyan ring around player).
+  shieldEl.style.display = 'none';
+
+}
+function drawParallaxBg(img) {
+  // Cover-fit + slow horizontal parallax driven by camera position. Mirrors
+  // red-ball/drawBgImage so pits reveal the bg through a black gradient.
+  var iw = img.naturalWidth, ih = img.naturalHeight;
+  var canvasAR = W / H, imgAR = iw / ih;
+  var dw, dh, dx, dy;
+  if (imgAR > canvasAR) { dh = H; dw = H * imgAR; }
+  else                  { dw = W; dh = W / imgAR; }
+  dx = (W - dw) / 2;
+  dy = (H - dh) / 2;
+  var slack = Math.max(0, dw - W);
+  if (slack > 0) {
+    var span = Math.max(1, levelLength - W);
+    var t = Math.max(0, Math.min(1, camera.x / span));
+    dx = -slack * t;
+  }
+  ctx.drawImage(img, dx, dy, dw, dh);
+}
+
+function drawPits() {
+  // Transparent at the rim, fully black at the bottom — pit drop reveals
+  // the parallax factory behind the play area while still reading as a
+  // dangerous void. Drawn before drawFloor so the floor walls cap the rims.
+  var topY = GROUND_Y;
+  var botY = H + 100;
+  for (var i = 0; i < level.pits.length; i++) {
+    var p = level.pits[i];
+    var grad = ctx.createLinearGradient(0, topY, 0, botY);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,1)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(p.x, topY, p.w, botY - topY);
+  }
+}
+
+function draw() {
+  if (bgFactory.complete && bgFactory.naturalWidth) {
+    drawParallaxBg(bgFactory);
+  } else {
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(0, 0, W, H);
+  }
+  resolveLevelGeometry();
+  updateCamera();
+
+  var sk = getShakeOffset();
+  ctx.save();
+  ctx.translate(sk.x, sk.y);
+
+  ctx.save();
+  ctx.translate(-camera.x, 0);
+  drawPits();
+  drawFloor();
+  drawFloorBelts();
+  drawPlatforms();
+  drawCheckpoints();
+  drawPickups();
+  drawEnemies();
+  drawBolts();
+  drawBoss();
+  drawBossProjectiles();
+  drawProjectiles();
+  drawPlayer();
+  ctx.restore();
+
+  ctx.restore();
+
+  // Yellow flash overlay during boss phase transition
+  if (boss.active && boss.invuln > 0) {
+    ctx.fillStyle = 'rgba(255,235,59,' + (boss.invuln * 0.7) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  var prog = Math.min(1, player.x / levelLength);
+  progressEl.style.width = (prog * 100) + '%';
+}
+
+function drawFloor() {
+  var segs = [{ x0: -50, x1: levelLength + 50 }];
+  for (var i = 0; i < level.pits.length; i++) {
+    var p = level.pits[i];
+    var newSegs = [];
+    for (var j = 0; j < segs.length; j++) {
+      var s = segs[j];
+      if (p.x + p.w < s.x0 || p.x > s.x1) { newSegs.push(s); continue; }
+      if (p.x > s.x0)        newSegs.push({ x0: s.x0, x1: p.x });
+      if (p.x + p.w < s.x1)  newSegs.push({ x0: p.x + p.w, x1: s.x1 });
+    }
+    segs = newSegs;
+  }
+  ctx.fillStyle = '#5D3A1A';
+  for (var k = 0; k < segs.length; k++) {
+    ctx.fillRect(segs[k].x0, GROUND_Y, segs[k].x1 - segs[k].x0, FLOOR_HEIGHT);
+  }
+  ctx.fillStyle = '#FFEB3B';
+  for (var m = 0; m < segs.length; m++) {
+    ctx.fillRect(segs[m].x0, GROUND_Y, segs[m].x1 - segs[m].x0, 3);
+  }
+  ctx.fillStyle = '#FF1744';
+  for (var p2 = 0; p2 < level.pits.length; p2++) {
+    var pp = level.pits[p2];
+    ctx.fillRect(pp.x - 2, GROUND_Y, 2, FLOOR_HEIGHT);
+    ctx.fillRect(pp.x + pp.w, GROUND_Y, 2, FLOOR_HEIGHT);
+  }
+}
+
+function drawFloorBelts() {
+  if (!level.floorBelts) return;
+  for (var i = 0; i < level.floorBelts.length; i++) {
+    var fb = level.floorBelts[i];
+    // Dark belt strip on top of the floor
+    ctx.fillStyle = '#37474F';
+    ctx.fillRect(fb.x, GROUND_Y, fb.w, 16);
+    // Scrolling diagonal stripes
+    ctx.fillStyle = '#FFEB3B';
+    var phase = (Date.now() / (fb.dir > 0 ? -120 : 120)) % 12;
+    if (phase < 0) phase += 12;
+    for (var d = -12 + phase; d < fb.w; d += 12) {
+      var x0 = fb.x + d, x1 = fb.x + d + 8;
+      var clipL = Math.max(fb.x, x0), clipR = Math.min(fb.x + fb.w, x1);
+      if (clipR > clipL) ctx.fillRect(clipL, GROUND_Y + 4, clipR - clipL, 6);
+    }
+    // Edges
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+    ctx.strokeRect(fb.x, GROUND_Y, fb.w, 16);
+  }
+}
+
+function drawPlatforms() {
+  for (var i = 0; i < level.platforms.length; i++) {
+    var pl = level.platforms[i];
+    var py = GROUND_Y + pl.top;
+    ctx.fillStyle = '#37474F';
+    ctx.fillRect(pl.x, py, pl.w, PLATFORM_HEIGHT);
+    ctx.fillStyle = '#FFEB3B';
+    var phase = (Date.now() / (pl.beltDir > 0 ? -120 : 120)) % 12;
+    if (phase < 0) phase += 12;
+    for (var d = -12 + phase; d < pl.w; d += 12) {
+      var x0 = pl.x + d, x1 = pl.x + d + 8;
+      var clipL = Math.max(pl.x, x0), clipR = Math.min(pl.x + pl.w, x1);
+      if (clipR > clipL) ctx.fillRect(clipL, py + 4, clipR - clipL, 6);
+    }
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+    ctx.strokeRect(pl.x, py, pl.w, PLATFORM_HEIGHT);
+  }
+}
+
+function drawLoadingSplash() {
+  ctx.fillStyle = '#101820';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#FFEB3B';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (assetsErrored) {
+    ctx.fillText('⚠ Could not load game assets', W / 2, H / 2 - 20);
+    ctx.font = '20px sans-serif';
+    ctx.fillText('Refresh the page to try again', W / 2, H / 2 + 20);
+  } else {
+    ctx.fillText('Loading…', W / 2, H / 2);
+  }
+  ctx.textAlign = 'start';
+  ctx.textBaseline = 'alphabetic';
+}
+
+resolveLevelGeometry();
+// Level setup runs inside startGame() when the menu's Start button is pressed.
+loadAssets();
+requestAnimationFrame(function(ts) { lastTime = ts; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
