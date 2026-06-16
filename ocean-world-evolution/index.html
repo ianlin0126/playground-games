@@ -84,7 +84,7 @@ body { background:#001122; overflow:hidden; touch-action:none; user-select:none;
   <div id="evo-bg"><div id="evo-fill"></div></div>
 </div>
 <div id="boss-wrap">
-  <div id="boss-label">🤖 OCEAN BOSS</div>
+  <div id="boss-label">🤖 ROBOT FISH</div>
   <div id="boss-bg"><div id="boss-fill"></div></div>
 </div>
 <button id="ink-btn" onclick="fireInk()">🦑<span id="ink-cd"></span></button>
@@ -182,6 +182,178 @@ var BOSS1_MAX = 7, BOSS2_MAX = 10, BOSS3_MAX = 12, MAX_LIVES = 20, INK_CD_MAX = 
 var CLOAK_DURATION = 10, CLOAK_CD_MAX = 14;
 var PREY_COLORS = ['#ffee58','#ffa726','#ab47bc','#26c6da','#66bb6a','#ff7eb3'];
 
+// ── Sprite atlas ─────────────────────────────────────────────────────────
+var OCEAN_ATLAS = new Image();
+OCEAN_ATLAS.src = './assets/ocean-atlas.png';
+
+// Sprite bboxes embedded from ocean-sprite-map.json. The atlas (gpt-image-1)
+// produced 4 columns × 5 rows = 20 sprites. After playtest feedback the
+// boss assignments are: row 2 col 1 → boss_robot ("Robot Fish"), row 2
+// col 2 → boss_kraken, row 2 col 3 → boss_anglerfish. Damaged variants
+// reuse the base sprite (no separate dmg art) for boss_robot and
+// boss_anglerfish; boss_kraken_dmg has its own sprite at row 3 col 1.
+// Sprites with {x:0,y:0,w:0,h:0} fall back to procedural: mega_shark
+// (renders the shark sprite at the larger size — size differentiates),
+// coin (procedural gold $ disc), explosion_3 (drawExplosions fades
+// explosion_2 in the third slot).
+var SPRITES_OCEAN = {
+  tiny_fish:           { x: 41,  y: 64,  w: 173, h: 142 },
+  shark:               { x: 255, y: 51,  w: 249, h: 160 },
+  mega_shark:          { x: 0,   y: 0,   w: 0,   h: 0   },
+  orca:                { x: 516, y: 55,  w: 226, h: 156 },
+  blue_whale:          { x: 761, y: 51,  w: 232, h: 158 },
+  squid:               { x: 39,  y: 251, w: 197, h: 202 },
+  octopus:             { x: 271, y: 251, w: 220, h: 202 },
+  plankton:            { x: 533, y: 254, w: 193, h: 186 },
+  small_fish_base:     { x: 770, y: 254, w: 215, h: 165 },
+  coin:                { x: 0,   y: 0,   w: 0,   h: 0   },
+  red_predator:        { x: 37,  y: 480, w: 198, h: 178 },
+  boss_robot:          { x: 273, y: 480, w: 220, h: 174 },
+  boss_kraken:         { x: 525, y: 465, w: 208, h: 195 },
+  boss_anglerfish:     { x: 769, y: 465, w: 219, h: 183 },
+  robo_fish:           { x: 40,  y: 685, w: 196, h: 159 },
+  boss_robot_dmg:      { x: 273, y: 480, w: 220, h: 174 },
+  boss_kraken_dmg:     { x: 291, y: 677, w: 173, h: 168 },
+  boss_anglerfish_dmg: { x: 769, y: 465, w: 219, h: 183 },
+  explosion_1:         { x: 52,  y: 861, w: 187, h: 144 },
+  explosion_2:         { x: 277, y: 860, w: 204, h: 145 },
+  explosion_3:         { x: 0,   y: 0,   w: 0,   h: 0   }
+};
+
+// Empirical render-size overrides per sprite, dialed in during QA from
+// side-by-side render comparison. Default (entry absent) = use bbox-ratio.
+// Add entries like: shark: { wMul: 1.0, hMul: 1.0, xOffset: 0, yOffset: 0 }
+var SPRITE_RENDER_OVERRIDES = {};
+
+// One-time setup for the offscreen-canvas tint recipe (kid-tablet safe;
+// avoids ctx.filter which iOS Safari < 17 silently ignores).
+var TINT_CANVAS = document.createElement('canvas');
+TINT_CANVAS.width = 512;
+TINT_CANVAS.height = 512;
+var TINT_CTX = TINT_CANVAS.getContext('2d');
+
+function drawSprite(atlas, name, dx, dy, dw, dh) {
+  var s = SPRITES_OCEAN[name];
+  if (!atlas.complete || atlas.naturalWidth === 0 || !s || !s.w) return false;
+  ctx.drawImage(atlas, s.x, s.y, s.w, s.h, dx, dy, dw, dh);
+  return true;
+}
+
+function drawSpriteCentered(atlas, name, cx, cy, dw, dh) {
+  return drawSprite(atlas, name, cx - dw / 2, cy - dh / 2, dw, dh);
+}
+
+function drawSpriteRel(atlas, refName, name, cx, cy, baseDW, baseDH) {
+  var ov = SPRITE_RENDER_OVERRIDES[name];
+  if (ov) {
+    var ox = ov.xOffset || 0, oy = ov.yOffset || 0;
+    return drawSpriteCentered(atlas, name, cx + ox, cy + oy,
+      baseDW * (ov.wMul || 1), baseDH * (ov.hMul || 1));
+  }
+  var ref = SPRITES_OCEAN[refName], s = SPRITES_OCEAN[name];
+  if (!ref || !s || !ref.w || !s.w) return drawSpriteCentered(atlas, name, cx, cy, baseDW, baseDH);
+  return drawSpriteCentered(atlas, name, cx, cy, baseDW * (s.w / ref.w), baseDH * (s.h / ref.h));
+}
+
+// Tint a sprite-shaped region with an arbitrary fill, masked by sprite alpha.
+// Used for: prey color tiers, mega_shark warm tint over shark sprite,
+// hit-flash white overlay on bosses, damage tinting.
+function drawSpriteTinted(atlas, name, cx, cy, dw, dh, tintFill) {
+  var s = SPRITES_OCEAN[name];
+  if (!atlas.complete || atlas.naturalWidth === 0 || !s || !s.w) return false;
+  TINT_CTX.clearRect(0, 0, TINT_CANVAS.width, TINT_CANVAS.height);
+  TINT_CTX.drawImage(atlas, s.x, s.y, s.w, s.h, 0, 0, dw, dh);
+  TINT_CTX.globalCompositeOperation = 'source-atop';
+  TINT_CTX.fillStyle = tintFill;
+  TINT_CTX.fillRect(0, 0, dw, dh);
+  TINT_CTX.globalCompositeOperation = 'source-over';
+  ctx.drawImage(TINT_CANVAS, 0, 0, dw, dh, cx - dw / 2, cy - dh / 2, dw, dh);
+  return true;
+}
+
+// Apply a flip-past-90° aware translate+rotate around (x, y) so a fish-style
+// sprite drawn facing +x stays right-side-up at any angle. The caller passes
+// the *base* (x, y, angle) and a body to run inside the transform; on return
+// the canvas state is restored.
+function withOrientation(x, y, angle, body) {
+  var ang = angle;
+  while (ang > Math.PI) ang -= 2 * Math.PI;
+  while (ang <= -Math.PI) ang += 2 * Math.PI;
+  ctx.save();
+  ctx.translate(x, y);
+  if (Math.abs(ang) > Math.PI / 2) {
+    ctx.scale(-1, 1);
+    ctx.rotate(Math.PI - ang);
+  } else {
+    ctx.rotate(ang);
+  }
+  body();
+  ctx.restore();
+}
+
+// Boss-death + xlf-prey-eat explosion system. Spawn triggers added in Task 9.
+var explosions = [];
+function spawnExplosion(ex, ey, esize) {
+  explosions.push({ x: ex, y: ey, size: esize, t: 0 });
+}
+function drawExplosions(dt) {
+  for (var i = explosions.length - 1; i >= 0; i--) {
+    var e = explosions[i];
+    e.t += dt;
+    var idx = Math.min(2, Math.floor(e.t / 0.08));
+    // explosion_3 is missing from the atlas — fade explosion_2 instead.
+    var name = idx === 2 ? 'explosion_2' : 'explosion_' + (idx + 1);
+    var alpha = idx === 2 ? Math.max(0, 1 - (e.t - 0.16) / 0.08) : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    drawSpriteCentered(OCEAN_ATLAS, name, e.x, e.y, e.size, e.size);
+    ctx.restore();
+    if (e.t > 0.24) explosions.splice(i, 1);
+  }
+}
+
+// QA mode hotkeys (active only when URL has ?qa=1)
+var QA_MODE = (typeof window !== 'undefined' && window.location && window.location.search.indexOf('qa=1') >= 0);
+if (QA_MODE) {
+  window.addEventListener('keydown', function(ev) {
+    var k = (ev.key || '').toLowerCase();
+    if (k >= '1' && k <= '5') {
+      isSquid = false; isOctopus = false; isLand = false;
+      si = parseInt(k, 10) - 1;
+      phase = 'play'; foods = []; enemies = []; respawnQ = [];
+      spawnFoods(14); spawnEnemies(3); updateHUD();
+    } else if (k === 'q') {
+      isSquid = true; isOctopus = false; si = FISH_STAGES.length - 1;
+      phase = 'squid'; squidEvo = 0; foods = []; enemies = [];
+      spawnFoods(14); spawnEnemies(3); updateHUD();
+    } else if (k === 'w') {
+      isSquid = true; isOctopus = true; si = FISH_STAGES.length - 1;
+      if (typeof startBoss3 === 'function') startBoss3();
+    } else if (k === 'e') {
+      isSquid = false; si = FISH_STAGES.length - 1;
+      phase = 'boss1'; bossHp = BOSS1_MAX;
+      if (typeof initBoss1 === 'function') initBoss1();
+      else if (typeof startBoss1 === 'function') startBoss1();
+    } else if (k === 'r') {
+      isSquid = true; phase = 'boss2';
+      if (typeof startKraken === 'function') startKraken();
+    } else if (k === 't') {
+      isSquid = true; isOctopus = true; phase = 'boss3';
+      if (typeof startBoss3 === 'function') startBoss3();
+    } else if (k === 'h') {
+      if (phase === 'boss1' && boss) bossHp = Math.max(0, bossHp / 2);
+      else if (phase === 'boss2' && kraken) kraken.hp = Math.max(0, kraken.hp / 2);
+      else if (phase === 'boss3' && anglerfish) anglerfish.hp = Math.max(0, anglerfish.hp / 2);
+    } else if (k === 'k') {
+      if (phase === 'boss1' && boss) bossHp = 0;
+      else if (phase === 'boss2' && kraken) kraken.hp = 0;
+      else if (phase === 'boss3' && anglerfish) anglerfish.hp = 0;
+    } else if (k === 'x') {
+      spawnExplosion(pTargetX, pTargetY, 120);
+    }
+  });
+}
+
 // ── State ─────────────────────────────────────────────────────────────────
 var phase, score, lives, si, evoPoints, isSquid, isOctopus, isLand;
 var cloakActive, cloakTimer, cloakCooldown;
@@ -240,7 +412,7 @@ function updateHUD() {
     evoLabel.textContent='🦑 Power up! '+squidEvo+' / '+SQUID.needed;
     evoWrap.style.display='block'; bossWrap.style.display='none';
   } else if (phase==='boss1') {
-    bossLabel.textContent='🤖 OCEAN BOSS';
+    bossLabel.textContent='🤖 ROBOT FISH';
     evoWrap.style.display='none'; bossWrap.style.display='block';
     bossFill.style.width=Math.max(0,(bossHp/BOSS1_MAX)*100)+'%';
   } else if (phase==='boss2') {
@@ -439,6 +611,7 @@ function updFoods(dt) {
     var fdx=f.x-px,fdy=f.y-py,fd=Math.sqrt(fdx*fdx+fdy*fdy);
     if(canEat(f.type)&&fd<ps*.9+f.size*.6){
       f.alive=false; score+=fPt(f.type); evoPoints+=fPt(f.type);
+      if(f.type==='xlf') spawnExplosion(f.x, f.y, f.size * 1.6);
       respawnQ.push(Date.now()+1400);
       if(evoPoints>=FISH_STAGES[si].needed) evolve();
     }
@@ -542,7 +715,7 @@ function startBoss1() {
   phase='boss1'; bossHp=BOSS1_MAX; bossHitCool=0; bossAtkTimer=3; bossPhase2=false;
   boss={x:W*.78,y:H/2,vx:-1.4,vy:0,angle:Math.PI,hitFlash:0,size:88};
   roboFish=[]; tornados=[];
-  showAnnounce('🤖 OCEAN BOSS! Charge into it! 🤖',3000);
+  showAnnounce('🤖 ROBOT FISH! Charge into it! 🤖',3000);
   bossWrap.style.display='block'; updateHUD();
 }
 
@@ -564,6 +737,7 @@ function updBoss1(dt) {
     boss.vx=Math.cos(bdir)*5.5; boss.vy=Math.sin(bdir)*3;
     pvx=Math.cos(bdir+Math.PI)*7; pvy=Math.sin(bdir+Math.PI)*7;
     if(bossHp<=0){
+      spawnExplosion(boss.x, boss.y, boss.size * 2.4);
       boss=null;
       lives=Math.min(MAX_LIVES,lives+2);
       showAnnounce('🎉 BOSS BEATEN!\n🦑 You became a SQUID!! +2❤️',4200);
@@ -702,7 +876,7 @@ function updKraken(dt) {
     var kdir=Math.atan2(kraken.y-py,kraken.x-px);
     kraken.vx=Math.cos(kdir)*4; kraken.vy=Math.sin(kdir)*2.5;
     pvx=Math.cos(kdir+Math.PI)*8; pvy=Math.sin(kdir+Math.PI)*8;
-    if(kraken.hp<=0){ showChoiceScreen(); return; }
+    if(kraken.hp<=0){ spawnExplosion(kraken.x, kraken.y, kraken.size * 2.4); showChoiceScreen(); return; }
     if(!krakenPhase2&&kraken.hp<=Math.ceil(BOSS2_MAX/2)){
       krakenPhase2=true;
       showAnnounce('🐙 KRAKEN ENRAGED!! 🐙',2000);
@@ -807,6 +981,7 @@ function updAnglerfish(dt) {
     af.vx=Math.cos(adir)*3.5; af.vy=Math.sin(adir)*2;
     pvx=Math.cos(adir+Math.PI)*7; pvy=Math.sin(adir+Math.PI)*7;
     if(af.hp<=0){
+      spawnExplosion(af.x, af.y, af.size * 2.4);
       anglerfish=null;
       winTitle.textContent='🎣 ANGLERFISH DEFEATED!! 🎣';
       winMsg.textContent='You conquered the deep sea!!\nNothing can stop you!! 🦑🌊';
@@ -873,6 +1048,7 @@ function draw() {
     else if(phase==='boss2'){ drawKraken(); drawKFishPiles(); drawRobos(); drawInkClouds(); }
     else if(phase==='boss3'){ drawAnglerfish(); drawLightbulbs(); drawInkClouds(); }
     if(fakeRobotDecoy&&fakeRobotDecoy.alive) drawFakeRobotDecoy();
+    drawExplosions(_lastDt);
     drawPlayer();
   }
 }
@@ -903,10 +1079,21 @@ function drawBg() {
 function drawFoods() {
   for(var fi=0;fi<foods.length;fi++){
     var f=foods[fi]; if(!f.alive) continue;
-    if(f.type==='plankton') drawPlankton(f.x,f.y,f.size,f.wobble);
-    else{
-      var fc={sf:'#ffee58',mf:'#ffa726',lf:'#ef5350',xlf:'#ab47bc'}[f.type]||'#ffee58';
-      drawSmallFish(f.x,f.y,f.size,fc,Math.atan2(f.vy||0,f.vx||0.1));
+    if(f.type==='plankton'){
+      var pdw = f.size * 2.6, pdh = f.size * 2.6;
+      var ok = drawSpriteCentered(OCEAN_ATLAS, 'plankton', f.x, f.y, pdw, pdh);
+      if (!ok) drawPlankton(f.x,f.y,f.size,f.wobble);
+    } else {
+      var ang = Math.atan2(f.vy||0, f.vx||0.1);
+      var fdw = f.size * 2.4, fdh = f.size * 1.6;
+      var drew = false;
+      withOrientation(f.x, f.y, ang, function() {
+        drew = drawSpriteCentered(OCEAN_ATLAS, 'small_fish_base', 0, 0, fdw, fdh);
+      });
+      if (!drew) {
+        var fc={sf:'#ffee58',mf:'#ffa726',lf:'#ef5350',xlf:'#ab47bc'}[f.type]||'#ffee58';
+        drawSmallFish(f.x,f.y,f.size,fc,ang);
+      }
     }
   }
 }
@@ -917,9 +1104,21 @@ function drawEnemies() {
     var e=enemies[ei]; if(!e.alive) continue;
     ctx.save(); if(e.stunned>0) ctx.globalAlpha=0.45;
     if(e.isPred){
-      drawRedFish(e.x,e.y,e.size,Math.atan2(py-e.y,px-e.x),e.size>ps*1.5);
+      var pang = Math.atan2(py-e.y, px-e.x);
+      var pdw = e.size * 2.4, pdh = e.size * 1.6;
+      var drew = false;
+      withOrientation(e.x, e.y, pang, function() {
+        drew = drawSpriteCentered(OCEAN_ATLAS, 'red_predator', 0, 0, pdw, pdh);
+      });
+      if (!drew) drawRedFish(e.x,e.y,e.size,pang,e.size>ps*1.5);
     } else {
-      drawSmallFish(e.x,e.y,e.size,e.color,Math.atan2(e.vy||0,e.vx||0.1));
+      var ang = Math.atan2(e.vy||0, e.vx||0.1);
+      var edw = e.size * 2.4, edh = e.size * 1.6;
+      var drew2 = false;
+      withOrientation(e.x, e.y, ang, function() {
+        drew2 = drawSpriteCentered(OCEAN_ATLAS, 'small_fish_base', 0, 0, edw, edh);
+      });
+      if (!drew2) drawSmallFish(e.x,e.y,e.size,e.color,ang);
     }
     ctx.restore();
   }
@@ -928,15 +1127,37 @@ function drawEnemies() {
 function drawPlayer() {
   var inv=invTimer>0&&(Math.floor(invTimer*8)%2===0);
   if(inv) return;
-  ctx.save();ctx.translate(px,py);ctx.rotate(pAngle);
-  if(cloakActive) ctx.globalAlpha=0.22;
-  if(isOctopus){ drawSquid(SQUID.size,OCTOPUS_COLOR); }
-  else if(isSquid){ drawSquid(SQUID.size,SQUID.color); }
-  else if(si===0){ drawFishBody(FISH_STAGES[si].size,FISH_STAGES[si].color,'#1565c0'); }
-  else if(si<=2){ drawShark(FISH_STAGES[si].size,FISH_STAGES[si].color); }
-  else if(si===3){ drawOrca(FISH_STAGES[si].size); }
-  else { drawWhale(FISH_STAGES[si].size,FISH_STAGES[si].color); }
-  ctx.restore();
+
+  var psize = isSquid ? SQUID.size : FISH_STAGES[si].size;
+  var dw, dh;
+  if (isSquid || isOctopus) {
+    dw = psize * 2.0; dh = psize * 2.0;
+  } else {
+    dw = psize * 2.4; dh = psize * 1.6;
+  }
+
+  withOrientation(px, py, pAngle, function() {
+    if (cloakActive) ctx.globalAlpha = 0.22;
+
+    var spriteName;
+    if (isOctopus) spriteName = 'octopus';
+    else if (isSquid) spriteName = 'squid';
+    else spriteName = ['tiny_fish','shark','mega_shark','orca','blue_whale'][si];
+
+    // mega_shark sprite is missing — render the plain shark sprite at the
+    // larger FISH_STAGES[2] size; the size alone differentiates the stage.
+    var renderName = spriteName === 'mega_shark' ? 'shark' : spriteName;
+    var ok = drawSpriteRel(OCEAN_ATLAS, renderName, renderName, 0, 0, dw, dh);
+
+    if (!ok) {
+      if(isOctopus){ drawSquid(SQUID.size,OCTOPUS_COLOR); }
+      else if(isSquid){ drawSquid(SQUID.size,SQUID.color); }
+      else if(si===0){ drawFishBody(FISH_STAGES[si].size,FISH_STAGES[si].color,'#1565c0'); }
+      else if(si<=2){ drawShark(FISH_STAGES[si].size,FISH_STAGES[si].color); }
+      else if(si===3){ drawOrca(FISH_STAGES[si].size); }
+      else { drawWhale(FISH_STAGES[si].size,FISH_STAGES[si].color); }
+    }
+  });
   if(cloakActive){
     ctx.save();
     ctx.globalAlpha=0.22+0.14*Math.sin(Date.now()/150);
@@ -962,28 +1183,44 @@ function drawAnglerfish() {
   if(!anglerfish) return;
   var af=anglerfish, flash=af.hitFlash>0;
   ctx.save(); ctx.translate(af.x,af.y);
+
+  // Outer green-glow halo (procedural)
   var glow=ctx.createRadialGradient(0,0,af.size*.4,0,0,af.size*1.6);
   glow.addColorStop(0,'rgba(0,60,20,.3)'); glow.addColorStop(1,'rgba(0,60,20,0)');
   ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0,af.size*1.6,0,Math.PI*2); ctx.fill();
-  // Tail
-  ctx.fillStyle=flash?'#ccc':'#0d3018';
-  ctx.beginPath(); ctx.moveTo(-af.size*.75,0); ctx.lineTo(-af.size*1.22,-af.size*.58); ctx.lineTo(-af.size*1.22,af.size*.58); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle='#000';ctx.lineWidth=af.size*.08;ctx.lineJoin='round';ctx.stroke();
-  // Body
-  ctx.fillStyle=flash?'#fff':'#0a2010';
-  ctx.beginPath(); ctx.ellipse(0,0,af.size,af.size*.55,0,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle='#000';ctx.lineWidth=af.size*.09;ctx.lineJoin='round';ctx.stroke();
-  // Dorsal spines
-  ctx.fillStyle=flash?'#eee':'#1a4020';
-  ctx.beginPath();
-  for(var fi2=0;fi2<5;fi2++){var fx=af.size*.2+fi2*af.size*.14;ctx.moveTo(fx,-af.size*.55);ctx.lineTo(fx+af.size*.05,-af.size*.8);ctx.lineTo(fx+af.size*.1,-af.size*.55);}
-  ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=af.size*.06;ctx.lineJoin='round';ctx.stroke();
-  // Lure rod
+
+  // Body: sprite-first, procedural fallback
+  var hpFrac = af.hp / BOSS3_MAX;
+  var spriteName = hpFrac < 0.5 ? 'boss_anglerfish_dmg' : 'boss_anglerfish';
+  var dw = af.size * 2.6, dh = af.size * 1.7;
+
+  var ok;
+  if (flash) {
+    ok = drawSpriteTinted(OCEAN_ATLAS, spriteName, 0, 0, dw, dh, 'rgba(255,255,255,0.85)');
+  } else {
+    ok = drawSpriteCentered(OCEAN_ATLAS, spriteName, 0, 0, dw, dh);
+  }
+
+  if (!ok) {
+    // Procedural fallback: tail + body + dorsal spines + eye (no lure — drawn next regardless)
+    ctx.fillStyle=flash?'#ccc':'#0d3018';
+    ctx.beginPath(); ctx.moveTo(-af.size*.75,0); ctx.lineTo(-af.size*1.22,-af.size*.58); ctx.lineTo(-af.size*1.22,af.size*.58); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#000';ctx.lineWidth=af.size*.08;ctx.lineJoin='round';ctx.stroke();
+    ctx.fillStyle=flash?'#fff':'#0a2010';
+    ctx.beginPath(); ctx.ellipse(0,0,af.size,af.size*.55,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#000';ctx.lineWidth=af.size*.09;ctx.lineJoin='round';ctx.stroke();
+    ctx.fillStyle=flash?'#eee':'#1a4020';
+    ctx.beginPath();
+    for(var fi2=0;fi2<5;fi2++){var fx=af.size*.2+fi2*af.size*.14;ctx.moveTo(fx,-af.size*.55);ctx.lineTo(fx+af.size*.05,-af.size*.8);ctx.lineTo(fx+af.size*.1,-af.size*.55);}
+    ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=af.size*.06;ctx.lineJoin='round';ctx.stroke();
+    cEye(af.size*.42,-af.size*.1,af.size*.18,'#001500');
+  }
+
+  // Lure: rod + glow + bulb (procedural — must stay so it sweeps and pulses)
   var lx=af.size*.5+Math.cos(af.lureAngle)*af.size*.35;
   var ly=-af.size*.7+Math.sin(af.lureAngle)*af.size*.2;
   ctx.strokeStyle=flash?'#aaa':'#2a6030'; ctx.lineWidth=5; ctx.lineCap='round';
   ctx.beginPath(); ctx.moveTo(af.size*.3,-af.size*.4); ctx.lineTo(lx,ly); ctx.stroke();
-  // Lure glow
   var lp=0.6+Math.sin(af.lurePulse)*0.4;
   var lg=ctx.createRadialGradient(lx,ly,0,lx,ly,24);
   lg.addColorStop(0,'rgba(255,255,150,'+lp+')'); lg.addColorStop(1,'rgba(255,220,0,0)');
@@ -991,8 +1228,7 @@ function drawAnglerfish() {
   ctx.fillStyle='#ffe000'; ctx.beginPath(); ctx.arc(lx,ly,9,0,Math.PI*2); ctx.fill();
   ctx.strokeStyle='#000';ctx.lineWidth=2.5;ctx.stroke();
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(lx-3,ly-3,3.5,0,Math.PI*2);ctx.fill();
-  // Eye (scary big)
-  cEye(af.size*.42,-af.size*.1,af.size*.18,'#001500');
+
   ctx.restore();
 }
 
@@ -1203,30 +1439,50 @@ function drawRedFish(x,y,sz,ang,big) {
 
 function drawBoss1() {
   if(!boss) return;
-  var bs=boss.size,flash=boss.hitFlash>0;
-  ctx.save();ctx.translate(boss.x,boss.y);ctx.rotate(boss.angle);
+  var bs=boss.size, flash=boss.hitFlash>0;
+
+  // Outer warm-glow halo (rotation-invariant; drawn outside withOrientation)
+  ctx.save(); ctx.translate(boss.x, boss.y);
   var glow=ctx.createRadialGradient(0,0,bs*.5,0,0,bs*1.5);
-  glow.addColorStop(0,'rgba(255,100,0,.22)');glow.addColorStop(1,'rgba(255,100,0,0)');
-  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,bs*1.5,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle=flash?'#fff':'#37474f';
-  ctx.beginPath();ctx.ellipse(0,0,bs,bs*.48,0,0,Math.PI*2);ctx.fill();
-  ctx.strokeStyle=flash?'#ccc':'#546e7a';ctx.lineWidth=3;
-  for(var p=-2;p<=2;p++){ctx.beginPath();ctx.moveTo(p*bs*.25,-bs*.48);ctx.lineTo(p*bs*.25,bs*.48);ctx.stroke();}
-  ctx.fillStyle=flash?'#eee':'#455a64';
-  ctx.beginPath();ctx.moveTo(bs*.12,-bs*.48);ctx.lineTo(bs*.38,-bs*.95);ctx.lineTo(bs*.62,-bs*.48);ctx.closePath();ctx.fill();
-  ctx.beginPath();ctx.moveTo(bs*.12,bs*.48);ctx.lineTo(bs*.3,bs*.88);ctx.lineTo(bs*.52,bs*.48);ctx.closePath();ctx.fill();
-  ctx.fillStyle=flash?'#eee':'#2e3b40';
-  ctx.fillRect(bs*.28,-bs*.2,bs*.46,bs*.12);ctx.fillRect(bs*.28,bs*.08,bs*.46,bs*.12);
-  var pulse=0.65+Math.sin(Date.now()/180)*.35;
-  ctx.fillStyle=flash?'#fff':'rgba(255,60,60,'+pulse+')';
-  ctx.beginPath();ctx.arc(bs*.5,0,bs*.22,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bs*.5,0,bs*.1,0,Math.PI*2);ctx.fill();
+  glow.addColorStop(0,'rgba(255,100,0,.22)'); glow.addColorStop(1,'rgba(255,100,0,0)');
+  ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0,bs*1.5,0,Math.PI*2); ctx.fill();
   ctx.restore();
+
+  var hpFrac = bossHp / BOSS1_MAX;
+  var spriteName = hpFrac < 0.5 ? 'boss_robot_dmg' : 'boss_robot';
+  var dw = bs * 2.4, dh = bs * 1.6;
+
+  var drew = false;
+  withOrientation(boss.x, boss.y, boss.angle, function() {
+    if (flash) {
+      drew = drawSpriteTinted(OCEAN_ATLAS, spriteName, 0, 0, dw, dh, 'rgba(255,255,255,0.85)');
+    } else {
+      drew = drawSpriteCentered(OCEAN_ATLAS, spriteName, 0, 0, dw, dh);
+    }
+    if (!drew) {
+      // Procedural fallback — original boss1 body shapes
+      ctx.fillStyle=flash?'#fff':'#37474f';
+      ctx.beginPath();ctx.ellipse(0,0,bs,bs*.48,0,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=flash?'#ccc':'#546e7a';ctx.lineWidth=3;
+      for(var p=-2;p<=2;p++){ctx.beginPath();ctx.moveTo(p*bs*.25,-bs*.48);ctx.lineTo(p*bs*.25,bs*.48);ctx.stroke();}
+      ctx.fillStyle=flash?'#eee':'#455a64';
+      ctx.beginPath();ctx.moveTo(bs*.12,-bs*.48);ctx.lineTo(bs*.38,-bs*.95);ctx.lineTo(bs*.62,-bs*.48);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(bs*.12,bs*.48);ctx.lineTo(bs*.3,bs*.88);ctx.lineTo(bs*.52,bs*.48);ctx.closePath();ctx.fill();
+      ctx.fillStyle=flash?'#eee':'#2e3b40';
+      ctx.fillRect(bs*.28,-bs*.2,bs*.46,bs*.12); ctx.fillRect(bs*.28,bs*.08,bs*.46,bs*.12);
+      var pulse=0.65+Math.sin(Date.now()/180)*.35;
+      ctx.fillStyle=flash?'#fff':'rgba(255,60,60,'+pulse+')';
+      ctx.beginPath();ctx.arc(bs*.5,0,bs*.22,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bs*.5,0,bs*.1,0,Math.PI*2);ctx.fill();
+    }
+  });
 }
 
 function drawKraken() {
   if(!kraken) return;
   var ks=kraken.size,flash=kraken.hitFlash>0;
+
+  // Tentacles (procedural — UNCHANGED from existing code)
   for(var ai=0;ai<kraken.arms.length;ai++){
     var arm=kraken.arms[ai]; if(arm.ext<0.02) continue;
     var tipX=kraken.x+Math.cos(arm.angle)*arm.length*arm.ext;
@@ -1245,26 +1501,46 @@ function drawKraken() {
       ctx.beginPath();ctx.arc(kraken.x+(tipX-kraken.x)*st,kraken.y+(tipY-kraken.y)*st,3.5,0,Math.PI*2);ctx.fill();
     }
   }
-  ctx.save();ctx.translate(kraken.x,kraken.y);
+
+  // Head: sprite-first, procedural fallback
+  ctx.save(); ctx.translate(kraken.x, kraken.y);
+
+  // Outer purple halo (procedural — runs regardless of sprite path)
   var kg=ctx.createRadialGradient(0,0,ks*.3,0,0,ks*1.4);
-  kg.addColorStop(0,'rgba(120,0,180,.35)');kg.addColorStop(1,'rgba(60,0,100,0)');
-  ctx.fillStyle=kg;ctx.beginPath();ctx.arc(0,0,ks*1.4,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle=flash?'#fff':(krakenPhase2?'#880e4f':'#4a148c');
-  ctx.beginPath();ctx.arc(0,0,ks,0,Math.PI*2);ctx.fill();
-  ctx.strokeStyle=flash?'#fff':'#7b1fa2'; ctx.lineWidth=2.5;
-  ctx.beginPath();ctx.arc(0,0,ks*.7,0,Math.PI*2);ctx.stroke();
-  ctx.beginPath();ctx.arc(0,0,ks*.42,0,Math.PI*2);ctx.stroke();
-  ctx.fillStyle=flash?'#ffca28':'#ff6d00';
-  ctx.beginPath();ctx.arc(-ks*.27,-ks*.16,ks*.2,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(ks*.27,-ks*.16,ks*.2,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#000';
-  ctx.beginPath();ctx.arc(-ks*.27,-ks*.16,ks*.1,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(ks*.27,-ks*.16,ks*.1,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#fff';
-  ctx.beginPath();ctx.arc(-ks*.2,-ks*.2,ks*.042,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(ks*.32,-ks*.2,ks*.042,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#12002a';
-  ctx.beginPath();ctx.moveTo(-ks*.09,ks*.1);ctx.lineTo(0,ks*.28);ctx.lineTo(ks*.09,ks*.1);ctx.closePath();ctx.fill();
+  kg.addColorStop(0,'rgba(120,0,180,.35)'); kg.addColorStop(1,'rgba(60,0,100,0)');
+  ctx.fillStyle=kg; ctx.beginPath(); ctx.arc(0,0,ks*1.4,0,Math.PI*2); ctx.fill();
+
+  var hpFrac = kraken.hp / BOSS2_MAX;
+  var spriteName = hpFrac < 0.5 ? 'boss_kraken_dmg' : 'boss_kraken';
+  var dw = ks * 2.2, dh = ks * 2.2;
+
+  var ok;
+  if (flash) {
+    ok = drawSpriteTinted(OCEAN_ATLAS, spriteName, 0, 0, dw, dh, 'rgba(255,255,255,0.85)');
+  } else {
+    ok = drawSpriteCentered(OCEAN_ATLAS, spriteName, 0, 0, dw, dh);
+  }
+
+  if (!ok) {
+    // Procedural head fallback (kraken head body + features — halo above runs anyway)
+    ctx.fillStyle=flash?'#fff':(krakenPhase2?'#880e4f':'#4a148c');
+    ctx.beginPath();ctx.arc(0,0,ks,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=flash?'#fff':'#7b1fa2'; ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(0,0,ks*.7,0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.arc(0,0,ks*.42,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle=flash?'#ffca28':'#ff6d00';
+    ctx.beginPath();ctx.arc(-ks*.27,-ks*.16,ks*.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ks*.27,-ks*.16,ks*.2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#000';
+    ctx.beginPath();ctx.arc(-ks*.27,-ks*.16,ks*.1,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ks*.27,-ks*.16,ks*.1,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(-ks*.2,-ks*.2,ks*.042,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ks*.32,-ks*.2,ks*.042,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#12002a';
+    ctx.beginPath();ctx.moveTo(-ks*.09,ks*.1);ctx.lineTo(0,ks*.28);ctx.lineTo(ks*.09,ks*.1);ctx.closePath();ctx.fill();
+  }
+
   ctx.restore();
 }
 
@@ -1298,10 +1574,12 @@ function drawKFishPiles() {
 function drawInkClouds() {
   for(var ci=0;ci<inkClouds.length;ci++){
     var ic=inkClouds[ci]; if(!ic.alive) continue;
-    var a=Math.min(1,ic.life/1.5)*.55;
+    var a=Math.min(1,ic.life/1.5)*.92;
     var ig=ctx.createRadialGradient(ic.x,ic.y,0,ic.x,ic.y,ic.r);
-    ig.addColorStop(0,'rgba(70,0,110,'+a+')');
-    ig.addColorStop(1,'rgba(20,0,50,0)');
+    ig.addColorStop(0,'rgba(20,0,40,'+a+')');
+    ig.addColorStop(0.35,'rgba(60,10,120,'+(a*0.85)+')');
+    ig.addColorStop(0.75,'rgba(80,20,140,'+(a*0.5)+')');
+    ig.addColorStop(1,'rgba(40,5,90,0)');
     ctx.fillStyle=ig; ctx.beginPath();ctx.arc(ic.x,ic.y,ic.r,0,Math.PI*2);ctx.fill();
   }
 }
@@ -1310,24 +1588,30 @@ function drawRobos() {
   for(var ri=0;ri<roboFish.length;ri++){
     var rf=roboFish[ri]; if(!rf.alive) continue;
     ctx.save(); if(rf.stunned>0) ctx.globalAlpha=0.4;
-    ctx.translate(rf.x,rf.y);ctx.rotate(Math.atan2(rf.vy,rf.vx));
-    // Tail
-    ctx.fillStyle='#78909c';
-    ctx.beginPath();ctx.moveTo(-rf.size*.7,0);ctx.lineTo(-rf.size*1.12,-rf.size*.47);ctx.lineTo(-rf.size*1.12,rf.size*.47);ctx.closePath();ctx.fill();cOutline(rf.size*.1);
-    // Body
-    ctx.fillStyle='#78909c';
-    ctx.beginPath();ctx.ellipse(0,0,rf.size,rf.size*.5,0,0,Math.PI*2);ctx.fill();cOutline(rf.size*.1);
-    // Panel lines
-    ctx.strokeStyle='#546e7a';ctx.lineWidth=1.8;ctx.lineCap='round';
-    ctx.beginPath();ctx.moveTo(-rf.size*.2,-rf.size*.45);ctx.lineTo(-rf.size*.2,rf.size*.45);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(rf.size*.15,-rf.size*.45);ctx.lineTo(rf.size*.15,rf.size*.45);ctx.stroke();
-    // Antenna
-    ctx.strokeStyle='#cfd8dc';ctx.lineWidth=2.5;
-    ctx.beginPath();ctx.moveTo(rf.size*.6,-rf.size*.5);ctx.lineTo(rf.size*.74,-rf.size*.96);ctx.stroke();
-    ctx.fillStyle='#ffeb3b';ctx.beginPath();ctx.arc(rf.size*.74,-rf.size*.96,5,0,Math.PI*2);ctx.fill();cOutline(2);
-    // Glowing red eye
-    ctx.fillStyle='#ff1744';ctx.beginPath();ctx.arc(rf.size*.44,0,rf.size*.24,0,Math.PI*2);ctx.fill();cOutline(rf.size*.08);
-    ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(rf.size*.36,-rf.size*.07,rf.size*.1,0,Math.PI*2);ctx.fill();
+    var rang = Math.atan2(rf.vy, rf.vx);
+    var rdw = rf.size * 2.4, rdh = rf.size * 1.6;
+    var drew = false;
+    withOrientation(rf.x, rf.y, rang, function() {
+      drew = drawSpriteCentered(OCEAN_ATLAS, 'robo_fish', 0, 0, rdw, rdh);
+    });
+    if (!drew) {
+      // Procedural fallback (original body — byte-for-byte from pre-edit code,
+      // but wrapped in our own translate+rotate since we're outside withOrientation)
+      ctx.save(); ctx.translate(rf.x, rf.y); ctx.rotate(rang);
+      ctx.fillStyle='#78909c';
+      ctx.beginPath();ctx.moveTo(-rf.size*.7,0);ctx.lineTo(-rf.size*1.12,-rf.size*.47);ctx.lineTo(-rf.size*1.12,rf.size*.47);ctx.closePath();ctx.fill();cOutline(rf.size*.1);
+      ctx.fillStyle='#78909c';
+      ctx.beginPath();ctx.ellipse(0,0,rf.size,rf.size*.5,0,0,Math.PI*2);ctx.fill();cOutline(rf.size*.1);
+      ctx.strokeStyle='#546e7a';ctx.lineWidth=1.8;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(-rf.size*.2,-rf.size*.45);ctx.lineTo(-rf.size*.2,rf.size*.45);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(rf.size*.15,-rf.size*.45);ctx.lineTo(rf.size*.15,rf.size*.45);ctx.stroke();
+      ctx.strokeStyle='#cfd8dc';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.moveTo(rf.size*.6,-rf.size*.5);ctx.lineTo(rf.size*.74,-rf.size*.96);ctx.stroke();
+      ctx.fillStyle='#ffeb3b';ctx.beginPath();ctx.arc(rf.size*.74,-rf.size*.96,5,0,Math.PI*2);ctx.fill();cOutline(2);
+      ctx.fillStyle='#ff1744';ctx.beginPath();ctx.arc(rf.size*.44,0,rf.size*.24,0,Math.PI*2);ctx.fill();cOutline(rf.size*.08);
+      ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(rf.size*.36,-rf.size*.07,rf.size*.1,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    }
     ctx.restore();
   }
 }
@@ -1370,17 +1654,24 @@ function updCoins(dt) {
 function drawCoinPickups() {
   for(var ci=0;ci<coinPickups.length;ci++){
     var c=coinPickups[ci]; if(!c.alive) continue;
-    ctx.save();
-    ctx.translate(c.x+Math.sin(c.wobble)*2,c.y+Math.cos(c.wobble*.7)*1.5);
-    ctx.globalAlpha=0.45; ctx.fillStyle='#ffd700';
-    ctx.beginPath();ctx.arc(0,0,c.r*2,0,Math.PI*2);ctx.fill();
-    ctx.globalAlpha=1;
-    ctx.fillStyle='#ffd700';
-    ctx.beginPath();ctx.arc(0,0,c.r,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#b8860b';ctx.lineWidth=2;ctx.stroke();
-    ctx.fillStyle='#7a5000';ctx.font='bold '+Math.round(c.r*1.3)+'px Arial';
-    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('$',0,1);
-    ctx.restore();
+    var cx = c.x + Math.sin(c.wobble) * 2;
+    var cy = c.y + Math.cos(c.wobble*.7) * 1.5;
+    var dw = c.r * 3.2, dh = c.r * 3.2;
+    var ok = drawSpriteCentered(OCEAN_ATLAS, 'coin', cx, cy, dw, dh);
+    if (!ok) {
+      // Procedural fallback (original — byte-for-byte from the pre-edit code)
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.globalAlpha=0.45; ctx.fillStyle='#ffd700';
+      ctx.beginPath();ctx.arc(0,0,c.r*2,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.fillStyle='#ffd700';
+      ctx.beginPath();ctx.arc(0,0,c.r,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#b8860b';ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle='#7a5000';ctx.font='bold '+Math.round(c.r*1.3)+'px Arial';
+      ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('$',0,1);
+      ctx.restore();
+    }
   }
 }
 
@@ -1405,24 +1696,37 @@ function updFakeRobotDecoy(dt) {
 function drawFakeRobotDecoy() {
   var rf=fakeRobotDecoy; if(!rf||!rf.alive) return;
   var sz=rf.size;
-  ctx.save();ctx.translate(rf.x,rf.y);ctx.rotate(Math.atan2(rf.vy||0,rf.vx||0.01));
+  var ang=Math.atan2(rf.vy||0,rf.vx||0.01);
+
+  // Cyan glow halo (rotation-invariant friendly-decoy indicator)
+  ctx.save(); ctx.translate(rf.x, rf.y);
   var sp=0.5+Math.sin(Date.now()/280)*.5;
   ctx.globalAlpha=sp*.4; ctx.fillStyle='#00e5ff';
   ctx.beginPath();ctx.arc(0,0,sz*1.7,0,Math.PI*2);ctx.fill();
-  ctx.globalAlpha=1;
-  ctx.fillStyle='#4dd0e1';
-  ctx.beginPath();ctx.moveTo(-sz*.7,0);ctx.lineTo(-sz*1.12,-sz*.47);ctx.lineTo(-sz*1.12,sz*.47);ctx.closePath();ctx.fill();cOutline(sz*.1);
-  ctx.fillStyle='#4dd0e1';
-  ctx.beginPath();ctx.ellipse(0,0,sz,sz*.5,0,0,Math.PI*2);ctx.fill();cOutline(sz*.1);
-  ctx.strokeStyle='#00acc1';ctx.lineWidth=1.8;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(-sz*.2,-sz*.45);ctx.lineTo(-sz*.2,sz*.45);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(sz*.15,-sz*.45);ctx.lineTo(sz*.15,sz*.45);ctx.stroke();
-  ctx.strokeStyle='#e0f7fa';ctx.lineWidth=2.5;
-  ctx.beginPath();ctx.moveTo(sz*.6,-sz*.5);ctx.lineTo(sz*.74,-sz*.96);ctx.stroke();
-  ctx.fillStyle='#ffd700';ctx.beginPath();ctx.arc(sz*.74,-sz*.96,5,0,Math.PI*2);ctx.fill();cOutline(2);
-  ctx.fillStyle='#00e5ff';ctx.beginPath();ctx.arc(sz*.44,0,sz*.24,0,Math.PI*2);ctx.fill();cOutline(sz*.08);
-  ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(sz*.36,-sz*.07,sz*.1,0,Math.PI*2);ctx.fill();
   ctx.restore();
+
+  var dw=sz*2.4, dh=sz*1.6;
+  var drew=false;
+  withOrientation(rf.x, rf.y, ang, function() {
+    drew = drawSpriteCentered(OCEAN_ATLAS, 'robo_fish', 0, 0, dw, dh);
+  });
+  if (!drew) {
+    // Procedural fallback (cyan body — original drawing)
+    ctx.save(); ctx.translate(rf.x,rf.y); ctx.rotate(ang);
+    ctx.fillStyle='#4dd0e1';
+    ctx.beginPath();ctx.moveTo(-sz*.7,0);ctx.lineTo(-sz*1.12,-sz*.47);ctx.lineTo(-sz*1.12,sz*.47);ctx.closePath();ctx.fill();cOutline(sz*.1);
+    ctx.fillStyle='#4dd0e1';
+    ctx.beginPath();ctx.ellipse(0,0,sz,sz*.5,0,0,Math.PI*2);ctx.fill();cOutline(sz*.1);
+    ctx.strokeStyle='#00acc1';ctx.lineWidth=1.8;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(-sz*.2,-sz*.45);ctx.lineTo(-sz*.2,sz*.45);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(sz*.15,-sz*.45);ctx.lineTo(sz*.15,sz*.45);ctx.stroke();
+    ctx.strokeStyle='#e0f7fa';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(sz*.6,-sz*.5);ctx.lineTo(sz*.74,-sz*.96);ctx.stroke();
+    ctx.fillStyle='#ffd700';ctx.beginPath();ctx.arc(sz*.74,-sz*.96,5,0,Math.PI*2);ctx.fill();cOutline(2);
+    ctx.fillStyle='#00e5ff';ctx.beginPath();ctx.arc(sz*.44,0,sz*.24,0,Math.PI*2);ctx.fill();cOutline(sz*.08);
+    ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(sz*.36,-sz*.07,sz*.1,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
 }
 
 // ── Land World ────────────────────────────────────────────────────────────
@@ -1788,8 +2092,10 @@ function buyFakeRobot() {
 }
 
 // ── Loop ──────────────────────────────────────────────────────────────────
+var _lastDt = 0.016;
 function loop(ts) {
   var dt=Math.min((ts-lastTs)/1000,0.05); lastTs=ts;
+  _lastDt = dt;
   if(phase!=='win'&&phase!=='choice'&&!shopOpen) update(dt);
   draw();
   requestAnimationFrame(loop);
